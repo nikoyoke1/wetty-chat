@@ -370,11 +370,13 @@ pub struct CreateMessageBody {
         deserialize_with = "crate::serde_i64_string::opt::deserialize"
     )]
     reply_to_id: Option<i64>,
-    #[serde(
-        default,
-        deserialize_with = "crate::serde_i64_string::opt::deserialize"
-    )]
-    reply_root_id: Option<i64>,
+}
+
+#[derive(serde::Deserialize)]
+pub struct ThreadIdPath {
+    chat_id: i64,
+    #[serde(deserialize_with = "crate::serde_i64_string::deserialize")]
+    thread_id: i64,
 }
 
 /// POST /chats/:chat_id/messages — Send a message.
@@ -407,7 +409,7 @@ pub async fn post_message(
         message: body.message,
         message_type: body.message_type,
         reply_to_id: body.reply_to_id,
-        reply_root_id: body.reply_root_id,
+        reply_root_id: None,
         created_at: now,
         client_generated_id: body.client_generated_id,
         sender_uid: uid,
@@ -503,6 +505,150 @@ pub async fn post_message(
             })) {
                 state.ws_registry.broadcast_to_uids(&member_uids, &ws_json);
             }
+        }
+    }
+
+    Ok((StatusCode::CREATED, Json(response)))
+}
+
+/// POST /chats/:chat_id/threads/:thread_id/messages — Send a message in a thread.
+pub async fn post_thread_message(
+    CurrentUid(uid): CurrentUid,
+    State(state): State<AppState>,
+    Path(ThreadIdPath { chat_id, thread_id }): Path<ThreadIdPath>,
+    Json(body): Json<CreateMessageBody>,
+) -> Result<impl IntoResponse, (StatusCode, &'static str)> {
+    let conn = &mut state.db.get().map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Database connection failed",
+        )
+    })?;
+
+    check_membership(conn, chat_id, uid)?;
+
+    // Fast-path: check if root message actually exists
+    use crate::schema::messages::dsl;
+    let root_msg_exists: bool = diesel::select(diesel::dsl::exists(
+        messages::table.filter(dsl::id.eq(thread_id).and(dsl::chat_id.eq(chat_id))),
+    ))
+    .get_result(conn)
+    .map_err(|e| {
+        tracing::error!("check root message exists: {:?}", e);
+        (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+    })?;
+
+    if !root_msg_exists {
+        return Err((StatusCode::NOT_FOUND, "Thread root message not found"));
+    }
+
+    let id = ids::next_message_id(state.id_gen.as_ref())
+        .await
+        .map_err(|e| {
+            tracing::error!("ferroid next_message_id: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "ID generation failed")
+        })?;
+
+    let now = Utc::now();
+
+    let new_msg = NewMessage {
+        id,
+        message: body.message,
+        message_type: body.message_type,
+        reply_to_id: body.reply_to_id,
+        reply_root_id: Some(thread_id),
+        created_at: now,
+        client_generated_id: body.client_generated_id,
+        sender_uid: uid,
+        chat_id,
+        updated_at: None,
+        deleted_at: None,
+        has_attachments: false,
+        has_thread: false,
+    };
+
+    diesel::insert_into(messages::table)
+        .values(&new_msg)
+        .execute(conn)
+        .map_err(|e| {
+            tracing::error!("insert threaded message: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to send message")
+        })?;
+
+    // Fetch reply_to_message if exists
+    let reply_to_message = if let Some(reply_id) = new_msg.reply_to_id {
+        messages::table
+            .filter(dsl::id.eq(reply_id))
+            .select(Message::as_select())
+            .first(conn)
+            .ok()
+            .map(|reply_msg: Message| {
+                Box::new(ReplyToMessage {
+                    id: reply_msg.id,
+                    message: if reply_msg.deleted_at.is_some() {
+                        None
+                    } else {
+                        reply_msg.message
+                    },
+                    sender_uid: reply_msg.sender_uid,
+                    is_deleted: reply_msg.deleted_at.is_some(),
+                })
+            })
+    } else {
+        None
+    };
+
+    let response = MessageResponse {
+        id: new_msg.id,
+        message: if new_msg.deleted_at.is_some() {
+            None
+        } else {
+            new_msg.message
+        },
+        message_type: new_msg.message_type,
+        reply_to_id: new_msg.reply_to_id,
+        reply_root_id: new_msg.reply_root_id,
+        client_generated_id: new_msg.client_generated_id,
+        sender_uid: new_msg.sender_uid,
+        chat_id: new_msg.chat_id,
+        created_at: new_msg.created_at,
+        is_edited: new_msg.updated_at.is_some(),
+        is_deleted: new_msg.deleted_at.is_some(),
+        has_attachments: new_msg.has_attachments,
+        has_thread: new_msg.has_thread,
+        reply_to_message,
+    };
+
+    let member_uids: Vec<i32> = group_membership::table
+        .filter(gm_dsl::chat_id.eq(chat_id))
+        .select(group_membership::uid)
+        .load(conn)
+        .map_err(|e| {
+            tracing::error!("list members for broadcast: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+        })?;
+
+    if let Ok(ws_json) = serde_json::to_string(&serde_json::json!({
+        "type": "message",
+        "payload": &response
+    })) {
+        state.ws_registry.broadcast_to_uids(&member_uids, &ws_json);
+    }
+
+    // Mark the root message as having a thread
+    let root_msg_updated: Option<Message> =
+        diesel::update(messages::table.filter(dsl::id.eq(thread_id)))
+            .set(dsl::has_thread.eq(true))
+            .get_result(conn)
+            .ok();
+
+    if let Some(root_msg) = root_msg_updated {
+        let root_response = MessageResponse::from(root_msg);
+        if let Ok(ws_json) = serde_json::to_string(&serde_json::json!({
+            "type": "message_updated",
+            "payload": &root_response
+        })) {
+            state.ws_registry.broadcast_to_uids(&member_uids, &ws_json);
         }
     }
 

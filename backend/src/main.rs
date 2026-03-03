@@ -111,6 +111,10 @@ async fn main() {
             get(handlers::messages::get_message)
                 .patch(handlers::messages::patch_message)
                 .delete(handlers::messages::delete_message),
+        )
+        .route(
+            "/{chat_id}/threads/{thread_id}/messages",
+            post(handlers::messages::post_thread_message),
         );
 
     // /group — group lifecycle (create, get info)

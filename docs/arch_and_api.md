@@ -81,7 +81,10 @@ _Sending actions use HTTP for durability; receiving uses WS. Message types cover
   - **Desc:** Paginate messages in a chat (cursor by `before`).
 - **POST** `/chats/{chat_id}/messages`  *(implemented)*
   - **Desc:** Send a message (text, emoji, file, reminder, etc.).
-  - **Req:** `{"message": "...", "message_type": "text|image|file|emote|...", "client_generated_id": "idempotency_key", "reply_to_id": "xx", "reply_root_id": "xx"}`
+  - **Req:** `{"message": "...", "message_type": "text|image|file|emote|...", "client_generated_id": "idempotency_key", "reply_to_id": "xx"}`
+- **POST** `/chats/{chat_id}/threads/{thread_id}/messages`
+  - **Desc:** Send a message specifically within a thread context.
+  - **Req:** `{"message": "...", "message_type": "text|image|file|emote|...", "client_generated_id": "idempotency_key", "reply_to_id": "xx"}`
 - **DELETE** `/chats/{chat_id}/messages/{message_id}`
   - **Desc:** Recall (soft delete) a message.
   - **Res:** `204 No Content` on success.

@@ -21,6 +21,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   getMessages,
   sendMessage,
+  sendThreadMessage,
   updateMessage,
   deleteMessage,
   getMessage,
@@ -227,7 +228,7 @@ export default function ChatThread() {
       message: text,
       message_type: 'text',
       reply_to_id: replyingTo?.id ?? null,
-      reply_root_id: threadId ?? replyingTo?.reply_root_id ?? replyingTo?.id ?? null,
+      reply_root_id: threadId ?? null,
       reply_to_message: replyingTo ? {
         id: replyingTo.id,
         message: replyingTo.message,
@@ -247,13 +248,18 @@ export default function ChatThread() {
     setReplyingTo(null);
     setTimeout(() => scrollToBottomRef.current?.(), 50);
 
-    sendMessage(apiChatId, {
+    const messagePayload = {
       message: text,
       message_type: 'text',
       client_generated_id: clientGeneratedId,
       reply_to_id: replyingTo?.id,
-      reply_root_id: threadId ?? replyingTo?.reply_root_id ?? replyingTo?.id,
-    })
+    };
+
+    const sendPromise = threadId
+      ? sendThreadMessage(apiChatId, threadId, messagePayload)
+      : sendMessage(apiChatId, messagePayload);
+
+    sendPromise
       .then((res) => {
         const postResponse = res.data;
         const confirmed: MessageResponse = {

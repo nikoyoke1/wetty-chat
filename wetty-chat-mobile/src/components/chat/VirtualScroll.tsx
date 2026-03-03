@@ -201,7 +201,7 @@ export function VirtualScroll({
       onAtBottomChange?.(true);
     }
     forceUpdate(c => c + 1);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [windowKey]);
 
   // Expose scrollToBottom for imperative use
@@ -218,7 +218,7 @@ export function VirtualScroll({
         }
       };
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollToBottomRef]);
 
   // Expose scrollToIndex for imperative use
@@ -239,7 +239,7 @@ export function VirtualScroll({
         el.scrollTo({ top: offset, behavior });
       };
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollToIndexRef, getItemOffset, loadingOlder]);
 
   const handleResize = useCallback((index: number, height: number) => {

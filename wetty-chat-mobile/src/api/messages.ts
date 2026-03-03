@@ -59,6 +59,14 @@ export function sendMessage(
   return apiClient.post(`/chats/${chatId}/messages`, body);
 }
 
+export function sendThreadMessage(
+  chatId: string | number,
+  threadId: string | number,
+  body: CreateMessageBody
+): Promise<AxiosResponse<MessageResponse>> {
+  return apiClient.post(`/chats/${chatId}/threads/${threadId}/messages`, body);
+}
+
 export interface UpdateMessageBody {
   message: string;
 }
