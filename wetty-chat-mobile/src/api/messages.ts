@@ -8,6 +8,14 @@ export interface ReplyToMessage {
   is_deleted: boolean;
 }
 
+export interface Attachment {
+  id: string;
+  url: string;
+  kind: string;
+  size: number;
+  file_name: string;
+}
+
 export interface MessageResponse {
   id: string;
   message: string | null;
@@ -23,6 +31,7 @@ export interface MessageResponse {
   has_attachments: boolean;
   has_thread: boolean;
   reply_to_message?: ReplyToMessage;
+  attachments?: Attachment[];
 }
 
 export interface ListMessagesResponse {
@@ -37,6 +46,7 @@ export interface CreateMessageBody {
   client_generated_id: string;
   reply_to_id?: string;
   reply_root_id?: string;
+  attachment_ids?: string[];
 }
 
 export function getMessages(

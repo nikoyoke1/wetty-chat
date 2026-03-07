@@ -3,6 +3,7 @@ import { IonIcon } from '@ionic/react';
 import { arrowUndo, chatbubbles } from 'ionicons/icons';
 import { t } from '@lingui/core/macro';
 import styles from './ChatBubble.module.scss';
+import type { Attachment } from '@/api/messages';
 
 interface ChatBubbleProps {
   senderName: string;
@@ -25,6 +26,7 @@ interface ChatBubbleProps {
   edited?: boolean;
   hasThread?: boolean;
   onThreadClick?: () => void;
+  attachments?: Attachment[];
 }
 
 function formatTime(iso: string): string {
@@ -55,7 +57,8 @@ export function ChatBubble({
   timestamp,
   edited,
   hasThread,
-  onThreadClick
+  onThreadClick,
+  attachments,
 }: ChatBubbleProps) {
   const swipeSign = swipeDirection === 'left' ? -1 : 1;
   const [offset, setOffset] = useState(0);
@@ -180,6 +183,18 @@ export function ChatBubble({
                 <span className={styles.timestamp}>{formatTime(timestamp)}{edited && ` (${t`Edited`})`}</span>
               )}
             </div>
+            {attachments && attachments.length > 0 && (
+              <div className={styles.attachmentsContainer}>
+                {attachments.map((att) => (
+                  <img
+                    key={att.id}
+                    src={att.url}
+                    alt="attachment"
+                    className={styles.attachmentImage}
+                  />
+                ))}
+              </div>
+            )}
             {hasThread && (
               <div className={styles.threadIndicator} onClick={onThreadClick}>
                 <IonIcon icon={chatbubbles} />

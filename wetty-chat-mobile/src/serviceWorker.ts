@@ -14,8 +14,8 @@ self.addEventListener('message', (event) => {
     }
 });
 
-// self.__WB_MANIFEST is default injection point
-precacheAndRoute(self.__WB_MANIFEST);
+const manifest = self.__WB_MANIFEST;
+precacheAndRoute(manifest);
 
 // clean old assets
 cleanupOutdatedCaches();
@@ -27,7 +27,7 @@ if (import.meta.env.DEV) {
 }
 
 // Workaround for dev server: only register navigation route if index.html is precached
-const hasPrecachedIndex = self.__WB_MANIFEST.some(
+const hasPrecachedIndex = manifest.some(
     (entry) => (typeof entry === 'string' ? entry : entry.url) === 'index.html'
 );
 

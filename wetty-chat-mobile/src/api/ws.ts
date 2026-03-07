@@ -71,6 +71,14 @@ function normalizePayload(p: unknown): MessageResponse | null {
       is_deleted: Boolean(r.is_deleted),
     };
   }
+  const attachmentsRaw = Array.isArray(o.attachments) ? o.attachments : [];
+  const attachments = attachmentsRaw.map((a: any) => ({
+    id: a.id != null ? String(a.id) : '0',
+    url: typeof a.url === 'string' ? a.url : '',
+    kind: typeof a.kind === 'string' ? a.kind : 'unknown',
+    size: typeof a.size === 'number' ? a.size : 0,
+  }));
+
   return {
     id: id ?? '0',
     message,
@@ -86,6 +94,7 @@ function normalizePayload(p: unknown): MessageResponse | null {
     is_deleted: Boolean(o.is_deleted),
     has_attachments: Boolean(o.has_attachments),
     has_thread: Boolean(o.has_thread),
+    attachments,
   };
 }
 

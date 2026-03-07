@@ -51,6 +51,10 @@ pub(crate) struct AppState {
     id_gen: Arc<utils::ids::IdGen>,
     ws_registry: Arc<services::ws_registry::ConnectionRegistry>,
     push_service: Arc<services::push::PushService>,
+    s3_client: aws_sdk_s3::Client,
+    s3_bucket_name: String,
+    s3_attachment_prefix: String,
+    s3_base_url: Option<String>,
 }
 
 #[tokio::main]
@@ -82,11 +86,22 @@ async fn main() {
 
     let ws_registry = Arc::new(services::ws_registry::ConnectionRegistry::new());
 
+    let aws_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
+    let s3_client = aws_sdk_s3::Client::new(&aws_config);
+    let s3_bucket_name = std::env::var("S3_BUCKET_NAME").expect("S3_BUCKET_NAME must be set");
+    let s3_attachment_prefix =
+        std::env::var("ATTACHMENTS_PREFIX").unwrap_or_else(|_| "attachments".to_string());
+    let s3_base_url = std::env::var("S3_BASE_URL").ok();
+
     let state = AppState {
         db: pool.clone(),
         id_gen: Arc::new(utils::ids::new_generator()),
         ws_registry: ws_registry.clone(),
         push_service: services::push::PushService::start(pool, ws_registry.clone()),
+        s3_client,
+        s3_bucket_name,
+        s3_attachment_prefix,
+        s3_base_url,
     };
 
     let registry = state.ws_registry.clone();
@@ -145,6 +160,9 @@ async fn main() {
         .route("/unsubscribe", post(handlers::push::post_unsubscribe))
         .route("/test", post(handlers::push::post_test));
 
+    let attachments_routes =
+        Router::new().route("/upload-url", post(handlers::attachments::post_upload_url));
+
     let trace_layer = TraceLayer::new_for_http()
         .make_span_with(|request: &Request<Body>| {
             let request_id = request
@@ -172,6 +190,7 @@ async fn main() {
         .nest("/chats", chats_routes)
         .nest("/group", group_routes)
         .nest("/api/push", push_routes)
+        .nest("/attachments", attachments_routes)
         .layer(RequestBodyLimitLayer::new(256 * 1024))
         .layer(
             ServiceBuilder::new()

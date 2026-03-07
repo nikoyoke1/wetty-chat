@@ -88,6 +88,42 @@ pub struct NewMessage {
     pub has_thread: bool,
 }
 
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]
+#[diesel(table_name = schema::attachments)]
+pub struct Attachment {
+    pub id: i64,
+    pub message_id: Option<i64>,
+    pub file_name: String,
+    pub kind: String,
+    pub external_reference: String,
+    pub size: i64,
+    pub created_at: DateTime<Utc>,
+    pub deleted_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AttachmentResponse {
+    #[serde(with = "crate::serde_i64_string")]
+    pub id: i64,
+    pub url: String,
+    pub kind: String,
+    pub size: i64,
+    pub file_name: String,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = schema::attachments)]
+pub struct NewAttachment {
+    pub id: i64,
+    pub message_id: Option<i64>,
+    pub file_name: String,
+    pub kind: String,
+    pub external_reference: String,
+    pub size: i64,
+    pub created_at: DateTime<Utc>,
+    pub deleted_at: Option<DateTime<Utc>>,
+}
+
 #[derive(Debug, Clone, AsChangeset)]
 #[diesel(table_name = schema::groups)]
 pub struct UpdateGroup {

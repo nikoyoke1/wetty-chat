@@ -144,6 +144,50 @@
   }
 }
 
+.attachmentsPreview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #fdfdfd;
+  border-bottom: 1px solid #eee;
+}
+
+.attachmentChip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--ion-color-primary);
+}
+
+.attachmentName {
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.removeAttachment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  font-size: 16px;
+  padding: 0;
+
+  &:hover {
+    color: var(--ion-color-danger, #ef4444);
+  }
+}
+
 :global(.ios) {
   .sendBtn {
     border-radius: 50%;

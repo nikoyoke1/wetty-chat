@@ -66,6 +66,20 @@
   border-radius: 18px 18px 4px 18px;
 }
 
+.attachmentsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.attachmentImage {
+  max-width: 100%;
+  border-radius: 8px;
+  object-fit: cover;
+  max-height: 300px;
+}
+
 .senderName {
   font-size: 12px;
   font-weight: 600;

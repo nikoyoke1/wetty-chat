@@ -24,7 +24,6 @@ import {
   sendThreadMessage,
   updateMessage,
   deleteMessage,
-  getMessage,
   type MessageResponse,
 } from '@/api/messages';
 import { getChatDetails } from '@/api/chats';
@@ -94,17 +93,7 @@ export default function ChatThread() {
   const [atBottom, setAtBottom] = useState(true);
   const [replyingTo, setReplyingTo] = useState<MessageResponse | null>(null);
   const [editingMessage, setEditingMessage] = useState<MessageResponse | null>(null);
-  const [rootMessage, setRootMessage] = useState<MessageResponse | null>(null);
 
-  useEffect(() => {
-    if (threadId) {
-      getMessage(apiChatId, threadId)
-        .then((res) => setRootMessage(res.data))
-        .catch(() => setRootMessage(null));
-    } else {
-      setRootMessage(null);
-    }
-  }, [apiChatId, threadId]);
 
   const [presentToast] = useIonToast();
   const [presentActionSheet] = useIonActionSheet();
@@ -199,7 +188,7 @@ export default function ChatThread() {
 
   const prevCursor = useSelector((state: RootState) => selectPrevCursorForChat(state, storeChatId));
 
-  const handleSend = useCallback((text: string) => {
+  const handleSend = useCallback((text: string, attachmentIds?: string[]) => {
     if (!apiChatId) return;
 
     // Edit flow
@@ -209,25 +198,15 @@ export default function ChatThread() {
 
       // Optimistic update
       dispatch(updateMessageInStore({ chatId: storeChatId, messageId, message: optimisticMsg }));
-      if (rootMessage?.id === messageId) {
-        setRootMessage(optimisticMsg);
-      }
       setEditingMessage(null);
 
       updateMessage(apiChatId, messageId, { message: text })
         .then((res) => {
-          const updatedMsg = { ...res.data, reply_to_message: res.data.reply_to_message ?? editingMessage.reply_to_message };
-          dispatch(updateMessageInStore({ chatId: storeChatId, messageId, message: updatedMsg }));
-          if (rootMessage?.id === messageId) {
-            setRootMessage(updatedMsg);
-          }
+          dispatch(updateMessageInStore({ chatId: storeChatId, messageId, message: res.data }));
         })
         .catch((err: Error) => {
           // Revert optimistic update
           dispatch(updateMessageInStore({ chatId: storeChatId, messageId, message: editingMessage }));
-          if (rootMessage?.id === messageId) {
-            setRootMessage(editingMessage);
-          }
           showToast(err.message || t`Failed to edit message`);
         });
       return;
@@ -253,7 +232,7 @@ export default function ChatThread() {
       created_at: new Date().toISOString(),
       is_edited: false,
       is_deleted: false,
-      has_attachments: false,
+      has_attachments: (attachmentIds && attachmentIds.length > 0) || false,
       has_thread: false,
     };
     dispatch(addMessage({ chatId: storeChatId, message: optimistic }));
@@ -265,6 +244,7 @@ export default function ChatThread() {
       message_type: 'text',
       client_generated_id: clientGeneratedId,
       reply_to_id: replyingTo?.id,
+      attachment_ids: attachmentIds,
     };
 
     const sendPromise = threadId
@@ -322,35 +302,7 @@ export default function ChatThread() {
     });
   }, [messages, apiChatId, threadId, history, showToast, presentActionSheet, setReplyingTo, setEditingMessage]);
 
-  const onClickRootMessage = useCallback(() => {
-    if (!rootMessage) return;
-    const isOwn = rootMessage.sender_uid === getCurrentUserId();
-    presentActionSheet({
-      buttons: [
-        {
-          text: t`Reply`, handler: () => {
-            setReplyingTo(rootMessage);
-          }
-        },
-        ...(isOwn ? [
-          {
-            text: t`Edit`, handler: () => {
-              setReplyingTo(null);
-              setEditingMessage(rootMessage);
-            }
-          },
-          {
-            text: t`Delete`, role: 'destructive' as const, handler: () => {
-              deleteMessage(apiChatId, rootMessage.id).catch((e: any) => {
-                showToast(e.message || t`Failed to delete message`);
-              });
-            }
-          }
-        ] : []),
-        { text: t`Cancel`, role: 'cancel' as const, handler: () => { } },
-      ],
-    });
-  }, [rootMessage, apiChatId, showToast, presentActionSheet, setReplyingTo, setEditingMessage]);
+
 
   return (
     <IonPage className="chat-thread-page">
@@ -387,26 +339,7 @@ export default function ChatThread() {
           windowKey={windowKey}
           initialScrollIndex={initialScrollIndex}
           onAtBottomChange={setAtBottom}
-          header={rootMessage ? (
-            <ChatBubble
-              senderName={`User ${rootMessage.sender_uid}`}
-              message={rootMessage.is_deleted ? t`[Deleted]` : (rootMessage.message ?? '')}
-              isSent={rootMessage.sender_uid === getCurrentUserId()}
-              avatarColor={colorForUser(rootMessage.sender_uid)}
-              onReply={() => setReplyingTo(rootMessage)}
-              onReplyTap={rootMessage.reply_to_id && !rootMessage.reply_to_message?.is_deleted ? () => jumpToMessage(rootMessage.reply_to_id!) : undefined}
-              onLongPress={onClickRootMessage}
-              showName={true}
-              showAvatar={true}
-              timestamp={rootMessage.created_at}
-              edited={rootMessage.is_edited}
-              replyTo={rootMessage.reply_to_message ? {
-                senderName: `User ${rootMessage.reply_to_message.sender_uid}`,
-                message: rootMessage.reply_to_message.is_deleted ? t`[Deleted]` : (rootMessage.reply_to_message.message ?? ''),
-                avatarColor: colorForUser(rootMessage.reply_to_message.sender_uid),
-              } : undefined}
-            />
-          ) : undefined}
+
           renderItem={(index: number) => {
             const msg = messages[index];
             const prevSender = index > 0 ? messages[index - 1].sender_uid : null;
@@ -426,6 +359,7 @@ export default function ChatThread() {
                 edited={msg.is_edited}
                 hasThread={msg.has_thread && !threadId}
                 onThreadClick={() => history.push(`/chats/chat/${apiChatId}/thread/${msg.id}`)}
+                attachments={msg.attachments}
                 replyTo={msg.reply_to_message ? {
                   senderName: `User ${msg.reply_to_message.sender_uid}`,
                   message: msg.reply_to_message.is_deleted ? t`[Deleted]` : (msg.reply_to_message.message ?? ''),

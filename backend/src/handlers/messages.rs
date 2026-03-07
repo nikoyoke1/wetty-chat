@@ -9,8 +9,8 @@ use diesel::prelude::*;
 use serde::Serialize;
 
 use crate::handlers::members::check_membership;
-use crate::models::{Message, NewMessage};
-use crate::schema::{group_membership, groups, messages, users};
+use crate::models::{Attachment, AttachmentResponse, Message, NewMessage};
+use crate::schema::{attachments, group_membership, groups, messages, users};
 use crate::services::push::PushJob;
 use crate::utils::auth::CurrentUid;
 use crate::utils::ids;
@@ -78,6 +78,7 @@ pub struct MessageResponse {
     has_attachments: bool,
     pub has_thread: bool,
     reply_to_message: Option<Box<ReplyToMessage>>,
+    attachments: Vec<AttachmentResponse>,
 }
 
 #[derive(Serialize)]
@@ -110,16 +111,18 @@ impl From<Message> for MessageResponse {
             has_attachments: m.has_attachments,
             has_thread: m.has_thread,
             reply_to_message: None,
+            attachments: vec![],
         }
     }
 }
 
 /// Attach reply_to_message to a list of messages by fetching referenced messages in one query.
-fn attach_replies(
+async fn attach_replies(
     conn: &mut diesel::r2d2::PooledConnection<
         diesel::r2d2::ConnectionManager<diesel::PgConnection>,
     >,
     messages_to_process: Vec<Message>,
+    state: &AppState,
 ) -> Vec<MessageResponse> {
     use crate::schema::messages::dsl;
     let reply_ids: Vec<i64> = messages_to_process
@@ -139,45 +142,81 @@ fn attach_replies(
         }
     }
 
-    messages_to_process
-        .into_iter()
-        .map(|m| {
-            let reply_to_message = m.reply_to_id.and_then(|reply_id| {
-                reply_messages_map.get(&reply_id).map(|reply_msg| {
-                    Box::new(ReplyToMessage {
-                        id: reply_msg.id,
-                        message: if reply_msg.deleted_at.is_some() {
-                            None
-                        } else {
-                            reply_msg.message.clone()
-                        },
-                        sender_uid: reply_msg.sender_uid,
-                        is_deleted: reply_msg.deleted_at.is_some(),
-                    })
-                })
-            });
-            MessageResponse {
-                id: m.id,
-                message: if m.deleted_at.is_some() {
-                    None
-                } else {
-                    m.message
-                },
-                message_type: m.message_type,
-                reply_to_id: m.reply_to_id,
-                reply_root_id: m.reply_root_id,
-                client_generated_id: m.client_generated_id,
-                sender_uid: m.sender_uid,
-                chat_id: m.chat_id,
-                created_at: m.created_at,
-                is_edited: m.updated_at.is_some(),
-                is_deleted: m.deleted_at.is_some(),
-                has_attachments: m.has_attachments,
-                has_thread: m.has_thread,
-                reply_to_message,
+    let mut message_attachments_map: std::collections::HashMap<i64, Vec<Attachment>> =
+        std::collections::HashMap::new();
+    let message_ids: Vec<i64> = messages_to_process.iter().map(|m| m.id).collect();
+    if !message_ids.is_empty() {
+        use crate::schema::attachments::dsl as a_dsl;
+        let attachments: Vec<Attachment> = attachments::table
+            .filter(a_dsl::message_id.eq_any(&message_ids))
+            .select(Attachment::as_select())
+            .load(conn)
+            .unwrap_or_default();
+        for att in attachments {
+            if let Some(msg_id) = att.message_id {
+                message_attachments_map.entry(msg_id).or_default().push(att);
             }
-        })
-        .collect()
+        }
+    }
+
+    let mut responses = Vec::with_capacity(messages_to_process.len());
+    for m in messages_to_process {
+        let reply_to_message = m.reply_to_id.and_then(|reply_id| {
+            reply_messages_map.get(&reply_id).map(|reply_msg| {
+                Box::new(ReplyToMessage {
+                    id: reply_msg.id,
+                    message: if reply_msg.deleted_at.is_some() {
+                        None
+                    } else {
+                        reply_msg.message.clone()
+                    },
+                    sender_uid: reply_msg.sender_uid,
+                    is_deleted: reply_msg.deleted_at.is_some(),
+                })
+            })
+        });
+
+        let mut attachments = Vec::new();
+        if let Some(atts) = message_attachments_map.remove(&m.id) {
+            for att in atts {
+                let base_url = state.s3_base_url.clone().unwrap_or_else(|| {
+                    format!("https://{}.s3.amazonaws.com", state.s3_bucket_name)
+                });
+                let url = format!("{}/{}", base_url, att.external_reference);
+
+                attachments.push(AttachmentResponse {
+                    id: att.id,
+                    url,
+                    kind: att.kind,
+                    size: att.size,
+                    file_name: att.file_name,
+                });
+            }
+        }
+
+        responses.push(MessageResponse {
+            id: m.id,
+            message: if m.deleted_at.is_some() {
+                None
+            } else {
+                m.message
+            },
+            message_type: m.message_type,
+            reply_to_id: m.reply_to_id,
+            reply_root_id: m.reply_root_id,
+            client_generated_id: m.client_generated_id,
+            sender_uid: m.sender_uid,
+            chat_id: m.chat_id,
+            created_at: m.created_at,
+            is_edited: m.updated_at.is_some(),
+            is_deleted: m.deleted_at.is_some(),
+            has_attachments: m.has_attachments,
+            has_thread: m.has_thread,
+            reply_to_message,
+            attachments,
+        });
+    }
+    responses
 }
 
 /// GET /chats/:chat_id/messages — List messages in a chat (cursor-based).
@@ -211,7 +250,7 @@ pub async fn get_messages(
                 .into_boxed()
                 .filter(dsl::chat_id.eq(chat_id).and(dsl::deleted_at.is_null()));
             if let Some(tid) = q_thread_id {
-                b = b.filter(dsl::reply_root_id.eq(tid));
+                b = b.filter(dsl::reply_root_id.eq(tid).or(dsl::id.eq(tid)));
             } else {
                 b = b.filter(dsl::reply_root_id.is_null());
             }
@@ -265,7 +304,7 @@ pub async fn get_messages(
         let mut combined: Vec<Message> = older_to_use.into_iter().rev().collect();
         combined.extend(newer_to_use);
 
-        let messages_vec = attach_replies(conn, combined);
+        let messages_vec = attach_replies(conn, combined, &state).await;
 
         return Ok(Json(ListMessagesResponse {
             messages: messages_vec,
@@ -293,7 +332,7 @@ pub async fn get_messages(
             .then(|| messages_to_process.last().map(|m| m.id))
             .flatten();
 
-        let messages_vec = attach_replies(conn, messages_to_process);
+        let messages_vec = attach_replies(conn, messages_to_process, &state).await;
 
         return Ok(Json(ListMessagesResponse {
             messages: messages_vec,
@@ -330,7 +369,7 @@ pub async fn get_messages(
     // Reverse to return ASC (oldest first)
     let messages_to_process: Vec<Message> = messages_to_process.into_iter().rev().collect();
 
-    let messages_vec = attach_replies(conn, messages_to_process);
+    let messages_vec = attach_replies(conn, messages_to_process, &state).await;
 
     Ok(Json(ListMessagesResponse {
         messages: messages_vec,
@@ -349,6 +388,8 @@ pub struct CreateMessageBody {
         deserialize_with = "crate::serde_i64_string::opt::deserialize"
     )]
     reply_to_id: Option<i64>,
+    #[serde(default)]
+    attachment_ids: Vec<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -395,7 +436,7 @@ pub async fn post_message(
         chat_id,
         updated_at: None,
         deleted_at: None,
-        has_attachments: false,
+        has_attachments: !body.attachment_ids.is_empty(),
         has_thread: false,
     };
 
@@ -406,6 +447,33 @@ pub async fn post_message(
             tracing::error!("insert message: {:?}", e);
             (StatusCode::INTERNAL_SERVER_ERROR, "Failed to send message")
         })?;
+
+    let mut attached = vec![];
+    if !body.attachment_ids.is_empty() {
+        let attachment_ids: Vec<i64> = body
+            .attachment_ids
+            .iter()
+            .filter_map(|s| s.parse().ok())
+            .collect();
+        use crate::schema::attachments::dsl as a_dsl;
+        let _: usize = diesel::update(attachments::table.filter(a_dsl::id.eq_any(&attachment_ids)))
+            .set(a_dsl::message_id.eq(id))
+            .execute(conn)
+            .map_err(|e| {
+                tracing::error!("update attachments: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to link attachments",
+                )
+            })?;
+
+        // Load the attachments to include in response
+        attached = attachments::table
+            .filter(a_dsl::id.eq_any(&attachment_ids))
+            .select(Attachment::as_select())
+            .load(conn)
+            .unwrap_or_default();
+    }
 
     // Fetch reply_to_message if exists
     let reply_to_message = if let Some(reply_id) = new_msg.reply_to_id {
@@ -450,6 +518,24 @@ pub async fn post_message(
         has_attachments: new_msg.has_attachments,
         has_thread: new_msg.has_thread,
         reply_to_message,
+        attachments: {
+            let mut att_responses = Vec::new();
+            for att in attached {
+                let base_url = state.s3_base_url.clone().unwrap_or_else(|| {
+                    format!("https://{}.s3.amazonaws.com", state.s3_bucket_name)
+                });
+                let url = format!("{}/{}", base_url, att.external_reference);
+
+                att_responses.push(AttachmentResponse {
+                    id: att.id,
+                    url,
+                    kind: att.kind,
+                    size: att.size,
+                    file_name: att.file_name.clone(),
+                });
+            }
+            att_responses
+        },
     };
 
     let member_uids: Vec<i32> = group_membership::table
@@ -542,7 +628,7 @@ pub async fn post_thread_message(
         chat_id,
         updated_at: None,
         deleted_at: None,
-        has_attachments: false,
+        has_attachments: !body.attachment_ids.is_empty(),
         has_thread: false,
     };
 
@@ -553,6 +639,33 @@ pub async fn post_thread_message(
             tracing::error!("insert threaded message: {:?}", e);
             (StatusCode::INTERNAL_SERVER_ERROR, "Failed to send message")
         })?;
+
+    let mut attached = vec![];
+    if !body.attachment_ids.is_empty() {
+        let attachment_ids: Vec<i64> = body
+            .attachment_ids
+            .iter()
+            .filter_map(|s| s.parse().ok())
+            .collect();
+        use crate::schema::attachments::dsl as a_dsl;
+        let _: usize = diesel::update(attachments::table.filter(a_dsl::id.eq_any(&attachment_ids)))
+            .set(a_dsl::message_id.eq(id))
+            .execute(conn)
+            .map_err(|e| {
+                tracing::error!("update attachments: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to link attachments",
+                )
+            })?;
+
+        // Load the attachments to include in response
+        attached = attachments::table
+            .filter(a_dsl::id.eq_any(&attachment_ids))
+            .select(Attachment::as_select())
+            .load(conn)
+            .unwrap_or_default();
+    }
 
     // Fetch reply_to_message if exists
     let reply_to_message = if let Some(reply_id) = new_msg.reply_to_id {
@@ -596,6 +709,24 @@ pub async fn post_thread_message(
         has_attachments: new_msg.has_attachments,
         has_thread: new_msg.has_thread,
         reply_to_message,
+        attachments: {
+            let mut att_responses = Vec::new();
+            for att in attached {
+                let base_url = state.s3_base_url.clone().unwrap_or_else(|| {
+                    format!("https://{}.s3.amazonaws.com", state.s3_bucket_name)
+                });
+                let url = format!("{}/{}", base_url, att.external_reference);
+
+                att_responses.push(AttachmentResponse {
+                    id: att.id,
+                    url,
+                    kind: att.kind,
+                    size: att.size,
+                    file_name: att.file_name.clone(),
+                });
+            }
+            att_responses
+        },
     };
 
     let member_uids: Vec<i32> = group_membership::table
@@ -642,7 +773,11 @@ pub async fn post_thread_message(
             .ok();
 
     if let Some(root_msg) = root_msg_updated {
-        let root_response = MessageResponse::from(root_msg);
+        let root_response = attach_replies(conn, vec![root_msg], &state)
+            .await
+            .into_iter()
+            .next()
+            .unwrap();
         if let Ok(ws_json) = serde_json::to_string(&serde_json::json!({
             "type": "message_updated",
             "payload": &root_response
@@ -722,7 +857,11 @@ pub async fn patch_message(
             )
         })?;
 
-    let response = MessageResponse::from(updated_message);
+    let response = attach_replies(conn, vec![updated_message], &state)
+        .await
+        .into_iter()
+        .next()
+        .unwrap();
 
     // Broadcast update to all members
     let member_uids: Vec<i32> = group_membership::table
@@ -794,7 +933,11 @@ pub async fn delete_message(
             )
         })?;
 
-    let response = MessageResponse::from(deleted_message);
+    let response = attach_replies(conn, vec![deleted_message], &state)
+        .await
+        .into_iter()
+        .next()
+        .unwrap();
 
     // Broadcast deletion to all members
     let member_uids: Vec<i32> = group_membership::table
@@ -835,12 +978,17 @@ pub async fn get_message(
 
     use crate::schema::messages::dsl;
     let message: Message = messages::table
-        .filter(dsl::id.eq(message_id).and(dsl::chat_id.eq(chat_id)))
+        .filter(
+            dsl::id
+                .eq(message_id)
+                .and(dsl::chat_id.eq(chat_id))
+                .and(dsl::deleted_at.is_null()),
+        )
         .select(Message::as_select())
         .first(conn)
         .map_err(|_| (StatusCode::NOT_FOUND, "Message not found"))?;
 
-    let messages_vec = attach_replies(conn, vec![message]);
+    let messages_vec = attach_replies(conn, vec![message], &state).await;
     let response = messages_vec.into_iter().next().unwrap();
 
     Ok(Json(response))

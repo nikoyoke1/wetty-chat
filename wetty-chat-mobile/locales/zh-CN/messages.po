@@ -281,7 +281,7 @@ msgstr "设置已保存"
 
 #: src/pages/chat-thread.tsx:286
 msgid "Start Thread"
-msgstr "开始话题"
+msgstr "发起话题"
 
 #: src/pages/chat-thread.tsx:71
 msgid "Thread"
