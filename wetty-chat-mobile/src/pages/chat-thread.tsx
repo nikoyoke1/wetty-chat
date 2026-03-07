@@ -34,7 +34,6 @@ import {
   selectNextCursorForChat,
   selectPrevCursorForChat,
   resetChat,
-  setMessagesForChat,
   pushWindow,
   addMessage,
   appendMessages,
@@ -191,8 +190,21 @@ export default function ChatThread() {
   const handleSend = useCallback((text: string, attachmentIds?: string[]) => {
     if (!apiChatId) return;
 
+    if (!text.trim() && (!attachmentIds || attachmentIds.length === 0)) {
+      return;
+    }
+
     // Edit flow
     if (editingMessage) {
+      if (!text.trim()) {
+        showToast(t`Message cannot be empty`);
+        return;
+      }
+      if (text.trim() === editingMessage.message?.trim()) {
+        setEditingMessage(null);
+        return;
+      }
+
       const messageId = editingMessage.id;
       const optimisticMsg = { ...editingMessage, message: text, is_edited: true };
 
@@ -215,7 +227,7 @@ export default function ChatThread() {
     const clientGeneratedId = generateClientId();
 
     const optimistic: MessageResponse = {
-      id: '0',
+      id: clientGeneratedId,
       message: text,
       message_type: 'text',
       reply_to_id: replyingTo?.id ?? null,
@@ -262,12 +274,11 @@ export default function ChatThread() {
       })
       .catch((err: Error) => {
         showToast(err.message || t`Failed to send`);
-        const state = store.getState();
-        const currentMessages = selectMessagesForChat(state, storeChatId);
-        const without = currentMessages.filter(
-          (m) => m.client_generated_id !== clientGeneratedId
-        );
-        dispatch(setMessagesForChat({ chatId: storeChatId, messages: without }));
+        dispatch(updateMessageInStore({
+          chatId: storeChatId,
+          messageId: clientGeneratedId,
+          message: { ...optimistic, is_deleted: true }
+        }));
       });
   }, [apiChatId, storeChatId, threadId, dispatch, showToast, replyingTo, editingMessage]);
 
@@ -291,7 +302,10 @@ export default function ChatThread() {
           },
           {
             text: t`Delete`, role: 'destructive' as const, handler: () => {
+              const deletedOptimistic = { ...msg, is_deleted: true };
+              dispatch(updateMessageInStore({ chatId: storeChatId, messageId: msg.id, message: deletedOptimistic }));
               deleteMessage(apiChatId, msg.id).catch((e: any) => {
+                dispatch(updateMessageInStore({ chatId: storeChatId, messageId: msg.id, message: msg }));
                 showToast(e.message || t`Failed to delete message`);
               });
             }
@@ -360,6 +374,7 @@ export default function ChatThread() {
                 hasThread={msg.has_thread && !threadId}
                 onThreadClick={() => history.push(`/chats/chat/${apiChatId}/thread/${msg.id}`)}
                 attachments={msg.attachments}
+                isConfirmed={!msg.id.startsWith('cg_')}
                 replyTo={msg.reply_to_message ? {
                   senderName: `User ${msg.reply_to_message.sender_uid}`,
                   message: msg.reply_to_message.is_deleted ? t`[Deleted]` : (msg.reply_to_message.message ?? ''),

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { IonIcon } from '@ionic/react';
-import { arrowUndo, chatbubbles } from 'ionicons/icons';
+import { arrowUndo, chatbubbles, checkmarkCircle, checkmarkCircleOutline } from 'ionicons/icons';
 import { t } from '@lingui/core/macro';
 import styles from './ChatBubble.module.scss';
 import type { Attachment } from '@/api/messages';
@@ -24,6 +24,7 @@ interface ChatBubbleProps {
   };
   timestamp?: string;
   edited?: boolean;
+  isConfirmed?: boolean;
   hasThread?: boolean;
   onThreadClick?: () => void;
   attachments?: Attachment[];
@@ -56,6 +57,7 @@ export function ChatBubble({
   replyTo,
   timestamp,
   edited,
+  isConfirmed,
   hasThread,
   onThreadClick,
   attachments,
@@ -176,13 +178,6 @@ export function ChatBubble({
                 <div className={styles.replyPreviewText}>{replyTo.message}</div>
               </div>
             )}
-            <div className={styles.messageWrapper}>
-              <span className={styles.messageText}>{message}</span>
-              <span className={styles.timestampSpacer} />
-              {timestamp && (
-                <span className={styles.timestamp}>{formatTime(timestamp)}{edited && ` (${t`Edited`})`}</span>
-              )}
-            </div>
             {attachments && attachments.length > 0 && (
               <div className={styles.attachmentsContainer}>
                 {attachments.map((att) => (
@@ -195,6 +190,21 @@ export function ChatBubble({
                 ))}
               </div>
             )}
+            <div className={styles.messageWrapper}>
+              <span className={styles.messageText}>{message}</span>
+              <span className={styles.timestampSpacer} />
+              {timestamp && (
+                <span className={styles.timestamp}>
+                  {formatTime(timestamp)}{edited && ` (${t`Edited`})`}
+                  {isSent && (
+                    <IonIcon
+                      icon={isConfirmed ? checkmarkCircle : checkmarkCircleOutline}
+                      className={styles.statusIcon}
+                    />
+                  )}
+                </span>
+              )}
+            </div>
             {hasThread && (
               <div className={styles.threadIndicator} onClick={onThreadClick}>
                 <IonIcon icon={chatbubbles} />
