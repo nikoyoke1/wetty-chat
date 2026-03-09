@@ -33,6 +33,8 @@ function initials(detail: ChatDetailResponse | null): string {
   return '?';
 }
 
+const isDev = import.meta.env.DEV;
+
 export default function GroupDetail() {
   const { id } = useParams<{ id: string }>();
   const [presentToast] = useIonToast();
@@ -188,9 +190,9 @@ export default function GroupDetail() {
               <h3 style={{ margin: '0 0 8px' }}>Members</h3>
             </div>
             <IonList>
-              <IonItem button onClick={handleAddMember}>
+              {isDev && <IonItem button onClick={handleAddMember}>
                 <IonLabel color="primary">Add Member</IonLabel>
-              </IonItem>
+              </IonItem>}
               {members.map((m) => (
                 <IonItem key={m.uid}>
                   <IonLabel>
