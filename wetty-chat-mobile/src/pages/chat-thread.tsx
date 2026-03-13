@@ -64,6 +64,8 @@ export default function ChatThread() {
 
   const dispatch = useDispatch();
   const currentUserId = useSelector((state: RootState) => state.user.uid);
+  const currentUserName = useSelector((state: RootState) => state.user.username);
+  const currentUserAvatarUrl = useSelector((state: RootState) => state.user.avatar_url);
   const storedName = useSelector((state: RootState) => selectChatName(state, apiChatId));
   const chatName = threadId ? t`Thread` : (storedName ?? t`Loading...`);
 
@@ -284,7 +286,11 @@ export default function ChatThread() {
         is_deleted: replyingTo.is_deleted,
       } : undefined,
       client_generated_id: clientGeneratedId,
-      sender: { uid: currentUserId || 0, name: null },
+      sender: {
+        uid: currentUserId || 0,
+        name: currentUserName,
+        avatar_url: currentUserAvatarUrl || undefined
+      },
       chat_id: apiChatId,
       created_at: new Date().toISOString(),
       is_edited: false,
@@ -325,7 +331,7 @@ export default function ChatThread() {
           message: { ...optimistic, is_deleted: true }
         }));
       });
-  }, [apiChatId, storeChatId, threadId, dispatch, showToast, replyingTo, editingMessage, currentUserId]);
+  }, [apiChatId, storeChatId, threadId, dispatch, showToast, replyingTo, editingMessage, currentUserId, currentUserName, currentUserAvatarUrl]);
 
   const onClickChatItem = useCallback((messageIndex: number) => {
     const msg = messages[messageIndex];
