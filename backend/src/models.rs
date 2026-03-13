@@ -39,6 +39,7 @@ pub struct User {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Sender {
     pub uid: i32,
+    pub avatar_url: Option<String>,
     pub name: Option<String>,
 }
 

@@ -56,11 +56,6 @@ function generateClientId(): string {
   return `cg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
 
-function colorForUser(uid: number): string {
-  const hue = ((uid * 137) % 360 + 360) % 360;
-  return `hsl(${hue}, 55%, 50%)`;
-}
-
 export default function ChatThread() {
   const { id, threadId } = useParams<{ id: string; threadId?: string }>();
   const apiChatId = id ? String(id) : '';
@@ -456,7 +451,7 @@ export default function ChatThread() {
                   senderName={msg.sender.name ?? `User ${msg.sender.uid}`}
                   message={msg.is_deleted ? t`[Deleted]` : (msg.message ?? '')}
                   isSent={msg.sender.uid === currentUserId}
-                  avatarColor={colorForUser(msg.sender.uid)}
+                  avatarUrl={msg.sender.avatar_url}
                   onReply={() => setReplyingTo(msg)}
                   onReplyTap={msg.reply_to_message && !msg.reply_to_message?.is_deleted ? () => jumpToMessage(msg.reply_to_message!.id) : undefined}
                   onLongPress={() => onClickChatItem(index)}
@@ -471,7 +466,6 @@ export default function ChatThread() {
                   replyTo={msg.reply_to_message ? {
                     senderName: msg.reply_to_message.sender.name ?? `User ${msg.reply_to_message.sender.uid}`,
                     message: msg.reply_to_message.is_deleted ? t`[Deleted]` : (msg.reply_to_message.message ?? ''),
-                    avatarColor: colorForUser(msg.reply_to_message.sender.uid),
                   } : undefined}
                 />
               </>

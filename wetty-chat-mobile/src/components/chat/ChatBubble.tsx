@@ -10,7 +10,7 @@ interface ChatBubbleProps {
   senderName: string;
   message: string;
   isSent: boolean;
-  avatarColor: string;
+  avatarUrl?: string;
   showName?: boolean;
   showAvatar?: boolean;
   swipeDirection?: 'left' | 'right';
@@ -21,7 +21,6 @@ interface ChatBubbleProps {
   replyTo?: {
     senderName: string;
     message: string;
-    avatarColor?: string;
   };
   timestamp?: string;
   edited?: boolean;
@@ -40,6 +39,16 @@ function getInitials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
+function colorForUser(name: string): string {
+  let hash = 0;
+  for (const char of name) {
+    hash = (hash << 5) - hash + char.charCodeAt(0);
+    hash |= 0; // Cap to 32bit
+  }
+  const hue = ((hash * 137) % 360 + 360) % 360;
+  return `hsl(${hue}, 55%, 50%)`;
+}
+
 const SWIPE_THRESHOLD = 60;
 const SWIPE_MAX = 80;
 
@@ -47,7 +56,7 @@ export function ChatBubble({
   senderName,
   message,
   isSent,
-  avatarColor,
+  avatarUrl,
   showName = true,
   showAvatar = true,
   swipeDirection = 'left',
@@ -159,13 +168,19 @@ export function ChatBubble({
       >
         <div className={`${styles.chatRow} ${isSent ? styles.sent : styles.received}`}>
           {showAvatar ? (
-            <div
-              className={styles.avatar}
-              style={{ backgroundColor: avatarColor, cursor: onAvatarClick ? 'pointer' : undefined }}
-              onClick={onAvatarClick}
-            >
-              {getInitials(senderName)}
-            </div>
+            avatarUrl ? (
+              <div className={styles.avatar}>
+                <img src={avatarUrl} />
+              </div>
+            ) : (
+              <div
+                className={styles.avatar}
+                style={{ backgroundColor: colorForUser(senderName), cursor: onAvatarClick ? 'pointer' : undefined }}
+                onClick={onAvatarClick}
+              >
+                {getInitials(senderName)}
+              </div>
+            )
           ) : (
             <div className={styles.avatarSpacer} />
           )}
@@ -237,13 +252,15 @@ export function ChatBubble({
           )}
         </div>
       </div>
-      {viewingAttachment && (
-        <ImageViewer
-          src={viewingAttachment.url}
-          fileName={viewingAttachment.file_name}
-          onClose={() => setViewingAttachment(null)}
-        />
-      )}
-    </div>
+      {
+        viewingAttachment && (
+          <ImageViewer
+            src={viewingAttachment.url}
+            fileName={viewingAttachment.file_name}
+            onClose={() => setViewingAttachment(null)}
+          />
+        )
+      }
+    </div >
   );
 }

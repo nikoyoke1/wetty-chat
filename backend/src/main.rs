@@ -63,6 +63,8 @@ pub(crate) struct AppState {
     pub discuz_db: Option<Pool<ConnectionManager<MysqlConnection>>>,
     pub discuz_cookie_prefix: String,
     pub discuz_authkey: String,
+    pub discuz_avatar_public_url: Option<String>,
+    pub discuz_avatar_path: Option<String>,
     pub ws_secret: [u8; 32],
 }
 
@@ -119,6 +121,8 @@ async fn main() {
     let mut discuz_db = None;
     let mut discuz_cookie_prefix = String::new();
     let mut discuz_authkey = String::new();
+    let mut discuz_avatar_public_url = None;
+    let mut discuz_avatar_path = None;
 
     if let AuthMethod::Discuz = auth_method {
         let discuz_db_url = std::env::var("DISCUZ_DB_URL").expect("DISCUZ_DB_URL must be set");
@@ -131,6 +135,8 @@ async fn main() {
         discuz_cookie_prefix =
             std::env::var("DISCUZ_COOKIE_PREFIX").expect("DISCUZ_COOKIE_PREFIX must be set");
         discuz_authkey = std::env::var("DISCUZ_AUTHKEY").expect("DISCUZ_AUTHKEY must be set");
+        discuz_avatar_public_url = std::env::var("DISCUZ_AVATAR_PUBLIC_URL").ok();
+        discuz_avatar_path = std::env::var("DISCUZ_AVATAR_PATH").ok();
     }
 
     let mut ws_secret = [0u8; 32];
@@ -152,6 +158,8 @@ async fn main() {
         discuz_db,
         discuz_cookie_prefix,
         discuz_authkey,
+        discuz_avatar_public_url,
+        discuz_avatar_path,
         ws_secret,
     };
 

@@ -3,6 +3,7 @@ import apiClient from './client';
 
 export interface Sender {
   uid: number;
+  avatar_url?: string,
   name: string | null;
 }
 

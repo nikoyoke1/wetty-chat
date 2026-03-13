@@ -1,6 +1,33 @@
 use crate::{AppState, AuthMethod};
 use diesel::prelude::*;
 use std::collections::HashMap;
+use std::time::UNIX_EPOCH;
+
+pub fn lookup_user_avatars(state: &AppState, uids: &[i32]) -> HashMap<i32, Option<String>> {
+    let (public_url, avatar_path) = match (&state.auth_method, &state.discuz_avatar_public_url, &state.discuz_avatar_path) {
+        (AuthMethod::Discuz, Some(url), Some(path)) => (url, path),
+        _ => return HashMap::new(),
+    };
+
+    let mut map = HashMap::with_capacity(uids.len());
+    for &uid in uids {
+        let uid1 = format!("{:0>9}", uid);
+        let dir1 = &uid1[0..3];
+        let dir2 = &uid1[3..5];
+        let dir3 = &uid1[5..7];
+        let stem = &uid1[7..9];
+        let rel = format!("{}/{}/{}/{}_avatar_small.jpg", dir1, dir2, dir3, stem);
+        let full_path = format!("{}/{}", avatar_path, rel);
+        let entry = std::fs::metadata(&full_path)
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+            .map(|d| format!("{}/{}?ts={}", public_url, rel, d.as_secs()))
+            .unwrap_or_else(|| format!("{}/noavatar.svg", public_url));
+        map.insert(uid, Some(entry));
+    }
+    map
+}
 
 /// Look up usernames for a list of target UIDs depending on the authentication method.
 pub async fn lookup_users(state: &AppState, uids: &[i32]) -> HashMap<i32, Option<String>> {

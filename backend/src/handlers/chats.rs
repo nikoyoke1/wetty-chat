@@ -11,7 +11,7 @@ use serde::Serialize;
 use crate::{
     handlers::members::check_membership,
     models::NewMessage,
-    services::push::PushJob,
+    services::{push::PushJob, user::lookup_user_avatars},
     utils::{auth::CurrentUid, ids},
 };
 use crate::{
@@ -323,6 +323,7 @@ pub async fn attach_replies(
 
     let target_uids: Vec<i32> = uids_to_lookup.into_iter().collect();
     let user_names = lookup_users(state, &target_uids).await;
+    let user_avatars = lookup_user_avatars(state, &target_uids);
 
     let mut message_attachments_map: std::collections::HashMap<i64, Vec<Attachment>> =
         std::collections::HashMap::new();
@@ -377,6 +378,7 @@ pub async fn attach_replies(
                     },
                     sender: Sender {
                         uid: reply_msg.sender_uid,
+                        avatar_url: user_avatars.get(&reply_msg.sender_uid).cloned().flatten(),
                         name: user_names.get(&reply_msg.sender_uid).cloned().flatten(),
                     },
                     is_deleted: reply_msg.deleted_at.is_some(),
@@ -416,6 +418,7 @@ pub async fn attach_replies(
             client_generated_id: m.client_generated_id,
             sender: Sender {
                 uid: m.sender_uid,
+                avatar_url: user_avatars.get(&m.sender_uid).cloned().flatten(),
                 name: user_names.get(&m.sender_uid).cloned().flatten(),
             },
             chat_id: m.chat_id,
