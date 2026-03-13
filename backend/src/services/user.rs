@@ -4,7 +4,11 @@ use std::collections::HashMap;
 use std::time::UNIX_EPOCH;
 
 pub fn lookup_user_avatars(state: &AppState, uids: &[i32]) -> HashMap<i32, Option<String>> {
-    let (public_url, avatar_path) = match (&state.auth_method, &state.discuz_avatar_public_url, &state.discuz_avatar_path) {
+    let (public_url, avatar_path) = match (
+        &state.auth_method,
+        &state.discuz_avatar_public_url,
+        &state.discuz_avatar_path,
+    ) {
         (AuthMethod::Discuz, Some(url), Some(path)) => (url, path),
         _ => return HashMap::new(),
     };
@@ -16,7 +20,7 @@ pub fn lookup_user_avatars(state: &AppState, uids: &[i32]) -> HashMap<i32, Optio
         let dir2 = &uid1[3..5];
         let dir3 = &uid1[5..7];
         let stem = &uid1[7..9];
-        let rel = format!("{}/{}/{}/{}_avatar_small.jpg", dir1, dir2, dir3, stem);
+        let rel = format!("{}/{}/{}/{}_avatar_middle.jpg", dir1, dir2, dir3, stem);
         let full_path = format!("{}/{}", avatar_path, rel);
         let entry = std::fs::metadata(&full_path)
             .ok()
