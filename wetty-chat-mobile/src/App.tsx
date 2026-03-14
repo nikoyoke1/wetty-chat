@@ -10,10 +10,10 @@ import {
   setupIonicReact,
 } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
-import { Route, Redirect } from 'react-router-dom';
+import { Route, Redirect, useLocation } from 'react-router-dom';
 import { chatbubbles, settings, flask } from 'ionicons/icons';
 import { useSelector, useDispatch } from 'react-redux';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { RootState, AppDispatch } from '@/store/index';
 import { fetchCurrentUser, setUser } from '@/store/userSlice';
 
@@ -36,6 +36,63 @@ import { t } from '@lingui/core/macro';
 import { syncApp } from '@/api/sync';
 
 setupIonicReact();
+
+const TAB_ROOT_PATHS = ['/chats', '/settings', '/demo'];
+
+const TabsContainer: React.FC = () => {
+  const location = useLocation();
+  const isTabRoot = TAB_ROOT_PATHS.includes(location.pathname);
+
+  const tabBarButtons = useMemo(() => {
+    const buttons = [
+      (
+        <IonTabButton tab="chats" href="/chats" key="chats">
+          <IonIcon icon={chatbubbles} />
+          <IonLabel><Trans>Chats</Trans></IonLabel>
+        </IonTabButton>
+      ),
+      (
+        <IonTabButton tab="settings" href="/settings" key="settings">
+          <IonIcon icon={settings} />
+          <IonLabel><Trans>Settings</Trans></IonLabel>
+        </IonTabButton>
+      ),
+    ];
+
+    if (import.meta.env.DEV) {
+      buttons.push(
+        <IonTabButton tab="demo" href="/demo" key="demo">
+          <IonIcon icon={flask} />
+          <IonLabel>Demo</IonLabel>
+        </IonTabButton>
+      );
+    }
+
+    return buttons;
+  }, []);
+
+  return (
+    <IonTabs className={isTabRoot ? '' : 'tab-bar-hidden'}>
+      <IonRouterOutlet>
+        <Route path="/chats" exact component={ChatsPage} />
+        <Route path="/chats/new" exact component={CreateChatPage} />
+        <Route path="/chats/chat/:id" exact component={ChatThreadPage} />
+        <Route path="/chats/chat/:id/thread/:threadId" exact component={ChatThreadPage} />
+        <Route path="/chats/chat/:id/settings" exact component={ChatSettingsPage} />
+        <Route path="/chats/chat/:id/members" exact component={ChatMembersPage} />
+        <Route path="/chats/chat/:id/details" exact component={GroupDetailPage} />
+        <Route path="/demo" exact component={ComponentDemoPage} />
+        <Route path="/settings/language" exact component={LanguagePage} />
+        <Route path="/settings" exact component={SettingsPage} />
+        <Redirect exact from="/" to="/chats" />
+        <Route component={NotFoundPage} />
+      </IonRouterOutlet>
+      <IonTabBar slot="bottom" style={isTabRoot ? undefined : { display: 'none' }}>
+        {tabBarButtons}
+      </IonTabBar>
+    </IonTabs>
+  );
+};
 
 const App: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -79,33 +136,6 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const tabBarButtons = [
-    (
-      <IonTabButton tab="chats" href="/chats" key="chats">
-        <IonIcon icon={chatbubbles} />
-        <IonLabel><Trans>Chats</Trans></IonLabel>
-      </IonTabButton>
-    ),
-    (
-
-      <IonTabButton tab="settings" href="/settings" key="settings">
-        <IonIcon icon={settings} />
-        <IonLabel><Trans>Settings</Trans></IonLabel>
-      </IonTabButton>
-    )
-  ];
-
-  if (import.meta.env.DEV) {
-    tabBarButtons.push(
-      (
-        <IonTabButton tab="demo" href="/demo" key="demo">
-          <IonIcon icon={flask} />
-          <IonLabel>Demo</IonLabel>
-        </IonTabButton>
-      )
-    );
-  }
-
   return (
     <IonApp>
       <IonToast
@@ -132,25 +162,7 @@ const App: React.FC = () => {
         </div>
       )}
       <IonReactRouter basename={import.meta.env.BASE_URL}>
-        <IonTabs>
-          <IonRouterOutlet>
-            <Route path="/chats" exact component={ChatsPage} />
-            <Route path="/chats/new" exact component={CreateChatPage} />
-            <Route path="/chats/chat/:id" exact component={ChatThreadPage} />
-            <Route path="/chats/chat/:id/thread/:threadId" exact component={ChatThreadPage} />
-            <Route path="/chats/chat/:id/settings" exact component={ChatSettingsPage} />
-            <Route path="/chats/chat/:id/members" exact component={ChatMembersPage} />
-            <Route path="/chats/chat/:id/details" exact component={GroupDetailPage} />
-            <Route path="/demo" exact component={ComponentDemoPage} />
-            <Route path="/settings/language" exact component={LanguagePage} />
-            <Route path="/settings" exact component={SettingsPage} />
-            <Redirect exact from="/" to="/chats" />
-            <Route component={NotFoundPage} />
-          </IonRouterOutlet>
-          <IonTabBar slot="bottom">
-            {tabBarButtons}
-          </IonTabBar>
-        </IonTabs>
+        <TabsContainer />
       </IonReactRouter>
     </IonApp>
   );
