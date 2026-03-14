@@ -530,7 +530,7 @@ export default function ChatThread() {
         </IonFab>
       </IonContent>
 
-      <IonFooter>
+      <IonFooter className="chat-thread-footer">
         <MessageComposeBar
           onSend={handleSend}
           replyTo={replyingTo ? {

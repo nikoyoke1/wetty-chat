@@ -286,6 +286,10 @@
   white-space: nowrap;
 }
 
+.chat-thread-footer {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 .reply-preview-close {
   background: none;
   border: none;
