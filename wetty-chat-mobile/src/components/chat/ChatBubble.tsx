@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { IonIcon } from '@ionic/react';
-import { arrowUndo, chatbubbles, checkmarkCircle, checkmarkCircleOutline } from 'ionicons/icons';
+import { arrowUndo, chatbubbles, checkmarkCircle, checkmarkCircleOutline, documentOutline } from 'ionicons/icons';
 import { t } from '@lingui/core/macro';
 import styles from './ChatBubble.module.scss';
 import type { Attachment } from '@/api/messages';
@@ -200,6 +200,21 @@ export function ChatBubble({
             {attachments && attachments.length > 0 && (
               <div className={styles.attachmentsContainer}>
                 {attachments.map((att) => {
+                  if (!att.kind.startsWith('image')) {
+                    return (
+                      <a
+                        key={att.id}
+                        className={styles.filePlaceholder}
+                        href={att.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <IonIcon icon={documentOutline} className={styles.fileIcon} />
+                        <span className={styles.fileName}>{att.file_name}</span>
+                      </a>
+                    );
+                  }
+
                   const hasSize = att.width && att.height;
 
                   const imageStyle: React.CSSProperties = {
