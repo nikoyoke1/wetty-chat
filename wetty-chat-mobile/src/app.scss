@@ -26,3 +26,9 @@ ion-tab-bar {
 .tab-bar-hidden ion-tab-bar {
   display: none !important;
 }
+
+:root {
+  --ion-color-primary: #1595d0;
+  --ion-toolbar-background: #40baf0;
+  --ion-toolbar-color: #fff;
+}
