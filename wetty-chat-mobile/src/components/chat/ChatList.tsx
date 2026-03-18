@@ -98,9 +98,10 @@ function getMessagePreview(message: MessageResponse | null): ReactNode {
 interface ChatListProps {
   activeChatId?: string;
   onChatSelect?: (chatId: string) => void;
+  toolbarStart?: ReactNode;
 }
 
-export function ChatList({ activeChatId, onChatSelect }: ChatListProps) {
+export function ChatList({ activeChatId, onChatSelect, toolbarStart }: ChatListProps) {
   const history = useHistory();
   const dispatch = useDispatch();
   const locale = useSelector(selectEffectiveLocale);
@@ -207,6 +208,7 @@ export function ChatList({ activeChatId, onChatSelect }: ChatListProps) {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
+            {toolbarStart}
           </IonButtons>
           <IonTitle><Trans>Chats</Trans></IonTitle>
           <IonButtons slot="end">

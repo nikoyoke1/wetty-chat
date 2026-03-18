@@ -13,6 +13,7 @@ import {
   IonListHeader,
   IonIcon,
   IonNote,
+  IonButtons,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -25,8 +26,15 @@ import { FeatureGate } from '@/components/FeatureGate';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { t } from '@lingui/core/macro';
 import { language, codeWorking, notifications, informationCircle, logIn, logOut, refreshCircle } from 'ionicons/icons';
+import { BackButton } from '@/components/BackButton';
+import type { BackAction } from '@/types/back-action';
 
-export default function Settings() {
+interface SettingsCoreProps {
+  backAction?: BackAction;
+  onOpenLanguage?: () => void;
+}
+
+export function SettingsCore({ backAction, onOpenLanguage }: SettingsCoreProps) {
   const currentUid = useSelector((state: RootState) => state.user.uid);
   const [uidInput, setUidInput] = useState(String(currentUid || '1'));
   const [presentToast] = useIonToast();
@@ -49,10 +57,21 @@ export default function Settings() {
     window.location.reload();
   };
 
+  const handleOpenLanguage = () => {
+    if (onOpenLanguage) {
+      onOpenLanguage();
+      return;
+    }
+    history.push('/settings/language');
+  };
+
   return (
     <IonPage>
       <IonHeader>
         <IonToolbar>
+          <IonButtons slot="start">
+            {backAction && <BackButton action={backAction} />}
+          </IonButtons>
           <IonTitle><Trans>Settings</Trans></IonTitle>
         </IonToolbar>
       </IonHeader>
@@ -61,7 +80,7 @@ export default function Settings() {
           <IonLabel><Trans>General</Trans></IonLabel>
         </IonListHeader>
         <IonList inset>
-          <IonItem button detail={true} onClick={() => history.push('/settings/language')}>
+          <IonItem button detail={true} onClick={handleOpenLanguage}>
             <IonIcon aria-hidden="true" icon={language} slot="start" color="primary" />
             <IonLabel><Trans>Language</Trans></IonLabel>
             <IonNote slot="end" color="medium">{{ 'en': 'English', 'zh-CN': '简体中文', 'zh-TW': '繁體中文' }[locale!] ?? t`Auto`}</IonNote>
@@ -149,4 +168,8 @@ export default function Settings() {
       </IonContent>
     </IonPage>
   );
+}
+
+export default function Settings() {
+  return <SettingsCore />;
 }

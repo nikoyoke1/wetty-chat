@@ -17,6 +17,8 @@ import { useHistory } from 'react-router-dom';
 import { Trans } from '@lingui/react/macro';
 import { selectLocale, setLocale } from '@/store/settingsSlice';
 import { dynamicActivate, activateDetectedLocale } from '@/i18n';
+import { BackButton } from '@/components/BackButton';
+import type { BackAction } from '@/types/back-action';
 
 const locales = [
   { code: 'en', label: 'English' },
@@ -24,7 +26,11 @@ const locales = [
   { code: 'zh-TW', label: '繁體中文' },
 ] as const;
 
-export default function LanguagePage() {
+interface LanguageCoreProps {
+  backAction?: BackAction;
+}
+
+export function LanguagePageCore({ backAction }: LanguageCoreProps) {
   const dispatch = useDispatch();
   const history = useHistory();
   const currentLocale = useSelector(selectLocale);
@@ -46,7 +52,7 @@ export default function LanguagePage() {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/settings" />
+            {backAction ? <BackButton action={backAction} /> : <IonBackButton defaultHref="/settings" />}
           </IonButtons>
           <IonTitle>Language</IonTitle>
         </IonToolbar>
@@ -71,4 +77,8 @@ export default function LanguagePage() {
       </IonContent>
     </IonPage>
   );
+}
+
+export default function LanguagePage() {
+  return <LanguagePageCore />;
 }
