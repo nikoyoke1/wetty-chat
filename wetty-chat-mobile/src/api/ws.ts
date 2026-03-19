@@ -1,14 +1,13 @@
 import apiClient from '@/api/client';
 import { syncApp } from '@/api/sync';
 import type { MessageResponse } from '@/api/messages';
-import { updateChatFromMessage } from '@/store/chatsSlice';
 import { setWsConnected } from '@/store/connectionSlice';
 import store from '@/store/index';
 import {
-  addMessage,
-  confirmPendingMessage,
-  updateMessageInStore,
-} from '@/store/messagesSlice';
+  messageAdded,
+  messageConfirmed,
+  messagePatched,
+} from '@/store/messageEvents';
 
 const WS_PATH = import.meta.env.BASE_URL + '_api/ws';
 const PING_INTERVAL_MS = 10_000;
@@ -96,22 +95,26 @@ function handleWsMessage(payload: unknown): void {
   const message = normalizePayload(payload);
   if (!message) return;
 
-  const targetChatId = message.reply_root_id
+  const storeChatId = message.reply_root_id
     ? `${message.chat_id}_thread_${message.reply_root_id}`
     : message.chat_id;
-  const all = allMessagesForChat(targetChatId);
+  const all = allMessagesForChat(storeChatId);
   const pending = all.find(
     current =>
-      current.client_generated_id === message.client_generated_id && current.id === '0',
+      current.client_generated_id === message.client_generated_id &&
+      current.id.startsWith('cg_'),
   );
 
   if (pending) {
     store.dispatch(
-      confirmPendingMessage({
-        chatId: targetChatId,
+      messageConfirmed({
+        chatId: message.chat_id,
+        storeChatId,
         clientGeneratedId: message.client_generated_id,
         message,
-      }),
+        origin: 'ws',
+        scope: message.reply_root_id ? 'thread' : 'main',
+      })
     );
   } else {
     const exists = all.some(
@@ -120,17 +123,15 @@ function handleWsMessage(payload: unknown): void {
         current.client_generated_id === message.client_generated_id,
     );
     if (!exists) {
-      store.dispatch(addMessage({ chatId: targetChatId, message }));
+      store.dispatch(messageAdded({
+        chatId: message.chat_id,
+        storeChatId,
+        message,
+        origin: 'ws',
+        scope: message.reply_root_id ? 'thread' : 'main',
+      }));
     }
   }
-
-  store.dispatch(
-    updateChatFromMessage({
-      chatId: message.chat_id,
-      message,
-      currentUserId: store.getState().user.uid || 0,
-    }),
-  );
 }
 
 function sendJson(message: AuthMessage | PingMessage | AppStateMessage): void {
@@ -253,20 +254,11 @@ async function connectWebSocket(): Promise<void> {
         ) {
           const payload = normalizePayload(message.payload);
           if (!payload) return;
-
-          const state = store.getState();
-          const chatPrefix = `${payload.chat_id}`;
-          for (const key of Object.keys(state.messages.chats)) {
-            if (key === chatPrefix || key.startsWith(`${chatPrefix}_thread_`)) {
-              store.dispatch(
-                updateMessageInStore({
-                  chatId: key,
-                  messageId: payload.id,
-                  message: payload,
-                }),
-              );
-            }
-          }
+          store.dispatch(messagePatched({
+            chatId: payload.chat_id,
+            messageId: payload.id,
+            message: payload,
+          }));
         }
       } catch {
         // ignore malformed websocket messages

@@ -1,5 +1,6 @@
 import { createSlice, createSelector } from '@reduxjs/toolkit';
 import type { MessageResponse } from '@/api/messages';
+import { messageAdded, messageConfirmed, messagePatched } from './messageEvents';
 
 const MAX_WINDOWS = 5;
 
@@ -37,6 +38,66 @@ function getChat(state: MessagesState, chatId: string): ChatMessageState {
 
 function getActiveWindow(chat: ChatMessageState): MessageWindow | undefined {
   return chat.windows[chat.activeWindowIndex];
+}
+
+function addMessageToWindow(state: MessagesState, chatId: string, message: MessageResponse): void {
+  const chat = getChat(state, chatId);
+  if (chat.windows.length === 0) {
+    chat.windows.push({ messages: [], nextCursor: null, prevCursor: null });
+    chat.activeWindowIndex = 0;
+  }
+  const lastWin = chat.windows[chat.windows.length - 1];
+  if (lastWin.messages.some(m => m.id === message.id)) return;
+  lastWin.messages.push(message);
+}
+
+function confirmPendingInWindows(
+  state: MessagesState,
+  chatId: string,
+  clientGeneratedId: string,
+  message: MessageResponse,
+): void {
+  const chat = state.chats[chatId];
+  if (!chat) return;
+  for (const win of chat.windows) {
+    const idx = win.messages.findIndex(m => m.client_generated_id === clientGeneratedId);
+    if (idx !== -1) {
+      win.messages[idx] = message;
+      return;
+    }
+  }
+}
+
+function patchMessageInWindows(
+  state: MessagesState,
+  baseChatId: string,
+  messageId: string,
+  message: MessageResponse,
+): void {
+  for (const [chatId, chat] of Object.entries(state.chats)) {
+    if (chatId !== baseChatId && !chatId.startsWith(`${baseChatId}_thread_`)) continue;
+
+    for (const win of chat.windows) {
+      if (message.is_deleted) {
+        win.messages = win.messages.filter(m => m.id !== messageId);
+      }
+
+      for (let i = 0; i < win.messages.length; i++) {
+        const current = win.messages[i];
+        if (!message.is_deleted && current.id === messageId) {
+          const preservedReplyTo =
+            message.reply_to_message ??
+            (message.reply_to_message === undefined && current.reply_to_message !== undefined
+              ? current.reply_to_message
+              : undefined);
+          win.messages[i] = { ...message, reply_to_message: preservedReplyTo };
+        } else if (current.reply_to_message?.id === messageId) {
+          current.reply_to_message.message = message.message;
+          current.reply_to_message.is_deleted = message.is_deleted;
+        }
+      }
+    }
+  }
 }
 
 const messagesSlice = createSlice({
@@ -113,61 +174,6 @@ const messagesSlice = createSlice({
       }
     },
 
-    addMessage(state, action: { payload: { chatId: string; message: MessageResponse } }) {
-      const { chatId, message } = action.payload;
-      const chat = getChat(state, chatId);
-      if (chat.windows.length === 0) {
-        chat.windows.push({ messages: [], nextCursor: null, prevCursor: null });
-        chat.activeWindowIndex = 0;
-      }
-      const lastWin = chat.windows[chat.windows.length - 1];
-      if (lastWin.messages.some(m => m.id === message.id)) return;
-      lastWin.messages.push(message);
-    },
-
-    confirmPendingMessage(
-      state,
-      action: { payload: { chatId: string; clientGeneratedId: string; message: MessageResponse } }
-    ) {
-      const { chatId, clientGeneratedId, message } = action.payload;
-      const chat = state.chats[chatId];
-      if (!chat) return;
-      for (const win of chat.windows) {
-        const idx = win.messages.findIndex(m => m.client_generated_id === clientGeneratedId);
-        if (idx !== -1) {
-          win.messages[idx] = message;
-          return;
-        }
-      }
-    },
-
-    updateMessageInStore(
-      state,
-      action: { payload: { chatId: string; messageId: string; message: MessageResponse } }
-    ) {
-      const { chatId, messageId, message } = action.payload;
-      const chat = state.chats[chatId];
-      if (!chat) return;
-      for (const win of chat.windows) {
-        if (message.is_deleted) {
-          // If the message is deleted, remove it from the list of messages
-          win.messages = win.messages.filter(m => m.id !== messageId);
-        }
-
-        for (let i = 0; i < win.messages.length; i++) {
-          const m = win.messages[i];
-          if (!message.is_deleted && m.id === messageId) {
-            // Use existing reply_to_message if the incoming update doesn't have it but is for the same reply
-            const preservedReplyTo = message.reply_to_message ?? (message.reply_to_message === undefined && m.reply_to_message !== undefined ? m.reply_to_message : undefined);
-            win.messages[i] = { ...message, reply_to_message: preservedReplyTo };
-          } else if (m.reply_to_message?.id === messageId) {
-            m.reply_to_message.message = message.message;
-            m.reply_to_message.is_deleted = message.is_deleted;
-          }
-        }
-      }
-    },
-
     // Backwards compat aliases
     setMessagesForChat(state, action: { payload: { chatId: string; messages: MessageResponse[] } }) {
       const { chatId, messages } = action.payload;
@@ -238,6 +244,28 @@ const messagesSlice = createSlice({
       chat.generation++;
     },
   },
+  extraReducers: builder => {
+    builder
+      .addCase(messageAdded, (state, action) => {
+        addMessageToWindow(state, action.payload.storeChatId, action.payload.message);
+      })
+      .addCase(messageConfirmed, (state, action) => {
+        confirmPendingInWindows(
+          state,
+          action.payload.storeChatId,
+          action.payload.clientGeneratedId,
+          action.payload.message,
+        );
+      })
+      .addCase(messagePatched, (state, action) => {
+        patchMessageInWindows(
+          state,
+          action.payload.chatId,
+          action.payload.messageId,
+          action.payload.message,
+        );
+      });
+  },
 });
 
 export const {
@@ -246,11 +274,8 @@ export const {
   setMessagesForChat,
   setNextCursorForChat,
   setPrevCursorForChat,
-  addMessage,
   appendMessages,
   prependMessages,
-  confirmPendingMessage,
-  updateMessageInStore,
   refreshLatest,
 } = messagesSlice.actions;
 

@@ -35,13 +35,11 @@ import {
   resetChat,
   refreshLatest,
   pushWindow,
-  addMessage,
   appendMessages,
   prependMessages,
-  confirmPendingMessage,
-  updateMessageInStore,
   selectChatGeneration,
 } from '@/store/messagesSlice';
+import { messageAdded, messageConfirmed, messagePatched } from '@/store/messageEvents';
 import store from '@/store/index';
 import type { RootState } from '@/store/index';
 import { VirtualScroll } from '@/components/chat/VirtualScroll';
@@ -295,16 +293,16 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
       const optimisticMsg = { ...editingMessage, message: text, is_edited: true };
 
       // Optimistic update
-      dispatch(updateMessageInStore({ chatId: storeChatId, messageId, message: optimisticMsg }));
+      dispatch(messagePatched({ chatId, messageId, message: optimisticMsg }));
       setEditingMessage(null);
 
       updateMessage(chatId, messageId, { message: text })
         .then((res) => {
-          dispatch(updateMessageInStore({ chatId: storeChatId, messageId, message: res.data }));
+          dispatch(messagePatched({ chatId, messageId, message: res.data }));
         })
         .catch((err: Error) => {
           // Revert optimistic update
-          dispatch(updateMessageInStore({ chatId: storeChatId, messageId, message: editingMessage }));
+          dispatch(messagePatched({ chatId, messageId, message: editingMessage }));
           showToast(err.message || t`Failed to edit message`);
         });
       return;
@@ -336,7 +334,13 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
       has_attachments: (attachmentIds && attachmentIds.length > 0) || false,
       thread_info: undefined,
     };
-    dispatch(addMessage({ chatId: storeChatId, message: optimistic }));
+    dispatch(messageAdded({
+      chatId,
+      storeChatId,
+      message: optimistic,
+      origin: 'optimistic',
+      scope: threadId ? 'thread' : 'main',
+    }));
     setReplyingTo(null);
     setTimeout(() => scrollToBottomRef.current?.(), 50);
 
@@ -359,12 +363,19 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
           ...postResponse,
           reply_to_message: postResponse.reply_to_message ?? optimistic.reply_to_message,
         };
-        dispatch(confirmPendingMessage({ chatId: storeChatId, clientGeneratedId, message: confirmed }));
+        dispatch(messageConfirmed({
+          chatId,
+          storeChatId,
+          clientGeneratedId,
+          message: confirmed,
+          origin: 'api_confirm',
+          scope: threadId ? 'thread' : 'main',
+        }));
       })
       .catch((err: Error) => {
         showToast(err.message || t`Failed to send`);
-        dispatch(updateMessageInStore({
-          chatId: storeChatId,
+        dispatch(messagePatched({
+          chatId,
           messageId: clientGeneratedId,
           message: { ...optimistic, is_deleted: true }
         }));
@@ -399,9 +410,9 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
                   {
                     text: t`Delete`, role: 'destructive' as const, handler: () => {
                       const deletedOptimistic = { ...msg, is_deleted: true };
-                      dispatch(updateMessageInStore({ chatId: storeChatId, messageId: msg.id, message: deletedOptimistic }));
+                      dispatch(messagePatched({ chatId, messageId: msg.id, message: deletedOptimistic }));
                       deleteMessage(chatId, msg.id).catch((e: any) => {
-                        dispatch(updateMessageInStore({ chatId: storeChatId, messageId: msg.id, message: msg }));
+                        dispatch(messagePatched({ chatId, messageId: msg.id, message: msg }));
                         showToast(e.message || t`Failed to delete message`);
                       });
                     }
