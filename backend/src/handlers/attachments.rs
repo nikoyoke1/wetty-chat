@@ -7,6 +7,7 @@ use axum::{
 use chrono::{Duration, Utc};
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 use crate::utils::auth::CurrentUid;
 use crate::utils::ids;
@@ -25,6 +26,7 @@ pub struct UploadUrlRequest {
 pub struct UploadUrlResponse {
     attachment_id: String,
     upload_url: String,
+    upload_headers: BTreeMap<String, String>,
 }
 
 // Kept for potential future use or non-public buckets
@@ -87,6 +89,7 @@ async fn post_upload_url(
 
     let key = format!("{}/{}.{}", prefix, s3_item_id, extension);
     let expires_in = Duration::minutes(15);
+    let cache_control = "public,max-age=31536000,immutable";
     let presigning_config =
         PresigningConfig::expires_in(expires_in.to_std().unwrap()).map_err(|e| {
             tracing::error!("presigning config error: {:?}", e);
@@ -101,6 +104,7 @@ async fn post_upload_url(
         .bucket(bucket)
         .key(&key)
         .content_type(&payload.content_type)
+        .cache_control(cache_control)
         .acl(aws_sdk_s3::types::ObjectCannedAcl::PublicRead)
         .presigned(presigning_config)
         .await
@@ -143,9 +147,16 @@ async fn post_upload_url(
             )
         })?;
 
+    let upload_headers = BTreeMap::from([
+        ("Cache-Control".to_string(), cache_control.to_string()),
+        ("Content-Type".to_string(), payload.content_type.clone()),
+        ("x-amz-acl".to_string(), "public-read".to_string()),
+    ]);
+
     let response = UploadUrlResponse {
         attachment_id: id.to_string(),
         upload_url: presigned_request.uri().to_string(),
+        upload_headers,
     };
 
     Ok((StatusCode::CREATED, Json(response)))

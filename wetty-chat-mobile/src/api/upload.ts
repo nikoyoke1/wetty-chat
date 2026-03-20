@@ -12,6 +12,7 @@ export interface UploadUrlRequest {
 export interface UploadUrlResponse {
     attachment_id: string;
     upload_url: string;
+    upload_headers: Record<string, string>;
 }
 
 export interface UploadFileToS3Options {
@@ -28,13 +29,11 @@ export function requestUploadUrl(
 export async function uploadFileToS3(
     url: string,
     file: File,
+    headers: Record<string, string>,
     options: UploadFileToS3Options = {}
 ): Promise<AxiosResponse<void>> {
     return axios.put(url, file, {
-        headers: {
-            'Content-Type': file.type,
-            'x-amz-acl': 'public-read',
-        },
+        headers,
         signal: options.signal,
         onUploadProgress: (event) => {
             if (!options.onProgress || !event.total) return;

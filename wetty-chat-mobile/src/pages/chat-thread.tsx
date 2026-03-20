@@ -287,8 +287,8 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
       ...dimensions,
     });
 
-    const { upload_url, attachment_id } = res.data;
-    await uploadFileToS3(upload_url, file, { onProgress, signal });
+    const { upload_url, attachment_id, upload_headers } = res.data;
+    await uploadFileToS3(upload_url, file, upload_headers, { onProgress, signal });
 
     return { attachmentId: attachment_id };
   }, []);
