@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -51,6 +51,7 @@ import {
   type ComposeUploadInput,
   type ComposeSendPayload,
   type ComposeUploadedAttachment,
+  type EditingMessage,
 } from '@/components/chat/MessageComposeBar';
 import './chat-thread.scss';
 import { t } from '@lingui/core/macro';
@@ -101,6 +102,10 @@ interface ChatThreadCoreProps {
   backAction?: BackAction;
 }
 
+interface EditSession extends EditingMessage {
+  originalMessage: MessageResponse;
+}
+
 function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
   const storeChatId = threadId ? `${chatId}_thread_${threadId}` : chatId;
   const history = useHistory();
@@ -124,7 +129,10 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
       .catch(() => { });
   }, [chatId, storedName, dispatch]);
   const messages = useSelector((state: RootState) => selectMessagesForChat(state, storeChatId));
-  const messageLookup = new Map(messages.map((message) => [message.id, message]));
+  const messageLookup = useMemo(
+    () => new Map(messages.map((message) => [message.id, message])),
+    [messages],
+  );
 
   const formatDateSeparator = useCallback((iso: string) => {
     if (!iso) return '';
@@ -162,7 +170,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
 
   const [atBottom, setAtBottom] = useState(true);
   const [replyingTo, setReplyingTo] = useState<MessageResponse | null>(null);
-  const [editingMessage, setEditingMessage] = useState<MessageResponse | null>(null);
+  const [editingSession, setEditingSession] = useState<EditSession | null>(null);
 
 
   const [presentToast] = useIonToast();
@@ -342,21 +350,22 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
     }
 
     // Edit flow
-    if (editingMessage) {
-      const originalAttachmentIds = (editingMessage.attachments ?? []).map((attachment) => attachment.id);
+    if (editingSession) {
+      const originalAttachmentIds = (editingSession.attachments ?? []).map((attachment) => attachment.id);
       if (!text.trim() && attachmentIds.length === 0) {
         revoke();
         showToast(t`Message cannot be empty`);
         return;
       }
-      if (text.trim() === (editingMessage.message?.trim() ?? '') && areAttachmentIdsEqual(attachmentIds, originalAttachmentIds)) {
+      if (text.trim() === editingSession.text.trim() && areAttachmentIdsEqual(attachmentIds, originalAttachmentIds)) {
         revoke();
         return;
       }
 
-      const messageId = editingMessage.id;
+      const messageId = editingSession.messageId;
+      const currentMessage = messageLookup.get(messageId) ?? editingSession.originalMessage;
       const optimisticMsg = {
-        ...editingMessage,
+        ...currentMessage,
         message: text,
         attachments: [...existingAttachments, ...optimisticUploadedAttachments],
         has_attachments: attachmentIds.length > 0,
@@ -365,7 +374,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
 
       // Optimistic update
       dispatch(messagePatched({ chatId, messageId, message: optimisticMsg }));
-      setEditingMessage(null);
+      setEditingSession(null);
 
       updateMessage(chatId, messageId, { message: text, attachment_ids: attachmentIds })
         .then((res) => {
@@ -373,7 +382,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         })
         .catch((err: Error) => {
           // Revert optimistic update
-          dispatch(messagePatched({ chatId, messageId, message: editingMessage }));
+          dispatch(messagePatched({ chatId, messageId, message: editingSession.originalMessage }));
           showToast(err.message || t`Failed to edit message`);
         })
         .finally(() => {
@@ -465,7 +474,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
       .finally(() => {
         revoke();
       });
-  }, [chatId, storeChatId, threadId, dispatch, showToast, replyingTo, editingMessage, currentUserId, currentUserName, currentUserAvatarUrl]);
+  }, [chatId, storeChatId, threadId, dispatch, showToast, replyingTo, editingSession, currentUserId, currentUserName, currentUserAvatarUrl, messageLookup]);
 
   const onClickChatItem = (messageIndex: number) => {
     const msg = messages[messageIndex];
@@ -482,7 +491,12 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
           {
             text: t`Edit`, handler: () => {
               setReplyingTo(null);
-              setEditingMessage(msg);
+              setEditingSession({
+                messageId: msg.id,
+                text: msg.message ?? '',
+                attachments: msg.attachments,
+                originalMessage: { ...msg },
+              });
             }
           },
           {
@@ -643,12 +657,8 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
             isDeleted: replyingTo.is_deleted,
           } : undefined}
           onCancelReply={() => setReplyingTo(null)}
-          editing={editingMessage ? {
-            messageId: editingMessage.id,
-            text: editingMessage.message ?? '',
-            attachments: editingMessage.attachments,
-          } : undefined}
-          onCancelEdit={() => setEditingMessage(null)}
+          editing={editingSession ?? undefined}
+          onCancelEdit={() => setEditingSession(null)}
         />
       </IonFooter>
     </div>

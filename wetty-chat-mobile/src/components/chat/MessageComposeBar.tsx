@@ -6,6 +6,7 @@ import styles from './MessageComposeBar.module.scss';
 import { UploadPreview, type ImageUploadDraft } from './UploadPreview';
 import type { Attachment } from '@/api/messages';
 import { getMessagePreviewText } from './messagePreview';
+import { FeatureGate } from '../FeatureGate';
 
 interface ReplyTo {
   messageId: string;
@@ -89,6 +90,7 @@ export function MessageComposeBar({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const draftsRef = useRef<DraftUploadRecord[]>([]);
+  const previousEditingMessageIdRef = useRef<string | null>(null);
   const [text, setText] = useState('');
   const prevTextLenRef = useRef(0);
   const [drafts, setDrafts] = useState<DraftUploadRecord[]>([]);
@@ -117,7 +119,10 @@ export function MessageComposeBar({
   }, [drafts]);
 
   useEffect(() => {
-    if (editing) {
+    const editingMessageId = editing?.messageId ?? null;
+    const previousEditingMessageId = previousEditingMessageIdRef.current;
+
+    if (editing && editingMessageId !== previousEditingMessageId) {
       setText(editing.text);
       prevTextLenRef.current = editing.text.length;
       setExistingAttachments(editing.attachments ?? []);
@@ -125,13 +130,18 @@ export function MessageComposeBar({
         prev.forEach(cleanupDraft);
         return [];
       });
-    } else {
+    } else if (!editing && previousEditingMessageId != null) {
       setText('');
       prevTextLenRef.current = 0;
       setExistingAttachments([]);
+      setDrafts((prev) => {
+        prev.forEach(cleanupDraft);
+        return [];
+      });
       const ta = textareaRef.current;
       if (ta) ta.style.height = 'auto';
     }
+    previousEditingMessageIdRef.current = editingMessageId;
   }, [cleanupDraft, editing]);
 
   useLayoutEffect(() => {
@@ -489,9 +499,11 @@ export function MessageComposeBar({
               prevTextLenRef.current = newLen;
             }}
           />
-          <button type="button" className={styles.stickerBtn} aria-label={t`Sticker`}>
-            <IonIcon icon={happyOutline} />
-          </button>
+          <FeatureGate>
+            <button type="button" className={styles.stickerBtn} aria-label={t`Sticker`}>
+              <IonIcon icon={happyOutline} />
+            </button>
+          </FeatureGate>
         </div>
       </div>
       <button
