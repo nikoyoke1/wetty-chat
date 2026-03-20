@@ -24,6 +24,12 @@ export interface MemberResponse {
   username: string | null;
 }
 
+export interface ListMembersResponse {
+  members: MemberResponse[];
+  next_cursor: number | null;
+  can_manage_members: boolean;
+}
+
 export interface AddMemberBody {
   uid: number;
   role?: string;
@@ -41,8 +47,11 @@ export function updateGroupInfo(chatId: string | number, body: UpdateGroupInfoBo
   return apiClient.patch(`/group/${chatId}`, body);
 }
 
-export function getMembers(chatId: string | number): Promise<AxiosResponse<MemberResponse[]>> {
-  return apiClient.get(`/group/${chatId}/members`);
+export function getMembers(
+  chatId: string | number,
+  params: { limit?: number; after?: number } = {},
+): Promise<AxiosResponse<ListMembersResponse>> {
+  return apiClient.get(`/group/${chatId}/members`, { params });
 }
 
 export function addMember(chatId: string | number, body: AddMemberBody): Promise<AxiosResponse<MemberResponse>> {

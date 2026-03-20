@@ -50,10 +50,10 @@ function GroupDetailSession({ id, backAction }: { id: string; backAction?: BackA
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([getGroupInfo(id), getMembers(id)])
+    Promise.all([getGroupInfo(id), getMembers(id, { limit: 20 })])
       .then(([chatRes, membersRes]) => {
         setDetail(chatRes.data);
-        setMembers(membersRes.data ?? []);
+        setMembers(membersRes.data.members ?? []);
       })
       .catch((err: Error) => {
         const msg = err?.message ?? 'Failed to load group';
@@ -64,8 +64,8 @@ function GroupDetailSession({ id, backAction }: { id: string; backAction?: BackA
   }, [id, presentToast]);
 
   const refreshMembers = () => {
-    getMembers(id)
-      .then((res) => setMembers(res.data ?? []))
+    getMembers(id, { limit: 20 })
+      .then((res) => setMembers(res.data.members ?? []))
       .catch((err: Error) => {
         presentToast({ message: err?.message ?? 'Failed to refresh members', duration: 3000 });
       });

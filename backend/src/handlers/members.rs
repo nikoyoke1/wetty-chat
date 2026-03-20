@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     Json,
 };
@@ -10,7 +10,7 @@ use serde::Serialize;
 use crate::models::{GroupRole, NewGroupMembership};
 use crate::schema::{self, group_membership};
 use crate::utils::auth::CurrentUid;
-use crate::AppState;
+use crate::{AppState, MAX_MEMBERS_LIMIT};
 
 #[derive(serde::Deserialize)]
 pub struct ChatIdPath {
@@ -41,6 +41,19 @@ pub struct MemberResponse {
     role: GroupRole,
     joined_at: DateTime<Utc>,
     username: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct ListMembersQuery {
+    limit: Option<i64>,
+    after: Option<i32>,
+}
+
+#[derive(Serialize)]
+struct ListMembersResponse {
+    members: Vec<MemberResponse>,
+    next_cursor: Option<i32>,
+    can_manage_members: bool,
 }
 
 /// Check if user is a member of the chat; return 403 if not.
@@ -96,13 +109,13 @@ fn check_admin_role(
     }
 }
 
-// TODO: deal with pagination later. I think we just return a list of member IDs for now
 /// GET /group/:chat_id/members — List members of a chat.
 async fn get_members(
     CurrentUid(uid): CurrentUid,
     State(state): State<AppState>,
     Path(ChatIdPath { chat_id }): Path<ChatIdPath>,
-) -> Result<Json<Vec<MemberResponse>>, (StatusCode, &'static str)> {
+    Query(q): Query<ListMembersQuery>,
+) -> Result<Json<ListMembersResponse>, (StatusCode, &'static str)> {
     let conn = &mut state.db.get().map_err(|_| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -115,25 +128,52 @@ async fn get_members(
 
     use crate::schema::group_membership::dsl as gm_dsl;
 
+    let requester_is_admin = group_membership::table
+        .filter(gm_dsl::chat_id.eq(chat_id).and(gm_dsl::uid.eq(uid)))
+        .select(gm_dsl::role)
+        .first::<GroupRole>(conn)
+        .map(|role| role == GroupRole::Admin)
+        .map_err(|e| {
+            tracing::error!("get requester role: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to load requester role")
+        })?;
+
+    let limit = q
+        .limit
+        .map(|l| std::cmp::min(l, MAX_MEMBERS_LIMIT))
+        .unwrap_or(MAX_MEMBERS_LIMIT)
+        .max(1);
+
     use crate::schema::discuz::discuz::common_member::dsl as cm_dsl;
 
-    let rows: Vec<(i32, GroupRole, DateTime<Utc>, Option<String>)> = group_membership::table
+    let mut query = group_membership::table
         .left_join(cm_dsl::common_member.on(gm_dsl::uid.eq(cm_dsl::uid)))
         .filter(gm_dsl::chat_id.eq(chat_id))
+        .into_boxed();
+
+    if let Some(after) = q.after {
+        query = query.filter(gm_dsl::uid.gt(after));
+    }
+
+    let rows: Vec<(i32, GroupRole, DateTime<Utc>, Option<String>)> = query
+        .order_by(gm_dsl::uid.asc())
         .select((
             gm_dsl::uid,
             gm_dsl::role,
             gm_dsl::joined_at,
             cm_dsl::username.nullable(),
         ))
+        .limit(limit + 1)
         .load(conn)
         .map_err(|e| {
             tracing::error!("list members: {:?}", e);
             (StatusCode::INTERNAL_SERVER_ERROR, "Failed to list members")
         })?;
 
-    let members = rows
+    let has_more = rows.len() as i64 > limit;
+    let members: Vec<MemberResponse> = rows
         .into_iter()
+        .take(limit as usize)
         .map(|(uid, role, joined_at, username)| MemberResponse {
             uid,
             role,
@@ -142,7 +182,13 @@ async fn get_members(
         })
         .collect();
 
-    Ok(Json(members))
+    let next_cursor = has_more.then(|| members.last().map(|member| member.uid)).flatten();
+
+    Ok(Json(ListMembersResponse {
+        members,
+        next_cursor,
+        can_manage_members: requester_is_admin,
+    }))
 }
 
 /// POST /group/:chat_id/members — Add a member to the chat (caller must be admin).

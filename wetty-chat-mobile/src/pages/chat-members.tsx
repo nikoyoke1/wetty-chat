@@ -1,14 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   IonPage,
   IonHeader,
   IonToolbar,
   IonTitle,
   IonContent,
-  IonList,
-  IonItem,
-  IonLabel,
-  IonChip,
   IonButton,
   IonButtons,
   IonSpinner,
@@ -20,11 +16,28 @@ import { useParams } from 'react-router-dom';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
 import { getMembers, addMember, removeMember, updateMemberRole, type MemberResponse } from '@/api/group';
+import { Virtuoso } from 'react-virtuoso';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store/index';
 import { FeatureGate } from '@/components/FeatureGate';
 import { BackButton } from '@/components/BackButton';
 import type { BackAction } from '@/types/back-action';
+import { ChatMemberRow } from '@/components/chat-members/ChatMemberRow';
+
+const MEMBERS_PAGE_SIZE = 50;
+
+function mergeMembers(existing: MemberResponse[], incoming: MemberResponse[]): MemberResponse[] {
+  const seen = new Set(existing.map((member) => member.uid));
+  const next = [...existing];
+
+  for (const member of incoming) {
+    if (seen.has(member.uid)) continue;
+    seen.add(member.uid);
+    next.push(member);
+  }
+
+  return next;
+}
 
 interface ChatMembersCoreProps {
   chatId?: string;
@@ -41,31 +54,83 @@ export default function ChatMembersCore({ chatId: propChatId, backAction }: Chat
   const [presentActionSheet] = useIonActionSheet();
 
   const [members, setMembers] = useState<MemberResponse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [nextCursor, setNextCursor] = useState<number | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const loadingMoreRef = useRef(false);
 
   const showToast = useCallback((msg: string, duration = 3000) => {
     presentToast({ message: msg, duration });
   }, [presentToast]);
 
-  const loadMembers = useCallback(() => {
-    if (!chatId) return;
-    setLoading(true);
-    getMembers(chatId)
+  const loadInitialMembers = useCallback(() => {
+    if (!chatId) {
+      setMembers([]);
+      setInitialLoading(false);
+      setLoadingMore(false);
+      setNextCursor(null);
+      setHasMore(false);
+      setIsAdmin(false);
+      return Promise.resolve();
+    }
+
+    loadingMoreRef.current = false;
+    setInitialLoading(true);
+    setLoadingMore(false);
+
+    return getMembers(chatId, { limit: MEMBERS_PAGE_SIZE })
       .then((res) => {
-        setMembers(res.data);
-        const currentMember = res.data.find((m) => m.uid === currentUserId);
-        setIsAdmin(currentMember?.role === 'admin');
+        setMembers(res.data.members);
+        setNextCursor(res.data.next_cursor);
+        setHasMore(res.data.next_cursor != null);
+        setIsAdmin(res.data.can_manage_members);
+      })
+      .catch((err: Error) => {
+        showToast(err.message || t`Failed to load members`);
+        setMembers([]);
+        setNextCursor(null);
+        setHasMore(false);
+        setIsAdmin(false);
+      })
+      .finally(() => setInitialLoading(false));
+  }, [chatId, showToast]);
+
+  const loadMoreMembers = useCallback(() => {
+    if (!chatId || !hasMore || nextCursor == null || loadingMoreRef.current) {
+      return;
+    }
+
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+
+    getMembers(chatId, { limit: MEMBERS_PAGE_SIZE, after: nextCursor })
+      .then((res) => {
+        setMembers((current) => mergeMembers(current, res.data.members));
+        setNextCursor(res.data.next_cursor);
+        setHasMore(res.data.next_cursor != null);
+        setIsAdmin(res.data.can_manage_members);
       })
       .catch((err: Error) => {
         showToast(err.message || t`Failed to load members`);
       })
-      .finally(() => setLoading(false));
-  }, [chatId, currentUserId, showToast]);
+      .finally(() => {
+        loadingMoreRef.current = false;
+        setLoadingMore(false);
+      });
+  }, [chatId, hasMore, nextCursor, showToast]);
+
+  const resetAndReloadMembers = useCallback(() => {
+    setMembers([]);
+    setNextCursor(null);
+    setHasMore(false);
+    return loadInitialMembers();
+  }, [loadInitialMembers]);
 
   useEffect(() => {
-    loadMembers();
-  }, [loadMembers]);
+    loadInitialMembers();
+  }, [loadInitialMembers]);
 
   const handleAddMember = () => {
     presentAlert({
@@ -85,7 +150,7 @@ export default function ChatMembersCore({ chatId: propChatId, backAction }: Chat
             addMember(chatId, { uid: userId })
               .then(() => {
                 showToast(t`Member added`, 2000);
-                loadMembers();
+                resetAndReloadMembers();
               })
               .catch((err: Error) => {
                 showToast(err.message || t`Failed to add member`);
@@ -110,7 +175,7 @@ export default function ChatMembersCore({ chatId: propChatId, backAction }: Chat
             removeMember(chatId, member.uid)
               .then(() => {
                 showToast(t`Member removed`, 2000);
-                loadMembers();
+                resetAndReloadMembers();
               })
               .catch((err: Error) => {
                 showToast(err.message || t`Failed to remove member`);
@@ -138,7 +203,7 @@ export default function ChatMembersCore({ chatId: propChatId, backAction }: Chat
             updateMemberRole(chatId, member.uid, { role: newRole })
               .then(() => {
                 showToast(isPromoting ? t`Member promoted` : t`Member demoted`, 2000);
-                loadMembers();
+                resetAndReloadMembers();
               })
               .catch((err: Error) => {
                 showToast(err.message || t`Failed to update role`);
@@ -167,6 +232,26 @@ export default function ChatMembersCore({ chatId: propChatId, backAction }: Chat
     });
   };
 
+  const renderMembersFooter = useCallback(() => {
+    if (loadingMore) {
+      return (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '16px' }}>
+          <IonSpinner />
+        </div>
+      );
+    }
+
+    if (members.length === 0) {
+      return (
+        <div style={{ padding: '16px', color: 'var(--ion-color-medium)' }}>
+          <Trans>No members found.</Trans>
+        </div>
+      );
+    }
+
+    return null;
+  }, [loadingMore, members.length]);
+
   return (
     <div className="ion-page">
       <IonHeader>
@@ -177,13 +262,13 @@ export default function ChatMembersCore({ chatId: propChatId, backAction }: Chat
           <IonTitle><Trans>Group Members</Trans></IonTitle>
         </IonToolbar>
       </IonHeader>
-      <IonContent>
-        {loading ? (
+      <IonContent scrollY={false}>
+        {initialLoading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '24px' }}>
             <IonSpinner />
           </div>
         ) : (
-          <>
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <FeatureGate>
               <div style={{ padding: '16px' }}>
                 <IonButton expand="block" onClick={handleAddMember}>
@@ -191,27 +276,23 @@ export default function ChatMembersCore({ chatId: propChatId, backAction }: Chat
                 </IonButton>
               </div>
             </FeatureGate>
-            <IonList>
-              {members.map((member) => (
-                <IonItem
-                  key={member.uid}
-                  button={isAdmin && member.uid !== currentUserId}
-                  detail={false}
-                  onClick={() => import.meta.env.DEV && handleMemberTap(member)}
-                >
-                  <IonLabel>
-                    {member.username || t`User ${member.uid}`}
-                  </IonLabel>
-                  <IonChip
-                    color={member.role === 'admin' ? 'primary' : 'medium'}
-                    slot="end"
-                  >
-                    {member.role}
-                  </IonChip>
-                </IonItem>
-              ))}
-            </IonList>
-          </>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <Virtuoso
+                data={members}
+                endReached={hasMore ? () => loadMoreMembers() : undefined}
+                style={{ height: '100%' }}
+                components={{ Footer: renderMembersFooter }}
+                itemContent={(_, member) => (
+                  <ChatMemberRow
+                    member={member}
+                    isAdmin={isAdmin}
+                    isCurrentUser={member.uid === currentUserId}
+                    onSelect={handleMemberTap}
+                  />
+                )}
+              />
+            </div>
+          </div>
         )}
       </IonContent>
     </div>
