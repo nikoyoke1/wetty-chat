@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { arrowUndo, chatbubbles, checkmarkCircle, checkmarkCircleOutline, documentOutline } from 'ionicons/icons';
 import { t } from '@lingui/core/macro';
 import styles from './ChatBubble.module.scss';
-import type { Attachment } from '@/api/messages';
+import type { Attachment, ReactionSummary } from '@/api/messages';
 import { ImageViewer } from './ImageViewer';
 import { getMessagePreviewText } from './messagePreview';
 import { selectChatFontSizeStyle } from '@/store/settingsSlice';
@@ -62,6 +62,8 @@ interface ChatBubbleProps {
   onThreadClick?: () => void;
   attachments?: Attachment[];
   maxImageHeight?: number;
+  reactions?: ReactionSummary[];
+  onReactionToggle?: (emoji: string, currentlyReacted: boolean) => void;
 }
 
 function formatTime(iso: string): string {
@@ -129,6 +131,8 @@ export function ChatBubble({
   onThreadClick,
   attachments,
   maxImageHeight = 300,
+  reactions,
+  onReactionToggle,
 }: ChatBubbleProps) {
   const swipeSign = swipeDirection === 'left' ? -1 : 1;
   const [offset, setOffset] = useState(0);
@@ -331,6 +335,39 @@ export function ChatBubble({
               <div className={styles.threadIndicator} onClick={onThreadClick}>
                 <IonIcon icon={chatbubbles} />
                 <span>{threadInfo.reply_count} {threadInfo.reply_count === 1 ? t`thread reply` : t`thread replies`}</span>
+              </div>
+            )}
+            {reactions && reactions.length > 0 && (
+              <div className={styles.reactions}>
+                {reactions.map(r => (
+                  <button
+                    key={r.emoji}
+                    type="button"
+                    className={`${styles.reactionPill} ${r.reacted_by_me ? styles.reactionPillActive : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onReactionToggle?.(r.emoji, !!r.reacted_by_me);
+                    }}
+                  >
+                    <span className={styles.reactionEmoji}>{r.emoji}</span>
+                    {r.reactors && r.reactors.length > 0 ? (
+                      <span className={styles.reactorAvatars}>
+                        {r.reactors.slice(0, 5).map((reactor, i) => (
+                          <img
+                            key={reactor.uid}
+                            src={reactor.avatar_url ?? undefined}
+                            alt=""
+                            className={styles.reactorAvatar}
+                            style={{ marginLeft: i > 0 ? -8 : 0, zIndex: 5 - i }}
+                          />
+                        ))}
+                        {r.count > 5 && <span className={styles.reactorOverflow}>+{r.count - 5}</span>}
+                      </span>
+                    ) : (
+                      r.count > 1 && <span className={styles.reactionCount}>{r.count}</span>
+                    )}
+                  </button>
+                ))}
               </div>
             )}
           </div>

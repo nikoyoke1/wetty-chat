@@ -1,12 +1,13 @@
 import apiClient from '@/api/client';
 import { syncApp } from '@/api/sync';
-import type { MessageResponse } from '@/api/messages';
+import type { MessageResponse, ReactionSummary } from '@/api/messages';
 import { setWsConnected } from '@/store/connectionSlice';
 import store from '@/store/index';
 import {
   messageAdded,
   messageConfirmed,
   messagePatched,
+  reactionsUpdated,
 } from '@/store/messageEvents';
 
 const WS_PATH = import.meta.env.BASE_URL + '_api/ws';
@@ -259,6 +260,22 @@ async function connectWebSocket(): Promise<void> {
             messageId: payload.id,
             message: payload,
           }));
+          return;
+        }
+
+        if (message.type === 'reaction_updated' && message.payload != null) {
+          const payload = message.payload as {
+            message_id: string;
+            chat_id: string;
+            reactions: ReactionSummary[];
+          };
+          if (payload.message_id && payload.chat_id) {
+            store.dispatch(reactionsUpdated({
+              chatId: payload.chat_id,
+              messageId: payload.message_id,
+              reactions: payload.reactions ?? [],
+            }));
+          }
         }
       } catch {
         // ignore malformed websocket messages

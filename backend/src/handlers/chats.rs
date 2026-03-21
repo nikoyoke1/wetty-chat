@@ -307,11 +307,20 @@ pub struct MessageResponse {
 }
 
 #[derive(Debug, Serialize, Clone)]
+pub struct ReactionReactor {
+    pub uid: i32,
+    pub name: Option<String>,
+    pub avatar_url: Option<String>,
+}
+
+#[derive(Debug, Serialize, Clone)]
 pub struct ReactionSummary {
     pub emoji: String,
     pub count: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reacted_by_me: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reactors: Option<Vec<ReactionReactor>>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -351,6 +360,26 @@ fn load_message_usernames(
         .select((messages::id, cm_dsl::username.nullable()))
         .load::<(i64, Option<String>)>(conn)
         .map(|rows| rows.into_iter().collect())
+}
+
+fn load_usernames_by_uids(
+    conn: &mut DbConn,
+    uids: &[i32],
+) -> std::collections::HashMap<i32, Option<String>> {
+    use crate::schema::discuz::discuz::common_member::dsl as cm_dsl;
+
+    if uids.is_empty() {
+        return std::collections::HashMap::new();
+    }
+
+    cm_dsl::common_member
+        .filter(cm_dsl::uid.eq_any(uids))
+        .select((cm_dsl::uid, cm_dsl::username))
+        .load::<(i32, String)>(conn)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(uid, name)| (uid, Some(name)))
+        .collect()
 }
 
 fn load_reply_messages(
@@ -469,8 +498,53 @@ pub async fn attach_metadata(
             .into_iter()
             .collect();
 
+        // Query 3: Fetch reactor UIDs per (message_id, emoji)
+        let raw_reactors: Vec<(i64, String, i32)> = message_reactions::table
+            .filter(message_reactions::message_id.eq_any(&reacted_message_ids))
+            .select((
+                message_reactions::message_id,
+                message_reactions::emoji,
+                message_reactions::user_uid,
+            ))
+            .load(conn)
+            .unwrap_or_default();
+
+        // Group by (msg_id, emoji) → Vec<uid>, capped at 5
+        let mut reactor_uids_map: std::collections::HashMap<(i64, String), Vec<i32>> =
+            std::collections::HashMap::new();
+        for (msg_id, emoji, uid) in &raw_reactors {
+            let entry = reactor_uids_map
+                .entry((*msg_id, emoji.clone()))
+                .or_default();
+            if entry.len() < 5 {
+                entry.push(*uid);
+            }
+        }
+
+        // Batch-resolve names + avatars for all reactor UIDs
+        let all_reactor_uids: Vec<i32> = reactor_uids_map
+            .values()
+            .flatten()
+            .copied()
+            .collect::<std::collections::HashSet<i32>>()
+            .into_iter()
+            .collect();
+        let reactor_names = load_usernames_by_uids(conn, &all_reactor_uids);
+        let reactor_avatars = lookup_user_avatars(state, &all_reactor_uids);
+
         for (msg_id, emoji, count) in counts {
             let reacted_by_me = Some(my_reactions.contains(&(msg_id, emoji.clone())));
+            let reactors = reactor_uids_map
+                .get(&(msg_id, emoji.clone()))
+                .map(|uids| {
+                    uids.iter()
+                        .map(|&uid| ReactionReactor {
+                            uid,
+                            name: reactor_names.get(&uid).cloned().flatten(),
+                            avatar_url: reactor_avatars.get(&uid).cloned().flatten(),
+                        })
+                        .collect()
+                });
             reaction_summaries_map
                 .entry(msg_id)
                 .or_default()
@@ -478,6 +552,7 @@ pub async fn attach_metadata(
                     emoji,
                     count,
                     reacted_by_me,
+                    reactors,
                 });
         }
     }
@@ -1384,30 +1459,22 @@ async fn get_unread_count(
 }
 
 fn validate_emoji(input: &str) -> Result<String, (StatusCode, &'static str)> {
-    let normalized: String = input
-        .chars()
-        .filter(|c| {
-            // Strip skin tone modifiers (Fitzpatrick scale)
-            !('\u{1F3FB}'..='\u{1F3FF}').contains(c)
-                // Strip variation selectors
-                && *c != '\u{FE0E}'
-                && *c != '\u{FE0F}'
-        })
-        .collect();
-
-    if normalized.is_empty() {
+    if input.is_empty() {
         return Err((StatusCode::BAD_REQUEST, "Invalid emoji"));
     }
 
-    // Every remaining char must be emoji or ZWJ (U+200D)
-    if !normalized
-        .chars()
-        .all(|c| unic_emoji_char::is_emoji(c) || c == '\u{200D}')
-    {
+    // Every char must be emoji, ZWJ (U+200D), variation selector, or skin tone modifier
+    if !input.chars().all(|c| {
+        unic_emoji_char::is_emoji(c)
+            || c == '\u{200D}'
+            || c == '\u{FE0E}'
+            || c == '\u{FE0F}'
+            || ('\u{1F3FB}'..='\u{1F3FF}').contains(&c)
+    }) {
         return Err((StatusCode::BAD_REQUEST, "Invalid emoji"));
     }
 
-    Ok(normalized)
+    Ok(input.to_string())
 }
 
 fn broadcast_reaction_update(
@@ -1423,12 +1490,50 @@ fn broadcast_reaction_update(
         .load(conn)
         .unwrap_or_default();
 
+    // Load reactor UIDs (capped at 5 per emoji)
+    let raw_reactors: Vec<(String, i32)> = message_reactions::table
+        .filter(message_reactions::message_id.eq(message_id))
+        .select((message_reactions::emoji, message_reactions::user_uid))
+        .load(conn)
+        .unwrap_or_default();
+
+    let mut reactor_uids_map: std::collections::HashMap<String, Vec<i32>> =
+        std::collections::HashMap::new();
+    for (emoji, uid) in &raw_reactors {
+        let entry = reactor_uids_map.entry(emoji.clone()).or_default();
+        if entry.len() < 5 {
+            entry.push(*uid);
+        }
+    }
+
+    let all_uids: Vec<i32> = reactor_uids_map
+        .values()
+        .flatten()
+        .copied()
+        .collect::<std::collections::HashSet<i32>>()
+        .into_iter()
+        .collect();
+    let names = load_usernames_by_uids(conn, &all_uids);
+    let avatars = lookup_user_avatars(state, &all_uids);
+
     let reactions: Vec<ReactionSummary> = counts
         .into_iter()
-        .map(|(emoji, count)| ReactionSummary {
-            emoji,
-            count,
-            reacted_by_me: None,
+        .map(|(emoji, count)| {
+            let reactors = reactor_uids_map.get(&emoji).map(|uids| {
+                uids.iter()
+                    .map(|&uid| ReactionReactor {
+                        uid,
+                        name: names.get(&uid).cloned().flatten(),
+                        avatar_url: avatars.get(&uid).cloned().flatten(),
+                    })
+                    .collect()
+            });
+            ReactionSummary {
+                emoji,
+                count,
+                reacted_by_me: None,
+                reactors,
+            }
         })
         .collect();
 
@@ -1448,6 +1553,94 @@ fn broadcast_reaction_update(
         ),
     );
     state.ws_registry.broadcast_to_uids(&member_uids, ws_msg);
+}
+
+#[derive(Debug, Serialize)]
+struct ReactionDetailGroup {
+    emoji: String,
+    reactors: Vec<ReactionReactor>,
+}
+
+#[derive(Debug, Serialize)]
+struct ReactionDetailResponse {
+    reactions: Vec<ReactionDetailGroup>,
+}
+
+async fn get_reaction_details(
+    CurrentUid(uid): CurrentUid,
+    State(state): State<AppState>,
+    Path((chat_id, message_id)): Path<(i64, i64)>,
+) -> Result<Json<ReactionDetailResponse>, (StatusCode, &'static str)> {
+    let conn = &mut state.db.get().map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Database connection failed",
+        )
+    })?;
+    check_membership(conn, chat_id, uid)?;
+
+    // Verify message exists in this chat
+    let _message: Message = messages::table
+        .filter(messages::id.eq(message_id))
+        .filter(messages::chat_id.eq(chat_id))
+        .first(conn)
+        .map_err(|_| (StatusCode::NOT_FOUND, "Message not found"))?;
+
+    // Load all reactions for this message
+    let raw: Vec<(String, i32)> = message_reactions::table
+        .filter(message_reactions::message_id.eq(message_id))
+        .order(message_reactions::created_at.asc())
+        .select((message_reactions::emoji, message_reactions::user_uid))
+        .load(conn)
+        .map_err(|e| {
+            tracing::error!("load reactions: {:?}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to load reactions",
+            )
+        })?;
+
+    // Group by emoji, preserving order
+    let mut groups: Vec<ReactionDetailGroup> = Vec::new();
+    let mut emoji_index: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
+    let mut all_uids = std::collections::HashSet::new();
+
+    for (emoji, uid) in &raw {
+        all_uids.insert(*uid);
+        if let Some(&idx) = emoji_index.get(emoji) {
+            groups[idx].reactors.push(ReactionReactor {
+                uid: *uid,
+                name: None,
+                avatar_url: None,
+            });
+        } else {
+            let idx = groups.len();
+            emoji_index.insert(emoji.clone(), idx);
+            groups.push(ReactionDetailGroup {
+                emoji: emoji.clone(),
+                reactors: vec![ReactionReactor {
+                    uid: *uid,
+                    name: None,
+                    avatar_url: None,
+                }],
+            });
+        }
+    }
+
+    // Resolve names + avatars
+    let uids_vec: Vec<i32> = all_uids.into_iter().collect();
+    let names = load_usernames_by_uids(conn, &uids_vec);
+    let avatars = lookup_user_avatars(&state, &uids_vec);
+
+    for group in &mut groups {
+        for reactor in &mut group.reactors {
+            reactor.name = names.get(&reactor.uid).cloned().flatten();
+            reactor.avatar_url = avatars.get(&reactor.uid).cloned().flatten();
+        }
+    }
+
+    Ok(Json(ReactionDetailResponse { reactions: groups }))
 }
 
 async fn put_reaction(
@@ -1574,6 +1767,10 @@ pub fn router() -> Router<crate::AppState> {
                         .route(
                             "/{message_id}",
                             get(get_message).patch(patch_message).delete(delete_message),
+                        )
+                        .route(
+                            "/{message_id}/reactions",
+                            get(get_reaction_details),
                         )
                         .route(
                             "/{message_id}/reactions/{emoji}",

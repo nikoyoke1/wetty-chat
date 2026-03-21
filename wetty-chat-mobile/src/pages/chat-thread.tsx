@@ -24,6 +24,8 @@ import {
   sendThreadMessage,
   updateMessage,
   deleteMessage,
+  putReaction,
+  deleteReaction,
   markMessagesAsRead,
   type MessageResponse,
   type Attachment,
@@ -41,7 +43,7 @@ import {
   prependMessages,
   selectChatGeneration,
 } from '@/store/messagesSlice';
-import { messageAdded, messageConfirmed, messagePatched } from '@/store/messageEvents';
+import { messageAdded, messageConfirmed, messagePatched, reactionsUpdated } from '@/store/messageEvents';
 import store from '@/store/index';
 import type { RootState } from '@/store/index';
 import { VirtualScroll } from '@/components/chat/VirtualScroll';
@@ -58,10 +60,13 @@ import { t } from '@lingui/core/macro';
 import { FeatureGate } from '@/components/FeatureGate';
 import { UserProfileModal } from '@/components/chat/UserProfileModal';
 import { MessageOverlay, type MessageOverlayAction } from '@/components/chat/MessageOverlay';
+import { ReactionDetailsModal } from '@/components/chat/ReactionDetailsModal';
 import { getGroupInfo } from '@/api/group';
 import { BackButton } from '@/components/BackButton';
 import type { BackAction } from '@/types/back-action';
 import { requestUploadUrl, uploadFileToS3 } from '@/api/upload';
+
+const QUICK_REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🎉'];
 
 function generateClientId(): string {
   return `cg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -173,6 +178,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
   const [atBottom, setAtBottom] = useState(true);
   const [replyingTo, setReplyingTo] = useState<MessageResponse | null>(null);
   const [profileSender, setProfileSender] = useState<Sender | null>(null);
+  const [reactionDetail, setReactionDetail] = useState<{ messageId: string; emoji?: string } | null>(null);
   const [editingSession, setEditingSession] = useState<EditSession | null>(null);
 
 
@@ -296,6 +302,27 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         loadingNewerRef.current = false;
       });
   }, [chatId, storeChatId, threadId, dispatch, showToast]);
+
+  const handleReactionToggle = useCallback((msg: MessageResponse, emoji: string, currentlyReacted: boolean) => {
+    // Optimistically update reactions locally
+    const existing = msg.reactions ?? [];
+    let optimistic: typeof existing;
+    if (currentlyReacted) {
+      optimistic = existing
+        .map(r => r.emoji === emoji ? { ...r, count: r.count - 1, reacted_by_me: false } : r)
+        .filter(r => r.count > 0);
+      deleteReaction(chatId, msg.id, emoji).catch(() => {});
+    } else {
+      const found = existing.find(r => r.emoji === emoji);
+      if (found) {
+        optimistic = existing.map(r => r.emoji === emoji ? { ...r, count: r.count + 1, reacted_by_me: true } : r);
+      } else {
+        optimistic = [...existing, { emoji, count: 1, reacted_by_me: true }];
+      }
+      putReaction(chatId, msg.id, emoji).catch(() => {});
+    }
+    dispatch(reactionsUpdated({ chatId, messageId: msg.id, reactions: optimistic }));
+  }, [chatId, dispatch]);
 
   const jumpToMessage = useCallback((messageId: string) => {
     const state = store.getState();
@@ -558,6 +585,17 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         },
       });
     }
+    if (msg.reactions?.length) {
+      for (const r of msg.reactions) {
+        actions.push({
+          key: `reaction-${r.emoji}`,
+          label: `${r.emoji} ${r.count}`,
+          handler: () => {
+            setReactionDetail({ messageId: msg.id, emoji: r.emoji });
+          },
+        });
+      }
+    }
     return actions;
   }, [overlayMessage, currentUserId, threadId, chatId, history, dispatch, showToast, presentAlert]);
 
@@ -653,6 +691,8 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
                   onAvatarClick={() => setProfileSender(msg.sender)}
                   attachments={msg.attachments}
                   isConfirmed={!msg.id.startsWith('cg_')}
+                  reactions={msg.reactions}
+                  onReactionToggle={(emoji, currentlyReacted) => handleReactionToggle(msg, emoji, currentlyReacted)}
                   replyTo={msg.reply_to_message ? {
                     senderName: msg.reply_to_message.sender.name ?? `User ${msg.reply_to_message.sender.uid}`,
                     message: msg.reply_to_message.message,
@@ -702,6 +742,12 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         sender={profileSender}
         onDismiss={() => setProfileSender(null)}
       />
+      <ReactionDetailsModal
+        chatId={chatId}
+        messageId={reactionDetail?.messageId ?? null}
+        initialEmoji={reactionDetail?.emoji}
+        onDismiss={() => setReactionDetail(null)}
+      />
       {overlayMessage && (
         <MessageOverlay
           senderName={overlayMessage.message.sender.name ?? `User ${overlayMessage.message.sender.uid}`}
@@ -720,6 +766,16 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
           } : undefined}
           sourceRect={overlayMessage.sourceRect}
           actions={overlayActions}
+          reactions={{
+            emojis: QUICK_REACTION_EMOJIS,
+            onReact: (emoji) => {
+              handleReactionToggle(
+                overlayMessage.message,
+                emoji,
+                !!overlayMessage.message.reactions?.some(r => r.emoji === emoji && r.reacted_by_me),
+              );
+            },
+          }}
           onClose={() => setOverlayMessage(null)}
         />
       )}

@@ -1,6 +1,6 @@
 import { createSlice, createSelector } from '@reduxjs/toolkit';
 import type { MessageResponse } from '@/api/messages';
-import { messageAdded, messageConfirmed, messagePatched } from './messageEvents';
+import { messageAdded, messageConfirmed, messagePatched, reactionsUpdated } from './messageEvents';
 
 const MAX_WINDOWS = 5;
 
@@ -264,6 +264,24 @@ const messagesSlice = createSlice({
           action.payload.messageId,
           action.payload.message,
         );
+      })
+      .addCase(reactionsUpdated, (state, action) => {
+        const { chatId, messageId, reactions } = action.payload;
+        for (const [storeKey, chat] of Object.entries(state.chats)) {
+          if (storeKey !== chatId && !storeKey.startsWith(`${chatId}_thread_`)) continue;
+          for (const win of chat.windows) {
+            for (let i = 0; i < win.messages.length; i++) {
+              if (win.messages[i].id === messageId) {
+                const existing = win.messages[i].reactions ?? [];
+                const merged = reactions.map(r => {
+                  const prev = existing.find(e => e.emoji === r.emoji);
+                  return { ...r, reacted_by_me: r.reacted_by_me ?? prev?.reacted_by_me };
+                });
+                win.messages[i] = { ...win.messages[i], reactions: merged };
+              }
+            }
+          }
+        }
       });
   },
 });

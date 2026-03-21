@@ -1,5 +1,5 @@
 import { createAction } from '@reduxjs/toolkit';
-import type { MessageResponse } from '@/api/messages';
+import type { MessageResponse, ReactionSummary } from '@/api/messages';
 
 export type MessageEventOrigin = 'ws' | 'optimistic' | 'api_confirm' | 'sync';
 export type MessageEventScope = 'main' | 'thread';
@@ -27,6 +27,13 @@ export interface MessagePatchedPayload {
   message: MessageResponse;
 }
 
+export interface ReactionsUpdatedPayload {
+  chatId: string;
+  messageId: string;
+  reactions: ReactionSummary[];
+}
+
 export const messageAdded = createAction<MessageAddedPayload>('messages/messageAdded');
 export const messageConfirmed = createAction<MessageConfirmedPayload>('messages/messageConfirmed');
 export const messagePatched = createAction<MessagePatchedPayload>('messages/messagePatched');
+export const reactionsUpdated = createAction<ReactionsUpdatedPayload>('messages/reactionsUpdated');

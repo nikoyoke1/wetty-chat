@@ -29,6 +29,23 @@ export interface ThreadInfo {
   reply_count: number;
 }
 
+export interface ReactionReactor {
+  uid: number;
+  name: string | null;
+  avatar_url?: string;
+}
+
+export interface ReactionSummary {
+  emoji: string;
+  count: number;
+  reacted_by_me?: boolean;
+  reactors?: ReactionReactor[];
+}
+
+export interface ReactionDetailResponse {
+  reactions: { emoji: string; reactors: ReactionReactor[] }[];
+}
+
 export interface MessageResponse {
   id: string;
   message: string | null;
@@ -44,6 +61,7 @@ export interface MessageResponse {
   thread_info?: ThreadInfo;
   reply_to_message?: ReplyToMessage;
   attachments?: Attachment[];
+  reactions?: ReactionSummary[];
 }
 
 export interface ListMessagesResponse {
@@ -114,6 +132,29 @@ export function getMessage(
   messageId: string
 ): Promise<AxiosResponse<MessageResponse>> {
   return apiClient.get(`/chats/${chatId}/messages/${messageId}`);
+}
+
+export function putReaction(
+  chatId: string | number,
+  messageId: string,
+  emoji: string
+): Promise<AxiosResponse<void>> {
+  return apiClient.put(`/chats/${chatId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`);
+}
+
+export function deleteReaction(
+  chatId: string | number,
+  messageId: string,
+  emoji: string
+): Promise<AxiosResponse<void>> {
+  return apiClient.delete(`/chats/${chatId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`);
+}
+
+export function getReactionDetails(
+  chatId: string | number,
+  messageId: string,
+): Promise<AxiosResponse<ReactionDetailResponse>> {
+  return apiClient.get(`/chats/${chatId}/messages/${messageId}/reactions`);
 }
 
 export function markMessagesAsRead(

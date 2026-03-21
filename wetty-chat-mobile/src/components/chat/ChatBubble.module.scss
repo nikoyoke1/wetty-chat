@@ -262,3 +262,73 @@
   border-top-color: rgba(var(--ion-color-primary-contrast-rgb, 255, 255, 255), 0.2);
   justify-content: flex-end;
 }
+
+.reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.reactionPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.04);
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+.reactionPillActive {
+  border-color: var(--ion-color-primary);
+  background: rgba(var(--ion-color-primary-rgb), 0.12);
+}
+
+.sent .reactionPill {
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.sent .reactionPillActive {
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.reactionEmoji {
+  font-size: 16px;
+}
+
+.reactionCount {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.reactorAvatars {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 2px;
+}
+
+.reactorAvatar {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  position: relative;
+}
+
+.reactorOverflow {
+  font-size: 11px;
+  margin-left: 2px;
+  opacity: 0.7;
+}
