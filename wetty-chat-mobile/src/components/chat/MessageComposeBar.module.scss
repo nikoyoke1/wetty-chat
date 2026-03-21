@@ -11,7 +11,7 @@
   align-items: flex-end;
   padding: 8px 12px;
   gap: 4px;
-  background: #fff;
+  background: var(--ion-background-color, #fff);
 }
 
 .attachBtn {
@@ -33,9 +33,10 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  border: 1px solid #ddd;
+  border: 1px solid var(--ion-background-color-step-200, #ddd);
   border-radius: 20px;
   overflow: hidden;
+  background: var(--ion-background-color, #fff);
 }
 
 .inputRow {
@@ -49,8 +50,8 @@
   align-items: center;
   gap: 4px;
   padding: 6px 8px 4px 12px;
-  background: #f0f0f0;
-  border-bottom: 1px solid #e0e0e0;
+  background: var(--ion-background-color-step-100, #f0f0f0);
+  border-bottom: 1px solid var(--ion-background-color-step-150, #e0e0e0);
 }
 
 .replyText {
@@ -69,7 +70,7 @@
 
 .replySnippet {
   font-size: 12px;
-  color: #666;
+  color: var(--ion-text-color-step-600, #666);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -86,7 +87,7 @@
   cursor: pointer;
   flex-shrink: 0;
   font-size: 18px;
-  color: #999;
+  color: var(--ion-text-color-step-500, #999);
   padding: 0;
 }
 
@@ -105,6 +106,8 @@
   appearance: none;
   -webkit-appearance: none;
   overflow-y: auto;
+  background: transparent;
+  color: var(--ion-text-color, inherit);
 }
 
 .stickerBtn {
@@ -118,7 +121,7 @@
   cursor: pointer;
   flex-shrink: 0;
   font-size: 22px;
-  color: #888;
+  color: var(--ion-text-color-step-500, #888);
   padding: 0;
 }
 
@@ -148,7 +151,7 @@
   .sendBtn {
     border-radius: 50%;
     background: var(--ion-color-primary);
-    color: #fff;
+    color: var(--ion-color-primary-contrast, #fff);
     border: none;
   }
 }
