@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::NewPushSubscription;
 use crate::schema::push_subscriptions;
-use crate::utils::auth::CurrentUid;
+use crate::utils::auth::{ClientId, CurrentUid};
 use crate::utils::ids;
 use crate::AppState;
 
@@ -34,9 +34,12 @@ pub struct SubscribeKeys {
 
 async fn post_subscribe(
     CurrentUid(uid): CurrentUid,
+    ClientId(client_id): ClientId,
     State(state): State<AppState>,
     Json(body): Json<SubscribeBody>,
 ) -> Result<impl IntoResponse, (StatusCode, &'static str)> {
+    state.client_tracking.record_activity(uid, &client_id)?;
+
     let conn = &mut state.db.get().map_err(|_| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -55,6 +58,7 @@ async fn post_subscribe(
         p256dh: body.keys.p256dh,
         auth: body.keys.auth,
         created_at: Utc::now().naive_utc(),
+        client_id: Some(client_id),
     };
 
     diesel::insert_into(push_subscriptions::table)
@@ -65,6 +69,7 @@ async fn post_subscribe(
             push_subscriptions::p256dh.eq(&new_sub.p256dh),
             push_subscriptions::auth.eq(&new_sub.auth),
             push_subscriptions::created_at.eq(&new_sub.created_at),
+            push_subscriptions::client_id.eq(&new_sub.client_id),
         ))
         .execute(conn)
         .map_err(|e| {
@@ -85,9 +90,12 @@ pub struct UnsubscribeBody {
 
 async fn post_unsubscribe(
     CurrentUid(uid): CurrentUid,
+    ClientId(client_id): ClientId,
     State(state): State<AppState>,
     Json(body): Json<UnsubscribeBody>,
 ) -> Result<impl IntoResponse, (StatusCode, &'static str)> {
+    state.client_tracking.record_activity(uid, &client_id)?;
+
     let conn = &mut state.db.get().map_err(|_| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -98,6 +106,7 @@ async fn post_unsubscribe(
     diesel::delete(
         push_subscriptions::table
             .filter(push_subscriptions::dsl::user_id.eq(uid))
+            .filter(push_subscriptions::dsl::client_id.eq(Some(client_id)))
             .filter(push_subscriptions::dsl::endpoint.eq(&body.endpoint)),
     )
     .execute(conn)

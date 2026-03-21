@@ -20,10 +20,12 @@ import { Provider } from 'react-redux';
 import { I18nProvider } from '@lingui/react';
 import { i18n, activateDetectedLocale } from '@/i18n';
 import store from '@/store/index';
+import { initializeClientId } from '@/utils/clientId';
 import App from './App';
 import { setupIonicReact } from '@ionic/react';
 
 activateDetectedLocale();
+initializeClientId();
 setupIonicReact({
   mode: 'ios',
   swipeBackEnabled: false,

@@ -1,5 +1,6 @@
 import axios, { HttpStatusCode } from 'axios';
 import { getCurrentUserId } from '@/js/current-user';
+import { getOrCreateClientId } from '@/utils/clientId';
 
 /**
  * Base URL for API requests.
@@ -10,6 +11,7 @@ import { getCurrentUserId } from '@/js/current-user';
 const apiClient = axios.create({ baseURL: import.meta.env.BASE_URL + '_api' });
 
 apiClient.interceptors.request.use((config) => {
+  config.headers['X-Client-Id'] = getOrCreateClientId();
   if (import.meta.env.DEV) {
     config.headers['X-User-Id'] = String(getCurrentUserId());
   }

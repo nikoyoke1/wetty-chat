@@ -32,6 +32,16 @@ diesel::table! {
 }
 
 diesel::table! {
+    clients (client_id) {
+        #[max_length = 64]
+        client_id -> Varchar,
+        created_at -> Timestamp,
+        last_active -> Timestamp,
+        last_active_uid -> Int4,
+    }
+}
+
+diesel::table! {
     use diesel::sql_types::*;
     use super::sql_types::GroupRole;
 
@@ -101,6 +111,8 @@ diesel::table! {
         p256dh -> Text,
         auth -> Text,
         created_at -> Timestamp,
+        #[max_length = 64]
+        client_id -> Nullable<Varchar>,
     }
 }
 
@@ -110,6 +122,7 @@ diesel::joinable!(message_reactions -> messages (message_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     attachments,
+    clients,
     group_membership,
     groups,
     message_reactions,

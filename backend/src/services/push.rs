@@ -448,8 +448,11 @@ mod tests {
     }
 }
 
-async fn supervise_worker<F, Fut>(worker_name: &str, restart_delay: Duration, mut worker: F)
-where
+pub(crate) async fn supervise_worker<F, Fut>(
+    worker_name: &str,
+    restart_delay: Duration,
+    mut worker: F,
+) where
     F: FnMut() -> Fut,
     Fut: std::future::Future<Output = ()>,
 {

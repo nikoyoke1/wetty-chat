@@ -58,6 +58,7 @@ pub(crate) struct AppState {
     metrics: Arc<metrics::Metrics>,
     ws_registry: Arc<services::ws_registry::ConnectionRegistry>,
     push_service: Arc<services::push::PushService>,
+    client_tracking: Arc<services::client_tracking::ClientTrackingService>,
     s3_client: aws_sdk_s3::Client,
     s3_bucket_name: String,
     s3_attachment_prefix: String,
@@ -149,7 +150,12 @@ async fn main() {
         id_gen: Arc::new(utils::ids::new_generator()),
         metrics: metrics.clone(),
         ws_registry: ws_registry.clone(),
-        push_service: services::push::PushService::start(pool, ws_registry.clone(), metrics),
+        push_service: services::push::PushService::start(
+            pool.clone(),
+            ws_registry.clone(),
+            metrics,
+        ),
+        client_tracking: services::client_tracking::ClientTrackingService::start(pool.clone()),
         s3_client,
         s3_bucket_name,
         s3_attachment_prefix,
@@ -196,6 +202,7 @@ async fn main() {
         );
 
     let metrics_registry = state.metrics.clone();
+    let client_tracking_state = state.clone();
     let app = Router::new()
         .merge(handlers::api_router())
         .layer(RequestBodyLimitLayer::new(256 * 1024))
@@ -205,6 +212,10 @@ async fn main() {
                 .propagate_x_request_id()
                 .layer(trace_layer),
         )
+        .layer(middleware::from_fn_with_state(
+            client_tracking_state,
+            services::client_tracking::track_client_activity,
+        ))
         .layer(middleware::from_fn_with_state(
             metrics_registry.clone(),
             metrics::track_http_metrics,

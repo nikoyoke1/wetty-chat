@@ -1,6 +1,6 @@
 use axum::{
     extract::FromRequestParts,
-    http::{request::Parts, StatusCode},
+    http::{request::Parts, HeaderMap, StatusCode},
 };
 use base64::{
     engine::{DecodePaddingMode, GeneralPurposeConfig},
@@ -9,10 +9,14 @@ use base64::{
 use rc4::{consts::U64, Key, KeyInit, Rc4, StreamCipher};
 use std::fmt;
 
-const X_USER_ID: &str = "x-user-id";
+pub const X_USER_ID: &str = "x-user-id";
+pub const X_CLIENT_ID: &str = "x-client-id";
 
 #[derive(Clone, Copy, Debug)]
 pub struct CurrentUid(pub i32);
+
+#[derive(Clone, Debug)]
+pub struct ClientId(pub String);
 
 impl fmt::Display for CurrentUid {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -78,6 +82,95 @@ fn decode(auth: &str, salt_key: &str, config_authkey: &str) -> Result<i32, Discu
     Ok(uid)
 }
 
+pub fn extract_current_uid(
+    headers: &HeaderMap,
+    state: &crate::AppState,
+) -> Result<i32, (StatusCode, &'static str)> {
+    match state.auth_method {
+        crate::AuthMethod::UIDHeader => {
+            let value = headers
+                .get(X_USER_ID)
+                .and_then(|v| v.to_str().ok())
+                .ok_or((
+                    StatusCode::UNAUTHORIZED,
+                    "Missing or invalid X-User-Id header",
+                ))?;
+            let uid = value
+                .trim()
+                .parse::<i32>()
+                .map_err(|_| (StatusCode::UNAUTHORIZED, "X-User-Id must be a valid i32"))?;
+            Ok(uid)
+        }
+        crate::AuthMethod::Discuz => {
+            let cookies_str = headers
+                .get("cookie")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("");
+
+            let mut auth_cookie = None;
+            let mut saltkey_cookie = None;
+            let auth_cookie_name = format!("{}_auth=", state.discuz_cookie_prefix);
+            let saltkey_cookie_name = format!("{}_saltkey=", state.discuz_cookie_prefix);
+
+            for cookie in cookies_str.split(';') {
+                let cookie = cookie.trim();
+                if let Some(stripped) = cookie.strip_prefix(&auth_cookie_name) {
+                    let decoded = urlencoding::decode(stripped)
+                        .map_err(|_| (StatusCode::UNAUTHORIZED, "InvalidDiscuz auth cookie"))?
+                        .to_string();
+                    auth_cookie = Some(decoded);
+                } else if let Some(stripped) = cookie.strip_prefix(&saltkey_cookie_name) {
+                    saltkey_cookie = Some(stripped);
+                }
+            }
+
+            let auth = auth_cookie.ok_or((StatusCode::UNAUTHORIZED, "Missing auth cookie"))?;
+            let saltkey =
+                saltkey_cookie.ok_or((StatusCode::UNAUTHORIZED, "Missing saltkey cookie"))?;
+
+            let uid = decode(&auth, saltkey, &state.discuz_authkey).map_err(|err| {
+                tracing::warn!("Discuz decode error: {:?}", err);
+                (StatusCode::UNAUTHORIZED, "Invalid Discuz auth cookie")
+            })?;
+
+            Ok(uid)
+        }
+    }
+}
+
+fn validate_client_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 64
+        && value
+            .bytes()
+            .all(|b| matches!(b, b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'_'))
+}
+
+pub fn optional_client_id(
+    headers: &HeaderMap,
+) -> Result<Option<String>, (StatusCode, &'static str)> {
+    match headers.get(X_CLIENT_ID) {
+        None => Ok(None),
+        Some(value) => {
+            let value = value.to_str().map_err(|_| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    "Missing or invalid X-Client-Id header",
+                )
+            })?;
+            let value = value.trim();
+            if !validate_client_id(value) {
+                return Err((StatusCode::BAD_REQUEST, "X-Client-Id is invalid"));
+            }
+            Ok(Some(value.to_string()))
+        }
+    }
+}
+
+pub fn required_client_id(headers: &HeaderMap) -> Result<String, (StatusCode, &'static str)> {
+    optional_client_id(headers)?.ok_or((StatusCode::BAD_REQUEST, "Missing X-Client-Id header"))
+}
+
 impl FromRequestParts<crate::AppState> for CurrentUid {
     type Rejection = (StatusCode, &'static str);
 
@@ -85,61 +178,17 @@ impl FromRequestParts<crate::AppState> for CurrentUid {
         parts: &mut Parts,
         state: &crate::AppState,
     ) -> Result<Self, Self::Rejection> {
-        match state.auth_method {
-            crate::AuthMethod::UIDHeader => {
-                let value = parts
-                    .headers
-                    .get(X_USER_ID)
-                    .and_then(|v| v.to_str().ok())
-                    .ok_or((
-                        StatusCode::UNAUTHORIZED,
-                        "Missing or invalid X-User-Id header",
-                    ))?;
-                let uid = value
-                    .trim()
-                    .parse::<i32>()
-                    .map_err(|_| (StatusCode::UNAUTHORIZED, "X-User-Id must be a valid i32"))?;
-                Ok(CurrentUid(uid))
-            }
-            crate::AuthMethod::Discuz => {
-                let cookies_str = parts
-                    .headers
-                    .get("cookie")
-                    .and_then(|v| v.to_str().ok())
-                    .unwrap_or("");
+        extract_current_uid(&parts.headers, state).map(CurrentUid)
+    }
+}
 
-                let mut auth_cookie = None;
-                let mut saltkey_cookie = None;
-                let auth_cookie_name = format!("{}_auth=", state.discuz_cookie_prefix);
-                let saltkey_cookie_name = format!("{}_saltkey=", state.discuz_cookie_prefix);
+impl FromRequestParts<crate::AppState> for ClientId {
+    type Rejection = (StatusCode, &'static str);
 
-                for cookie in cookies_str.split(';') {
-                    let cookie = cookie.trim();
-                    if let Some(stripped) = cookie.strip_prefix(&auth_cookie_name) {
-                        let decoded = urlencoding::decode(stripped)
-                            .map_err(|_| (StatusCode::UNAUTHORIZED, "InvalidDiscuz auth cookie"))?
-                            .to_string();
-                        auth_cookie = Some(decoded);
-                    } else if let Some(stripped) = cookie.strip_prefix(&saltkey_cookie_name) {
-                        saltkey_cookie = Some(stripped);
-                    }
-                }
-
-                let auth = auth_cookie.ok_or((StatusCode::UNAUTHORIZED, "Missing auth cookie"))?;
-                let saltkey =
-                    saltkey_cookie.ok_or((StatusCode::UNAUTHORIZED, "Missing saltkey cookie"))?;
-
-                let uid = decode(&auth, saltkey, &state.discuz_authkey).map_err(|err| {
-                    tracing::warn!("Discuz decode error: {:?}", err);
-                    (StatusCode::UNAUTHORIZED, "Invalid Discuz auth cookie")
-                })?;
-
-                // At this step, we could optionally cross-check against the local Discuz table
-                // to make sure the user is still valid, but the current flow is decode-only.
-                // For now we accept the decoded UID.
-
-                Ok(CurrentUid(uid))
-            }
-        }
+    async fn from_request_parts(
+        parts: &mut Parts,
+        _state: &crate::AppState,
+    ) -> Result<Self, Self::Rejection> {
+        required_client_id(&parts.headers).map(ClientId)
     }
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import apiClient from '@/api/client';
+import { initializeClientId } from '@/utils/clientId';
 
 // Helper to convert base64 to Uint8Array for Web Push manager
 function urlBase64ToUint8Array(base64String: string) {
@@ -65,6 +66,7 @@ function encodeSubscriptionKeys(subscription: PushSubscription) {
 }
 
 function syncSubscriptionWithBackend(subscription: PushSubscription) {
+    initializeClientId();
     const keys = encodeSubscriptionKeys(subscription);
     apiClient.post('/push/subscribe', {
         endpoint: subscription.endpoint,
@@ -80,6 +82,7 @@ export function usePushNotifications() {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
+        initializeClientId();
         if ('Notification' in window) {
             setPermission(Notification.permission);
         }

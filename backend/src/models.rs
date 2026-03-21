@@ -185,6 +185,24 @@ pub struct UpdateGroup {
 }
 
 #[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]
+#[diesel(table_name = schema::clients)]
+pub struct ClientRecord {
+    pub client_id: String,
+    pub created_at: chrono::NaiveDateTime,
+    pub last_active: chrono::NaiveDateTime,
+    pub last_active_uid: i32,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = schema::clients)]
+pub struct NewClientRecord {
+    pub client_id: String,
+    pub created_at: chrono::NaiveDateTime,
+    pub last_active: chrono::NaiveDateTime,
+    pub last_active_uid: i32,
+}
+
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]
 #[diesel(table_name = schema::push_subscriptions)]
 pub struct PushSubscription {
     pub id: i64,
@@ -193,6 +211,7 @@ pub struct PushSubscription {
     pub p256dh: String,
     pub auth: String,
     pub created_at: chrono::NaiveDateTime,
+    pub client_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Insertable)]
@@ -204,4 +223,5 @@ pub struct NewPushSubscription {
     pub p256dh: String,
     pub auth: String,
     pub created_at: chrono::NaiveDateTime,
+    pub client_id: Option<String>,
 }
