@@ -1,3 +1,5 @@
+import { v4 as uuidv4 } from 'uuid';
+
 const CLIENT_ID_STORAGE_KEY = 'client_id';
 const CLIENT_ID_CACHE_NAME = 'wetty-chat-client-id';
 const CLIENT_ID_CACHE_PATH = `${import.meta.env.BASE_URL}__client_id__`;
@@ -7,7 +9,7 @@ function generateClientId(): string {
     return crypto.randomUUID();
   }
 
-  return `client-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
+  return uuidv4();
 }
 
 function isValidClientId(value: string): boolean {
