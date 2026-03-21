@@ -55,6 +55,25 @@ function checkPushSupport(): PushNotificationResult {
     return success();
 }
 
+function encodeSubscriptionKeys(subscription: PushSubscription) {
+    const p256dh = btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(subscription.getKey('p256dh')!))));
+    const auth = btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(subscription.getKey('auth')!))));
+    return {
+        p256dh: p256dh.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
+        auth: auth.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
+    };
+}
+
+function syncSubscriptionWithBackend(subscription: PushSubscription) {
+    const keys = encodeSubscriptionKeys(subscription);
+    apiClient.post('/push/subscribe', {
+        endpoint: subscription.endpoint,
+        keys,
+    }).catch((err) => {
+        console.warn('Failed to sync push subscription with backend', err);
+    });
+}
+
 export function usePushNotifications() {
     const [permission, setPermission] = useState<NotificationPermission>('default');
     const [isSubscribed, setIsSubscribed] = useState(false);
@@ -65,11 +84,14 @@ export function usePushNotifications() {
             setPermission(Notification.permission);
         }
 
-        // Check if already subscribed in SW
+        // Check if already subscribed in SW, and re-sync with backend
         if ('serviceWorker' in navigator && 'PushManager' in window) {
             navigator.serviceWorker.ready.then(async (registration) => {
                 const subscription = await registration.pushManager.getSubscription();
                 setIsSubscribed(!!subscription);
+                if (subscription) {
+                    syncSubscriptionWithBackend(subscription);
+                }
             });
         }
     }, []);
@@ -123,21 +145,12 @@ export function usePushNotifications() {
                 applicationServerKey: publicKey
             });
 
-            // Extract keys and endpoint
-            const p256dh = btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(subscription.getKey('p256dh')!))));
-            const auth = btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(subscription.getKey('auth')!))));
-
-            const p256dhUrlSafe = p256dh.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-            const authUrlSafe = auth.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
             // Send to backend
+            const keys = encodeSubscriptionKeys(subscription);
             try {
                 await apiClient.post('/push/subscribe', {
                     endpoint: subscription.endpoint,
-                    keys: {
-                        p256dh: p256dhUrlSafe,
-                        auth: authUrlSafe
-                    }
+                    keys,
                 });
             } catch (backendError) {
                 console.error('Backend subscription failed, rolling back browser subscription', backendError);

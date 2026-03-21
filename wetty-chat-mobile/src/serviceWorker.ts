@@ -52,10 +52,13 @@ self.addEventListener('push', (event) => {
                 setAppBadgeCount(self.navigator, payload.unread_count)?.catch(console.error);
             }
 
+            const tag = payload.data?.message_id ? `msg_${payload.data.message_id}` : undefined;
+
             const promiseChain = self.registration.showNotification(title, {
                 body: body,
                 icon: '/appicon/icon-192.png',
                 badge: '/appicon/icon-192.png', // Ideally should be a monochrome maskable icon
+                tag,
                 data: payload
             });
 
@@ -65,6 +68,31 @@ self.addEventListener('push', (event) => {
         }
     }
 });
+
+self.addEventListener('pushsubscriptionchange', ((event: Event & { newSubscription?: PushSubscription; oldSubscription?: PushSubscription }) => {
+    const newSub = event.newSubscription;
+    if (!newSub) return;
+
+    const p256dh = btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(newSub.getKey('p256dh')!))));
+    const auth = btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(newSub.getKey('auth')!))));
+    const p256dhUrlSafe = p256dh.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const authUrlSafe = auth.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+    const apiBase = import.meta.env.BASE_URL + '_api';
+    (event as ExtendableEvent).waitUntil(
+        fetch(`${apiBase}/push/subscribe`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                endpoint: newSub.endpoint,
+                keys: { p256dh: p256dhUrlSafe, auth: authUrlSafe },
+            }),
+        }).catch((err) => {
+            console.error('Failed to re-register rotated push subscription', err);
+        })
+    );
+}) as EventListener);
 
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();

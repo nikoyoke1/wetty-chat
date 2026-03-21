@@ -9,6 +9,7 @@ import {
   messagePatched,
   reactionsUpdated,
 } from '@/store/messageEvents';
+import { setAppBadgeCount } from '@/utils/badges';
 
 const WS_PATH = import.meta.env.BASE_URL + '_api/ws';
 const PING_INTERVAL_MS = 10_000;
@@ -92,6 +93,60 @@ function allMessagesForChat(chatId: string): MessageResponse[] {
   return chat.windows.flatMap(window => window.messages);
 }
 
+const MESSAGE_PREVIEW_MAX = 100;
+
+function showLocalNotification(message: MessageResponse): void {
+  if (currentAppState !== 'inactive') return;
+
+  const currentUid = store.getState().user.uid;
+  if (currentUid != null && message.sender.uid === currentUid) return;
+  if (message.is_deleted) return;
+
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+
+  const chatEntry = store.getState().chats.byId[message.chat_id];
+  const chatName = chatEntry?.details?.name ?? 'New Message';
+
+  let body: string;
+  if (message.message) {
+    const preview = message.message.length > MESSAGE_PREVIEW_MAX
+      ? message.message.slice(0, MESSAGE_PREVIEW_MAX) + '…'
+      : message.message;
+    body = `${message.sender.name ?? 'Someone'}: ${preview}`;
+  } else {
+    body = `${message.sender.name ?? 'Someone'} sent a message`;
+  }
+
+  const tag = `msg_${message.id}`;
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready.then(registration => {
+      registration.showNotification(chatName, {
+        body,
+        icon: '/appicon/icon-192.png',
+        badge: '/appicon/icon-192.png',
+        tag,
+        data: {
+          type: 'new_message',
+          chat_id: message.chat_id,
+          message_id: message.id,
+        },
+      });
+    }).catch(() => { /* SW not available */ });
+  }
+
+  if ('setAppBadge' in navigator) {
+    const totalUnread = Object.values(store.getState().chats.byId)
+      .reduce((sum, entry) => {
+        const unread = entry.liveProjection?.unread_count
+          ?? entry.listSnapshot?.unread_count
+          ?? 0;
+        return sum + unread;
+      }, 0);
+    setAppBadgeCount(navigator, totalUnread)?.catch(() => {});
+  }
+}
+
 function handleWsMessage(payload: unknown): void {
   const message = normalizePayload(payload);
   if (!message) return;
@@ -131,6 +186,7 @@ function handleWsMessage(payload: unknown): void {
         origin: 'ws',
         scope: message.reply_root_id ? 'thread' : 'main',
       }));
+      showLocalNotification(message);
     }
   }
 }
