@@ -1,6 +1,12 @@
 import { defineConfig, mergeConfig } from 'vite';
-import baseConfig from './vite.config.base';
+import { createBaseConfig } from './vite.config.base';
 import { execSync } from 'child_process';
+
+const assetUrl = process.env.ASSET_URL?.replace(/\/+$/, '');
+
+if (!assetUrl) {
+  throw new Error('ASSET_URL is required for production builds');
+}
 
 let commitHash = 'unknown';
 try {
@@ -9,7 +15,16 @@ try {
   // Ignore
 }
 
-export default mergeConfig(baseConfig, defineConfig({
+export default mergeConfig(createBaseConfig({ assetCdnOrigin: assetUrl }), defineConfig({
+  experimental: {
+    renderBuiltUrl(filename, { type }) {
+      if (type === 'public') {
+        return `/${filename}`;
+      }
+
+      return `${assetUrl}/${filename}`;
+    },
+  },
   define: {
     // Uncomment this and comment out __AUTH_REDIRECT_URL__ for separate domain deployment
     // __API_BASE__: JSON.stringify('https://chahui.app/_api'),
