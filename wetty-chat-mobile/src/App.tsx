@@ -53,7 +53,7 @@ function AppRouter({ isDesktop }: { isDesktop: boolean }) {
 function AppShell() {
   const dispatch = useDispatch<AppDispatch>();
   const isDesktop = useIsDesktop();
-  const token = useDeviceToken();
+  const token = useDeviceToken(true);
   useAppLifecycle();
   const { needRefresh, setNeedRefresh, updateServiceWorker } = useAppUpdate();
 
