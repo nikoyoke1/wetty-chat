@@ -12,7 +12,7 @@ import {
 import { setAppBadgeCount } from '@/utils/badges';
 import { getStoredJwtToken } from '@/utils/jwtToken';
 
-const WS_PATH = import.meta.env.BASE_URL + '_api/ws';
+const WS_PATH = (__API_BASE__ ?? (import.meta.env.BASE_URL + '_api')) + '/ws';
 const PING_INTERVAL_MS = 10_000;
 const MAX_RECONNECT_DELAY_MS = 30_000;
 const RETRY_BASE_DELAY_MS = 1_000;
@@ -54,6 +54,21 @@ const intentionalClosures = new WeakSet<WebSocket>();
 export async function requestWsTicket(): Promise<string> {
   const res = await apiClient.get<{ ticket: string }>('/ws/ticket');
   return res.data.ticket;
+}
+
+function resolveWebSocketUrl(path: string): string {
+  if (typeof location === 'undefined') {
+    return path;
+  }
+
+  const baseUrl = new URL(path, location.href);
+  if (baseUrl.protocol === 'http:') {
+    baseUrl.protocol = 'ws:';
+  } else if (baseUrl.protocol === 'https:') {
+    baseUrl.protocol = 'wss:';
+  }
+
+  return baseUrl.toString();
 }
 
 function clearPingInterval(): void {
@@ -160,7 +175,7 @@ function showLocalNotification(message: MessageResponse): void {
           ?? 0;
         return sum + unread;
       }, 0);
-    setAppBadgeCount(navigator, totalUnread)?.catch(() => {});
+    setAppBadgeCount(navigator, totalUnread)?.catch(() => { });
   }
 }
 
@@ -282,10 +297,7 @@ async function connectWebSocket(): Promise<void> {
       return;
     }
 
-    const protocol =
-      typeof location !== 'undefined' && location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = typeof location !== 'undefined' ? location.host : 'localhost';
-    const socket = new WebSocket(`${protocol}//${host}${WS_PATH}`);
+    const socket = new WebSocket(resolveWebSocketUrl(WS_PATH));
     ws = socket;
 
     socket.onopen = () => {
