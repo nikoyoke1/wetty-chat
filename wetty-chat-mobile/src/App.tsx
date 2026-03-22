@@ -23,6 +23,7 @@ import OobePage from '@/pages/oobe';
 import LandingPage from './pages/landing';
 import { initWebSocket } from '@/api/ws';
 import { syncStoredJwtToken } from '@/utils/jwtToken';
+import { useDeviceToken } from './hooks/useDeviceToken';
 
 setupIonicReact({
   mode: 'ios',
@@ -52,8 +53,15 @@ function AppRouter({ isDesktop }: { isDesktop: boolean }) {
 function AppShell() {
   const dispatch = useDispatch<AppDispatch>();
   const isDesktop = useIsDesktop();
+  const token = useDeviceToken();
   useAppLifecycle();
   const { needRefresh, setNeedRefresh, updateServiceWorker } = useAppUpdate();
+
+  if (import.meta.env.PROD) {
+    if (!token || token.length === 0) {
+      return <h1>I'm a tea pot</h1>;
+    }
+  }
 
   useEffect(() => {
     syncStoredJwtToken();

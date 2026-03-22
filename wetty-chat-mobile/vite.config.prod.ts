@@ -23,10 +23,8 @@ export default mergeConfig(createBaseConfig({ assetCdnOrigin: ASSET_URL }), defi
     },
   },
   define: {
-    // Uncomment this and comment out __AUTH_REDIRECT_URL__ for separate domain deployment
     __ASSET_BASE__: JSON.stringify(ASSET_URL),
     __API_BASE__: JSON.stringify(API_BASE_URL),
     __APP_VERSION__: JSON.stringify(commitHash),
-    __AUTH_REDIRECT_URL__: JSON.stringify("/main/member.php?mod=logging&action=login&referer=https://www.shireyishunjian.com/chat/"),
   },
 }));
