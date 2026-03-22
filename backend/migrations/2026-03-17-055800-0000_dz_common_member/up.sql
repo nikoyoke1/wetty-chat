@@ -2,7 +2,7 @@
 CREATE SCHEMA IF NOT EXISTS discuz;
 
 CREATE TABLE IF NOT EXISTS discuz.common_member (
-	uid serial4 NOT NULL,
+	uid int4 NOT NULL PRIMARY KEY,
 	email varchar(255) DEFAULT ''::character varying NOT NULL,
 	username bpchar(15) DEFAULT ''::bpchar NOT NULL,
 	"password" bpchar(32) DEFAULT ''::bpchar NOT NULL,
