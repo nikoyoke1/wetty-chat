@@ -10,7 +10,7 @@
     "pretypecheck": "npm run clean:css-module-types",
     "dev": "vite -c vite.config.dev.ts",
     "build": "tsc -b && vite build -c vite.config.staging.ts",
-    "build-prod": "tsc -b && ASSET_URL=https://chahui.app vite build --base=/ --outDir prod-dist -c vite.config.prod.ts",
+    "build-prod": "tsc -b && vite build --base=/ --outDir prod-dist -c vite.config.prod.ts",
     "lint": "eslint .",
     "verify": "npm run lint && npm run typecheck",
     "extract": "lingui extract",
