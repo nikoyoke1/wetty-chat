@@ -628,11 +628,9 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
             <IonButton onClick={() => history.push(`/chats/chat/${chatId}/members`)}>
               <IonIcon slot="icon-only" icon={people} />
             </IonButton>
-            <FeatureGate>
-              <IonButton onClick={() => history.push(`/chats/chat/${chatId}/settings`)}>
-                <IonIcon slot="icon-only" icon={settings} />
-              </IonButton>
-            </FeatureGate>
+            <IonButton onClick={() => history.push(`/chats/chat/${chatId}/settings`)}>
+              <IonIcon slot="icon-only" icon={settings} />
+            </IonButton>
           </IonButtons>
           {!wsConnected && <IonProgressBar type="indeterminate" />}
         </IonToolbar>

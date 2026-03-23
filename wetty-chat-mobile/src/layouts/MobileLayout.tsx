@@ -6,9 +6,9 @@ import { Redirect, Route, useLocation } from "react-router-dom";
 
 import ChatsPage from '@/pages/chats';
 import { CreateChatPage } from '@/pages/create-chat';
-import { ChatThreadPage } from '@/pages/chat-thread';
-import { ChatSettingsPage } from '@/pages/chat-settings';
-import { ChatMembersPage } from '@/pages/chat-members';
+import { ChatThreadPage } from '@/pages/chat-thread/chat-thread';
+import { ChatSettingsPage } from '@/pages/chat-thread/chat-settings';
+import { ChatMembersPage } from '@/pages/chat-thread/chat-members';
 import SettingsPage from '@/pages/settings';
 import GeneralSettingsPage from '@/pages/settings/general';
 import LanguagePage from '@/pages/settings/language';
