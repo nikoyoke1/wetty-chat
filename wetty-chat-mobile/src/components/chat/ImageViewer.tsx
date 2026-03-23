@@ -2,14 +2,7 @@ import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } fr
 import { createPortal } from 'react-dom';
 import { IonIcon } from '@ionic/react';
 import { t } from '@lingui/core/macro';
-import {
-  chevronBack,
-  chevronForward,
-  close,
-  contractOutline,
-  download,
-  expandOutline,
-} from 'ionicons/icons';
+import { chevronBack, chevronForward, close, contractOutline, download, expandOutline } from 'ionicons/icons';
 import { useIsDesktop } from '@/hooks/platformHooks';
 import styles from './ImageViewer.module.scss';
 
@@ -78,18 +71,18 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
   const resetOnNextScaleRef = useRef(true);
   const touchStateRef = useRef<
     | {
-      mode: 'swipe' | 'pan';
-      startPoint: Point;
-      startTranslate: Point;
-      deltaX: number;
-      deltaY: number;
-    }
+        mode: 'swipe' | 'pan';
+        startPoint: Point;
+        startTranslate: Point;
+        deltaX: number;
+        deltaY: number;
+      }
     | {
-      mode: 'pinch';
-      startDistance: number;
-      startScale: number;
-      contentPoint: Point;
-    }
+        mode: 'pinch';
+        startDistance: number;
+        startScale: number;
+        contentPoint: Point;
+      }
     | null
   >(null);
   const activeImage = images[activeIndex];
@@ -114,11 +107,7 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
       return 1;
     }
 
-    return Math.min(
-      1,
-      stageSize.width / activeImageSize.width,
-      stageSize.height / activeImageSize.height
-    );
+    return Math.min(1, stageSize.width / activeImageSize.width, stageSize.height / activeImageSize.height);
   }, [activeImageSize, stageSize.height, stageSize.width]);
 
   const canZoomPan = !!activeImageSize && !!stageSize.width && !!stageSize.height;
@@ -142,7 +131,7 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
         y: clamp(nextTranslate.y, -maxY, maxY),
       };
     },
-    [activeImageSize, minScale, stageSize.height, stageSize.width]
+    [activeImageSize, minScale, stageSize.height, stageSize.width],
   );
 
   const applyScaleAtPoint = useCallback(
@@ -166,7 +155,7 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
           x: pointInStage.x - contentPoint.x * nextEffectiveScale,
           y: pointInStage.y - contentPoint.y * nextEffectiveScale,
         },
-        nextZoom
+        nextZoom,
       );
 
       setZoom(nextZoom);
@@ -181,12 +170,15 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
       stageSize.width,
       translate.x,
       translate.y,
-    ]
+    ],
   );
 
-  const navigateTo = useCallback((nextIndex: number) => {
-    setActiveIndex(clamp(nextIndex, 0, Math.max(images.length - 1, 0)));
-  }, [images.length]);
+  const navigateTo = useCallback(
+    (nextIndex: number) => {
+      setActiveIndex(clamp(nextIndex, 0, Math.max(images.length - 1, 0)));
+    },
+    [images.length],
+  );
 
   const handleDismissClick = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
@@ -194,7 +186,7 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
         onClose();
       }
     },
-    [onClose]
+    [onClose],
   );
 
   useEffect(() => {
@@ -254,8 +246,8 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
       return;
     }
 
-    setZoom(prevZoom => {
-      setTranslate(prevTranslate => clampTranslate(prevTranslate, prevZoom));
+    setZoom((prevZoom) => {
+      setTranslate((prevTranslate) => clampTranslate(prevTranslate, prevZoom));
       return prevZoom;
     });
   }, [clampTranslate, minScale, stageSize.height, stageSize.width]);
@@ -309,8 +301,7 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
 
       const link = document.createElement('a');
       link.href = blobUrl;
-      const downloadName =
-        activeImage.fileName || activeImage.src.split('/').pop()?.split('?')[0] || 'image';
+      const downloadName = activeImage.fileName || activeImage.src.split('/').pop()?.split('?')[0] || 'image';
       link.download = downloadName;
       document.body.appendChild(link);
       link.click();
@@ -389,8 +380,8 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
           x: dragStartRef.current.translate.x + dx,
           y: dragStartRef.current.translate.y + dy,
         },
-        zoom
-      )
+        zoom,
+      ),
     );
   };
 
@@ -463,10 +454,9 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
         y: center.y - rect.top - stageSize.height / 2,
       };
       const nextScale = clamp(
-        (touchStateRef.current.startScale * distance(first, second)) /
-        touchStateRef.current.startDistance,
+        (touchStateRef.current.startScale * distance(first, second)) / touchStateRef.current.startDistance,
         1,
-        MAX_SCALE
+        MAX_SCALE,
       );
       const nextEffectiveScale = minScale * nextScale;
 
@@ -475,7 +465,7 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
           x: pointInStage.x - touchStateRef.current.contentPoint.x * nextEffectiveScale,
           y: pointInStage.y - touchStateRef.current.contentPoint.y * nextEffectiveScale,
         },
-        nextScale
+        nextScale,
       );
 
       setZoom(nextScale);
@@ -494,8 +484,8 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
             x: touchStateRef.current.startTranslate.x + dx,
             y: touchStateRef.current.startTranslate.y + dy,
           },
-          zoom
-        )
+          zoom,
+        ),
       );
       return;
     }
@@ -548,12 +538,7 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
               <IonIcon icon={isFullscreen ? contractOutline : expandOutline} />
             </button>
           )}
-          <button
-            className={styles.iconButton}
-            onClick={onClose}
-            title={t`Close`}
-            aria-label={t`Close viewer`}
-          >
+          <button className={styles.iconButton} onClick={onClose} title={t`Close`} aria-label={t`Close viewer`}>
             <IonIcon icon={close} />
           </button>
         </div>
@@ -689,6 +674,6 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
         )}
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }
