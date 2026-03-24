@@ -284,15 +284,14 @@ export function ChatBubble({
                           ...(imageLayoutStyle ?? {}),
                       };
                       return (
-                          <button
+                           <a
                               key={att.id}
-                              type="button"
+                              href={att.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className={styles.attachmentImageButton}
                               style={imageContainerStyle}
-                              onClick={() => {
-                                  // const imageIndex = imageAttachments.findIndex(image => image.id === att.id);
-                                  // setViewingAttachmentIndex(imageIndex >= 0 ? imageIndex : 0);
-                              }}
+                              onClick={(e) => e.stopPropagation()}
                           >
                               <video
                                   autoPlay
@@ -302,7 +301,7 @@ export function ChatBubble({
                                   className={styles.attachmentImage}
                                   style={imageLayoutStyle ? undefined : {maxHeight: maxImageHeight}}
                               />
-                          </button>
+                          </a>
                       );
                   }else{
                     return (
