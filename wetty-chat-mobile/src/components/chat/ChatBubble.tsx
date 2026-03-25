@@ -132,7 +132,7 @@ export function ChatBubble({
     directionLocked.current = null;
     setAnimating(false);
 
-    if (onLongPress && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
+    if (onLongPress) {
       longPressTimer.current = setTimeout(() => {
         if (bubbleRef.current) {
           onLongPress(bubbleRef.current.getBoundingClientRect());
