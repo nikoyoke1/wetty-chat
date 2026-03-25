@@ -8,6 +8,7 @@ import { renderMessageWithLinks } from './renderMessageWithLinks';
 import { getMessagePreviewText } from './messagePreview';
 import { selectChatFontSizeStyle } from '@/store/settingsSlice';
 import type { Attachment } from '@/api/messages';
+import { useMouseDetected } from '@/hooks/platformHooks';
 import styles from './MessageOverlay.module.scss';
 
 export interface MessageOverlayAction {
@@ -65,6 +66,7 @@ export function MessageOverlay({
 }: MessageOverlayProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const chatFontSizeStyle = useSelector(selectChatFontSizeStyle);
+  const mouseDetected = useMouseDetected();
 
   // Compute position after first render so we know the full content dimensions
   useLayoutEffect(() => {
@@ -132,7 +134,7 @@ export function MessageOverlay({
     }
   }
 
-  const bubbleClass = `${styles.bubbleClone} ${isSent ? styles.bubbleSent : styles.bubbleReceived}`;
+  const bubbleClass = `${styles.bubbleClone} ${mouseDetected ? styles.mouseSelectable : ''} ${isSent ? styles.bubbleSent : styles.bubbleReceived}`;
 
   const overlay = (
     <div className={styles.overlay} onClick={handleBackdropClick}>

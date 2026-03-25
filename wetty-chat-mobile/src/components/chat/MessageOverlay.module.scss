@@ -45,15 +45,21 @@
   align-items: flex-end;
 }
 
-/* Bubble clone — mirrors ChatBubble styles but enables text selection */
+/* Bubble clone mirrors ChatBubble and only enables selection after mouse detection */
 .bubbleClone {
   padding: 8px 12px;
   line-height: 1.4;
   font-size: 14px;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
+}
+
+.mouseSelectable {
   user-select: text;
   -webkit-user-select: text;
   -webkit-touch-callout: default;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
 }
 
 .bubbleReceived {

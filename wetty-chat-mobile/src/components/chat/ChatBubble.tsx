@@ -18,6 +18,7 @@ import { getMessagePreviewText } from './messagePreview';
 import { renderMessageWithLinks } from './renderMessageWithLinks';
 import { selectChatFontSizeStyle } from '@/store/settingsSlice';
 import { UserAvatar } from '@/components/UserAvatar';
+import { useMouseDetected } from '@/hooks/platformHooks';
 
 interface ChatBubbleProps {
   senderName: string;
@@ -57,6 +58,7 @@ function formatTime(iso: string): string {
 
 const SWIPE_THRESHOLD = 60;
 const SWIPE_MAX = 80;
+const LONG_PRESS_DELAY_MS = 350;
 
 function getImageLayoutStyle(
   width: number | null | undefined,
@@ -110,6 +112,7 @@ export function ChatBubble({
   const [offset, setOffset] = useState(0);
   const [animating, setAnimating] = useState(false);
   const [viewingAttachmentIndex, setViewingAttachmentIndex] = useState<number | null>(null);
+  const mouseDetected = useMouseDetected();
   const startX = useRef(0);
   const startY = useRef(0);
   const swiping = useRef(false);
@@ -137,7 +140,7 @@ export function ChatBubble({
         if (bubbleRef.current) {
           onLongPress(bubbleRef.current.getBoundingClientRect());
         }
-      }, 500);
+      }, LONG_PRESS_DELAY_MS);
     }
   }
 
@@ -223,7 +226,11 @@ export function ChatBubble({
           ) : (
             <div className={styles.avatarSpacer} />
           )}
-          <div ref={bubbleRef} className={styles.bubble} style={{ fontSize: chatFontSizeStyle }}>
+          <div
+            ref={bubbleRef}
+            className={`${styles.bubble} ${mouseDetected ? styles.mouseSelectable : ''}`}
+            style={{ fontSize: chatFontSizeStyle }}
+          >
             {showName && (
               <div className={styles.sender}>
                 <span className={styles.senderName}>{senderName}</span>
