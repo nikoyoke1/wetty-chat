@@ -30,17 +30,14 @@ export function useChatRows(messages: MessageResponse[], formatDateSeparator: (i
       const nextMsg = messages[i + 1];
 
       // Date separator: always shown on the first message and on date boundaries.
-      // The first message uses a distinct key prefix so it doesn't collide with a
-      // "real" date boundary separator that may appear when older messages are prepended.
+      // The key must stay stable when older messages are prepended, otherwise
+      // staging batches can get stranded waiting on a row that changed identity.
       const isDateBoundary = prevMsg && !isSameDate(msg.created_at, prevMsg.created_at);
       const isFirstMessage = i === 0;
       if (isFirstMessage || isDateBoundary) {
         rows.push({
           type: 'date',
-          key:
-            isFirstMessage && !isDateBoundary
-              ? `datefirst:${formatDateKey(msg.created_at)}`
-              : `date:${formatDateKey(msg.created_at)}`,
+          key: `date:${formatDateKey(msg.created_at)}`,
           dateLabel: formatDateSeparator(msg.created_at),
         });
         prevSenderUid = null;
@@ -55,6 +52,8 @@ export function useChatRows(messages: MessageResponse[], formatDateSeparator: (i
       rows.push({
         type: 'message',
         key: `msg:${msg.client_generated_id || msg.id}`,
+        messageId: msg.id,
+        clientGeneratedId: msg.client_generated_id ?? null,
         message: msg,
         showName,
         showAvatar: isLastInGroup,

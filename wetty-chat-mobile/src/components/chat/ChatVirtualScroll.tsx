@@ -74,7 +74,7 @@ function formatAnchorForLog(anchor: ChatVirtualScrollProps['initialAnchor']) {
     return { type: 'bottom', token: anchor.token };
   }
 
-  return { type: 'item', key: anchor.key, token: anchor.token };
+  return { type: 'message', messageId: anchor.messageId, token: anchor.token };
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -192,6 +192,7 @@ export function ChatVirtualScroll({
   initialAnchorRef.current = initialAnchor;
 
   const pendingScrollKeyRef = useRef<string | null>(null);
+  const pendingScrollMessageIdRef = useRef<string | null>(null);
   const pendingScrollBehaviorRef = useRef<ScrollBehavior>('auto');
   const pendingScrollToBottomRef = useRef(false);
   const pendingScrollToBottomBehaviorRef = useRef<ScrollBehavior>('auto');
@@ -237,6 +238,14 @@ export function ChatVirtualScroll({
     rowKeys.forEach((key, index) => map.set(key, index));
     return map;
   }, [rowKeys]);
+  const messageIdToTarget = useMemo(() => {
+    const map = new Map<string, { key: string; index: number }>();
+    rows.forEach((row, index) => {
+      if (row.type !== 'message') return;
+      map.set(row.messageId, { key: row.key, index });
+    });
+    return map;
+  }, [rows]);
   const prevKeysRef = useRef<string[]>([]);
 
   const [phase, setPhase] = useState<Phase>('WAITING_VIEWPORT');
@@ -432,12 +441,23 @@ export function ChatVirtualScroll({
   const scrollToKeyInternal = useCallback((key: string, behavior: ScrollBehavior = 'auto') => {
     const container = containerRef.current;
     const row = rowRefsMap.current.get(key);
-    if (!container || !row) return;
+    if (!container || !row) {
+      logVirtualScroll('scroll-to-item-missed-row', {
+        key,
+        behavior,
+        hasContainer: container != null,
+        hasRow: row != null,
+        mounted: mountedRef.current,
+      });
+      return false;
+    }
 
     const target = roundScrollValue(
       Math.max(0, Math.min(row.offsetTop, container.scrollHeight - container.clientHeight)),
     );
-    if (behavior === 'auto' && !hasMeaningfulScrollDelta(container.scrollTop, target)) return;
+    if (behavior === 'auto' && !hasMeaningfulScrollDelta(container.scrollTop, target)) {
+      return true;
+    }
     logVirtualScroll('scroll-to-item-execute', {
       key,
       behavior,
@@ -447,7 +467,15 @@ export function ChatVirtualScroll({
       mounted: mountedRef.current,
     });
     container.scrollTo({ top: target, behavior });
+    return true;
   }, []);
+
+  const resolveMessageTarget = useCallback(
+    (messageId: string) => {
+      return messageIdToTarget.get(messageId) ?? null;
+    },
+    [messageIdToTarget],
+  );
 
   const restoreAnchorOffset = useCallback((key: string, offsetTop: number) => {
     const container = containerRef.current;
@@ -806,7 +834,19 @@ export function ChatVirtualScroll({
         visible,
         targetIndex,
         scrollTop: container.scrollTop,
+        pendingScrollKey: pendingScrollKeyRef.current,
+        pendingScrollMessageId: pendingScrollMessageIdRef.current,
+        initialAnchor: formatAnchorForLog(initialAnchorRef.current),
       });
+      if (!pendingScrollMessageIdRef.current && initialAnchorRef.current.type === 'message') {
+        pendingScrollMessageIdRef.current = initialAnchorRef.current.messageId;
+        pendingScrollBehaviorRef.current = 'auto';
+        logVirtualScroll('recenter-seeded-pending-message-scroll', {
+          messageId: initialAnchorRef.current.messageId,
+          targetIndex,
+          source: 'initial-anchor',
+        });
+      }
       enterRecentering(targetIndex);
       return;
     }
@@ -1015,7 +1055,18 @@ export function ChatVirtualScroll({
       pendingBatch: pendingBatch?.keys.length ?? 0,
       logicalAtBottom: isAtBottomRef.current,
       pendingScrollToBottom: pendingScrollToBottomRef.current,
+      pendingScrollMessageId: pendingScrollMessageIdRef.current,
     });
+
+    if (pendingScrollMessageIdRef.current) {
+      logVirtualScroll('scroll-idle-navigation-lock', {
+        phase: phaseRef.current,
+        messageId: pendingScrollMessageIdRef.current,
+        atTopEdge,
+        atBottomEdge,
+      });
+      return;
+    }
 
     if (atTopEdge) {
       if (loadOlder.hasMore && !loadOlder.loading && topLoadArmedRef.current) {
@@ -1145,14 +1196,35 @@ export function ChatVirtualScroll({
       pendingScrollToBottomSourceRef.current = null;
     }
 
+    if (intent?.scrollToMessageId) {
+      const target = resolveMessageTarget(intent.scrollToMessageId.messageId);
+      logVirtualScroll('layout-intent-scroll-to-message', {
+        messageId: intent.scrollToMessageId.messageId,
+        resolvedKey: target?.key ?? null,
+        behavior: intent.scrollToMessageId.behavior,
+        mounted: mountedRef.current,
+      });
+      if (target) {
+        const scrolled = scrollToKeyInternal(target.key, intent.scrollToMessageId.behavior);
+        if (scrolled && pendingScrollMessageIdRef.current === intent.scrollToMessageId.messageId) {
+          pendingScrollMessageIdRef.current = null;
+        }
+      } else {
+        logVirtualScroll('layout-intent-scroll-to-message-missed', {
+          messageId: intent.scrollToMessageId.messageId,
+          behavior: intent.scrollToMessageId.behavior,
+        });
+      }
+    }
+
     if (intent?.scrollToKey) {
       logVirtualScroll('layout-intent-scroll-to-item', {
         key: intent.scrollToKey.key,
         behavior: intent.scrollToKey.behavior,
         mounted: mountedRef.current,
       });
-      scrollToKeyInternal(intent.scrollToKey.key, intent.scrollToKey.behavior);
-      if (pendingScrollKeyRef.current === intent.scrollToKey.key) {
+      const scrolled = scrollToKeyInternal(intent.scrollToKey.key, intent.scrollToKey.behavior);
+      if (scrolled && pendingScrollKeyRef.current === intent.scrollToKey.key) {
         pendingScrollKeyRef.current = null;
       }
     }
@@ -1165,8 +1237,10 @@ export function ChatVirtualScroll({
           behavior: pendingScrollBehaviorRef.current,
           mounted: mountedRef.current,
         });
-        scrollToKeyInternal(pendingScrollKeyRef.current, pendingScrollBehaviorRef.current);
-        pendingScrollKeyRef.current = null;
+        const scrolled = scrollToKeyInternal(pendingScrollKeyRef.current, pendingScrollBehaviorRef.current);
+        if (scrolled) {
+          pendingScrollKeyRef.current = null;
+        }
       }
     }
 
@@ -1281,6 +1355,7 @@ export function ChatVirtualScroll({
     restoreAnchorOffset,
     scheduleBottomSettle,
     logMutationSnapshot,
+    resolveMessageTarget,
     scrollToBottomInternal,
     scrollToKeyInternal,
     setPhaseState,
@@ -1396,6 +1471,7 @@ export function ChatVirtualScroll({
     mountedRef.current = null;
     recenterTargetIndexRef.current = null;
     pendingScrollKeyRef.current = null;
+    pendingScrollMessageIdRef.current = null;
     pendingScrollToBottomRef.current = false;
     pendingScrollToBottomBehaviorRef.current = 'auto';
     pendingScrollToBottomSourceRef.current = null;
@@ -1444,7 +1520,7 @@ export function ChatVirtualScroll({
           'bootstrap',
         );
       } else {
-        const anchorIndex = keyToIndex.get(anchor.key) ?? rowKeys.length - 1;
+        const anchorIndex = resolveMessageTarget(anchor.messageId)?.index ?? rowKeys.length - 1;
         queueRangeBatch(
           Math.max(0, anchorIndex - BOOTSTRAP_ITEM_RADIUS),
           Math.min(rowKeys.length - 1, anchorIndex + BOOTSTRAP_ITEM_RADIUS),
@@ -1496,7 +1572,7 @@ export function ChatVirtualScroll({
       return;
     }
 
-    const anchorIndex = keyToIndex.get(anchor.key) ?? rowKeys.length - 1;
+    const anchorIndex = resolveMessageTarget(anchor.messageId)?.index ?? rowKeys.length - 1;
     const heightBelowAnchor = heightBetween(Math.max(anchorIndex + 1, mounted.start), mounted.end + 1);
     if (heightBelowAnchor < containerHeight && mounted.end < rowKeys.length - 1) {
       queueRangeBatch(
@@ -1519,20 +1595,21 @@ export function ChatVirtualScroll({
       measuredHeight,
       containerHeight,
       mounted,
-      action: 'scrollToKey',
+      action: 'scrollToMessageId',
     });
-    layoutIntentRef.current = { scrollToKey: { key: anchor.key, behavior: 'auto' } };
+    pendingScrollMessageIdRef.current = anchor.messageId;
+    pendingScrollBehaviorRef.current = 'auto';
     updateMountedRange(capRange(mounted, rowKeys.length - 1));
     setPhaseState('READY');
     triggerRender();
   }, [
     containerHeight,
     heightBetween,
-    keyToIndex,
     offsetOf,
     pendingBatch,
     phase,
     queueRangeBatch,
+    resolveMessageTarget,
     rowKeys.length,
     setPhaseState,
     triggerRender,
@@ -1566,9 +1643,28 @@ export function ChatVirtualScroll({
     }
 
     if (allMeasured(desired.start, desired.end)) {
+      if (!pendingScrollMessageIdRef.current && initialAnchorRef.current.type === 'message') {
+        const anchorIndex = resolveMessageTarget(initialAnchorRef.current.messageId)?.index ?? null;
+        logVirtualScroll('recenter-ready-without-pending-message-scroll', {
+          anchor: formatAnchorForLog(initialAnchorRef.current),
+          anchorIndex,
+          targetIndex,
+          desired,
+          mounted,
+          scrollTop: container?.scrollTop ?? null,
+        });
+      }
+
       updateMountedRange(capRange(desired, rowKeys.length - 1));
 
-      if (pendingScrollKeyRef.current) {
+      if (pendingScrollMessageIdRef.current) {
+        layoutIntentRef.current = {
+          scrollToMessageId: {
+            messageId: pendingScrollMessageIdRef.current,
+            behavior: pendingScrollBehaviorRef.current,
+          },
+        };
+      } else if (pendingScrollKeyRef.current) {
         layoutIntentRef.current = {
           scrollToKey: { key: pendingScrollKeyRef.current, behavior: pendingScrollBehaviorRef.current },
         };
@@ -1604,6 +1700,7 @@ export function ChatVirtualScroll({
     pendingBatch,
     phase,
     queueRangeBatch,
+    resolveMessageTarget,
     rowKeys.length,
     setPhaseState,
     triggerRender,
@@ -1620,6 +1717,33 @@ export function ChatVirtualScroll({
         mounted: mountedRef.current,
       });
       ensureBottomMeasured();
+      return;
+    }
+
+    if (pendingScrollMessageIdRef.current) {
+      const target = resolveMessageTarget(pendingScrollMessageIdRef.current);
+      if (!target) {
+        logVirtualScroll('pending-scroll-to-message-target-missed', {
+          messageId: pendingScrollMessageIdRef.current,
+          phase,
+        });
+        pendingScrollMessageIdRef.current = null;
+        return;
+      }
+
+      const mounted = mountedRef.current;
+      if (mounted && target.index >= mounted.start && target.index <= mounted.end) {
+        layoutIntentRef.current = {
+          scrollToMessageId: {
+            messageId: pendingScrollMessageIdRef.current,
+            behavior: pendingScrollBehaviorRef.current,
+          },
+        };
+        triggerRender();
+        return;
+      }
+
+      enterRecentering(target.index);
       return;
     }
 
@@ -1650,6 +1774,7 @@ export function ChatVirtualScroll({
     keyToIndex,
     maybeUpdateMountedForScroll,
     phase,
+    resolveMessageTarget,
     renderTick,
     triggerRender,
   ]);
@@ -1660,6 +1785,7 @@ export function ChatVirtualScroll({
       scrollApiRef.current = {
       scrollToBottom: (options?: ScrollToBottomOptions) => {
         pendingScrollKeyRef.current = null;
+        pendingScrollMessageIdRef.current = null;
         pendingScrollToBottomRef.current = true;
         const {
           behavior = 'auto',
@@ -1711,6 +1837,7 @@ export function ChatVirtualScroll({
         const resolvedBehavior = isMounted ? behavior : behavior === 'smooth' ? 'auto' : behavior;
         pendingScrollBehaviorRef.current = resolvedBehavior;
         pendingScrollKeyRef.current = key;
+        pendingScrollMessageIdRef.current = null;
         pendingScrollToBottomRef.current = false;
         pendingScrollToBottomBehaviorRef.current = 'auto';
         pendingScrollToBottomSourceRef.current = null;
@@ -1726,8 +1853,10 @@ export function ChatVirtualScroll({
         });
 
         if (mounted && targetIndex >= mounted.start && targetIndex <= mounted.end) {
-          scrollToKeyInternal(key, resolvedBehavior);
-          pendingScrollKeyRef.current = null;
+          const scrolled = scrollToKeyInternal(key, resolvedBehavior);
+          if (scrolled) {
+            pendingScrollKeyRef.current = null;
+          }
           return;
         }
 
@@ -1742,6 +1871,63 @@ export function ChatVirtualScroll({
           enterRecentering(targetIndex);
         }
       },
+      scrollToMessageId: (messageId: string, behavior: ScrollBehavior = 'auto') => {
+        const target = resolveMessageTarget(messageId);
+        if (!target) {
+          logVirtualScroll('scroll-to-message-requested', {
+            messageId,
+            requestedBehavior: behavior,
+            resolvedBehavior: behavior,
+            targetIndex: null,
+            targetKey: null,
+            mounted: mountedRef.current,
+            phase: phaseRef.current,
+            found: false,
+          });
+          return;
+        }
+
+        const mounted = mountedRef.current;
+        const isMounted = mounted != null && target.index >= mounted.start && target.index <= mounted.end;
+        const resolvedBehavior = isMounted ? behavior : behavior === 'smooth' ? 'auto' : behavior;
+        pendingScrollBehaviorRef.current = resolvedBehavior;
+        pendingScrollMessageIdRef.current = messageId;
+        pendingScrollKeyRef.current = null;
+        pendingScrollToBottomRef.current = false;
+        pendingScrollToBottomBehaviorRef.current = 'auto';
+        pendingScrollToBottomSourceRef.current = null;
+        logVirtualScroll('scroll-to-message-requested', {
+          messageId,
+          requestedBehavior: behavior,
+          resolvedBehavior,
+          targetIndex: target.index,
+          targetKey: target.key,
+          mounted,
+          phase: phaseRef.current,
+          found: true,
+          isMounted,
+        });
+
+        if (mounted && target.index >= mounted.start && target.index <= mounted.end) {
+          const scrolled = scrollToKeyInternal(target.key, resolvedBehavior);
+          if (scrolled) {
+            pendingScrollMessageIdRef.current = null;
+          }
+          return;
+        }
+
+        if (phaseRef.current === 'READY') {
+          logVirtualScroll('scroll-to-message-recenter-requested', {
+            messageId,
+            targetIndex: target.index,
+            targetKey: target.key,
+            requestedBehavior: behavior,
+            resolvedBehavior,
+            mounted,
+          });
+          enterRecentering(target.index);
+        }
+      },
     };
 
     return () => {
@@ -1749,7 +1935,7 @@ export function ChatVirtualScroll({
         scrollApiRef.current = null;
       }
     };
-  }, [ensureBottomMeasured, enterRecentering, keyToIndex, scrollApiRef, scrollToKeyInternal]);
+  }, [ensureBottomMeasured, enterRecentering, keyToIndex, resolveMessageTarget, scrollApiRef, scrollToKeyInternal]);
 
   useEffect(() => {
     return () => {
@@ -1763,6 +1949,23 @@ export function ChatVirtualScroll({
   if (rowKeys !== adjustPrevKeysRef.current) {
     if (adjustPrevKeysRef.current.length > 0) {
       const mutation = classifyKeyMutation(adjustPrevKeysRef.current, rowKeys);
+      if (pendingBatch) {
+        const missingPendingKeys = pendingBatch.keys.filter((key) => !keyToIndex.has(key));
+        logVirtualScroll('row-mutation-during-pending-batch', {
+          mutation,
+          pendingBatch: {
+            reason: pendingBatch.reason,
+            direction: pendingBatch.direction,
+            size: pendingBatch.keys.length,
+            firstKey: pendingBatch.keys[0] ?? null,
+            lastKey: pendingBatch.keys[pendingBatch.keys.length - 1] ?? null,
+          },
+          mounted: mountedRef.current,
+          recenterTargetIndex: recenterTargetIndexRef.current,
+          missingPendingKeysCount: missingPendingKeys.length,
+          missingPendingKeysSample: missingPendingKeys.slice(0, 6),
+        });
+      }
       if (mutation === 'prepend') {
         const anchor = captureVisibleAnchor();
         pendingPrependRestoreRef.current = anchor;
@@ -1796,6 +1999,10 @@ export function ChatVirtualScroll({
         }
         if (recenterTargetIndexRef.current != null) {
           recenterTargetIndexRef.current += prependCount;
+          logMutationSnapshot('prepend-shifted-recenter-target', {
+            prependCount,
+            nextRecenterTargetIndex: recenterTargetIndexRef.current,
+          });
         }
       } else if (mutation === 'append') {
         mutationSnapshotRef.current = {

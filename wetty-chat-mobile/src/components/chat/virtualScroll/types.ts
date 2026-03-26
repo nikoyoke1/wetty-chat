@@ -8,6 +8,8 @@ export type ChatRow =
   | {
       type: 'message';
       key: string;
+      messageId: string;
+      clientGeneratedId?: string | null;
       message: MessageResponse;
       showName: boolean;
       showAvatar: boolean;
@@ -45,6 +47,7 @@ export interface PendingBatch {
 export interface LayoutIntent {
   preserveHeightDelta?: number;
   scrollToBottom?: { behavior: ScrollBehavior };
+  scrollToMessageId?: { messageId: string; behavior: ScrollBehavior };
   scrollToKey?: { key: string; behavior: ScrollBehavior };
 }
 
@@ -60,9 +63,12 @@ export interface ScrollToBottomOptions {
 export interface VirtualScrollHandle {
   scrollToBottom: (options?: ScrollToBottomOptions) => void;
   scrollToItem: (key: string, behavior?: ScrollBehavior) => void;
+  scrollToMessageId: (messageId: string, behavior?: ScrollBehavior) => void;
 }
 
-export type VirtualScrollAnchor = { type: 'bottom'; token: number } | { type: 'item'; key: string; token: number };
+export type VirtualScrollAnchor =
+  | { type: 'bottom'; token: number }
+  | { type: 'message'; messageId: string; token: number };
 
 export interface LoadController {
   hasMore: boolean;

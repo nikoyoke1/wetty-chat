@@ -496,13 +496,29 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
       const currentMessages = selectMessagesForChat(state, storeChatId);
       const idx = currentMessages.findIndex((m) => m.id === messageId);
       if (idx !== -1) {
-        scrollApiRef.current?.scrollToItem(getMessageKey(currentMessages[idx]), 'smooth');
+        scrollApiRef.current?.scrollToMessageId(messageId, 'smooth');
         return;
       }
       // Message not in current window — fetch centered window
       getMessages(chatId, { around: messageId, max: 50, thread_id: threadId })
         .then((res) => {
           const list = res.data.messages ?? [];
+          const targetMessage = list.find((message) => message.id === messageId) ?? null;
+          const anchorKey = targetMessage ? getMessageKey(targetMessage) : `msg:${messageId}`;
+
+          if (import.meta.env.DEV) {
+            console.log('[ChatThread] jumpToMessage fetched-window', {
+              chatId,
+              storeChatId,
+              threadId: threadId ?? null,
+              messageId,
+              fetchedCount: list.length,
+              targetFound: targetMessage != null,
+              targetClientGeneratedId: targetMessage?.client_generated_id ?? null,
+              anchorKey,
+            });
+          }
+
           dispatch(
             pushWindow({
               chatId: storeChatId,
@@ -512,8 +528,8 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
             }),
           );
           setInitialAnchor((currentAnchor) => ({
-            type: 'item',
-            key: `msg:${messageId}`,
+            type: 'message',
+            messageId,
             token: currentAnchor.token + 1,
           }));
         })
