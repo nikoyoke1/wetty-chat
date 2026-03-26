@@ -9,6 +9,7 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+use crate::services::media::{build_storage_key, presign_public_upload};
 use crate::utils::auth::CurrentUid;
 use crate::utils::ids;
 use crate::{models::NewAttachment, schema::attachments, AppState};
@@ -81,40 +82,10 @@ async fn post_upload_url(
 
     let s3_item_id = uuid::Uuid::new_v4().to_string();
 
-    // Format: <prefix>/<snowflake_id>.<extension>
-    let extension = std::path::Path::new(&payload.filename)
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("bin");
-
-    let key = format!("{}/{}.{}", prefix, s3_item_id, extension);
+    let key = build_storage_key(prefix, &payload.filename, &s3_item_id);
     let expires_in = Duration::minutes(15);
-    let cache_control = "public,max-age=31536000,immutable";
-    let presigning_config =
-        PresigningConfig::expires_in(expires_in.to_std().unwrap()).map_err(|e| {
-            tracing::error!("presigning config error: {:?}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Failed to configure presigned URL",
-            )
-        })?;
-
-    let presigned_request = s3_client
-        .put_object()
-        .bucket(bucket)
-        .key(&key)
-        .content_type(&payload.content_type)
-        .cache_control(cache_control)
-        .acl(aws_sdk_s3::types::ObjectCannedAcl::PublicRead)
-        .presigned(presigning_config)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to generate presigned URL: {:?}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Failed to generate upload URL",
-            )
-        })?;
+    let presigned_upload =
+        presign_public_upload(s3_client, bucket, &key, &payload.content_type, expires_in).await?;
 
     let conn = &mut state.db.get().map_err(|_| {
         (
@@ -147,16 +118,10 @@ async fn post_upload_url(
             )
         })?;
 
-    let upload_headers = BTreeMap::from([
-        ("Cache-Control".to_string(), cache_control.to_string()),
-        ("Content-Type".to_string(), payload.content_type.clone()),
-        ("x-amz-acl".to_string(), "public-read".to_string()),
-    ]);
-
     let response = UploadUrlResponse {
         attachment_id: id.to_string(),
-        upload_url: presigned_request.uri().to_string(),
-        upload_headers,
+        upload_url: presigned_upload.upload_url,
+        upload_headers: presigned_upload.upload_headers,
     };
 
     Ok((StatusCode::CREATED, Json(response)))

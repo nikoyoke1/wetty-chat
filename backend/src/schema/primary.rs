@@ -78,11 +78,28 @@ diesel::table! {
         #[max_length = 255]
         name -> Varchar,
         description -> Nullable<Text>,
-        avatar -> Nullable<Text>,
+        avatar_image_id -> Nullable<Int8>,
         created_at -> Timestamptz,
         visibility -> GroupVisibility,
         last_message_id -> Nullable<Int8>,
         last_message_at -> Nullable<Timestamptz>,
+    }
+}
+
+diesel::table! {
+    media_images (id) {
+        id -> Int8,
+        owner_group_id -> Int8,
+        #[max_length = 255]
+        content_type -> Varchar,
+        storage_key -> Text,
+        size -> Int8,
+        created_at -> Timestamptz,
+        deleted_at -> Nullable<Timestamptz>,
+        #[max_length = 255]
+        file_name -> Varchar,
+        width -> Nullable<Int4>,
+        height -> Nullable<Int4>,
     }
 }
 
@@ -151,6 +168,7 @@ diesel::table! {
 
 diesel::joinable!(attachments -> messages (message_id));
 diesel::joinable!(group_membership -> groups (chat_id));
+diesel::joinable!(media_images -> groups (owner_group_id));
 diesel::joinable!(message_reactions -> messages (message_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
@@ -159,6 +177,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     clients,
     group_membership,
     groups,
+    media_images,
     message_reactions,
     messages,
     push_subscriptions,

@@ -52,7 +52,7 @@ pub struct Group {
     pub id: i64,
     pub name: String,
     pub description: Option<String>,
-    pub avatar: Option<String>,
+    pub avatar_image_id: Option<i64>,
     pub created_at: DateTime<Utc>,
     pub visibility: GroupVisibility,
     pub last_message_id: Option<i64>,
@@ -66,9 +66,39 @@ pub struct NewGroup {
     pub id: i64,
     pub name: String,
     pub description: Option<String>,
-    pub avatar: Option<String>,
+    pub avatar_image_id: Option<i64>,
     pub created_at: DateTime<Utc>,
     pub visibility: GroupVisibility,
+}
+
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]
+#[diesel(table_name = schema::media_images)]
+pub struct MediaImage {
+    pub id: i64,
+    pub owner_group_id: i64,
+    pub content_type: String,
+    pub storage_key: String,
+    pub size: i64,
+    pub created_at: DateTime<Utc>,
+    pub deleted_at: Option<DateTime<Utc>>,
+    pub file_name: String,
+    pub width: Option<i32>,
+    pub height: Option<i32>,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = schema::media_images)]
+pub struct NewMediaImage {
+    pub id: i64,
+    pub owner_group_id: i64,
+    pub content_type: String,
+    pub storage_key: String,
+    pub size: i64,
+    pub created_at: DateTime<Utc>,
+    pub deleted_at: Option<DateTime<Utc>>,
+    pub file_name: String,
+    pub width: Option<i32>,
+    pub height: Option<i32>,
 }
 
 #[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]
@@ -191,7 +221,6 @@ pub struct NewAttachment {
 pub struct UpdateGroup {
     pub name: Option<String>,
     pub description: Option<String>,
-    pub avatar: Option<String>,
     pub visibility: Option<GroupVisibility>,
 }
 

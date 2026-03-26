@@ -1,22 +1,27 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Json, Path, State},
     http::StatusCode,
     response::IntoResponse,
-    Json,
 };
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 use serde::Serialize;
+use std::collections::BTreeMap;
 
 use crate::handlers::members::check_membership;
-use crate::models::{GroupRole, GroupVisibility, NewGroup, NewGroupMembership, UpdateGroup};
-use crate::schema::{group_membership, groups};
+use crate::models::{
+    GroupRole, GroupVisibility, MediaImage, NewGroup, NewGroupMembership, NewMediaImage,
+    UpdateGroup,
+};
+use crate::schema::{group_membership, groups, media_images};
+use crate::services::media::{build_public_object_url, build_storage_key, presign_public_upload};
 use crate::utils::auth::CurrentUid;
 use crate::utils::ids;
 use crate::AppState;
 
 /// Maximum mute duration: 7 days in seconds.
 const MAX_MUTE_DURATION_SECS: i64 = 7 * 24 * 3600;
+const MAX_GROUP_AVATAR_BYTES: i64 = 10 * 1024 * 1024;
 
 /// Far-future date used for "mute indefinitely".
 fn indefinite_mute_until() -> DateTime<Utc> {
@@ -34,6 +39,136 @@ pub(super) struct CreateChatResponse {
     id: i64,
     name: Option<String>,
     created_at: DateTime<Utc>,
+}
+
+#[derive(serde::Deserialize)]
+pub(super) struct ChatIdPath {
+    pub(super) chat_id: i64,
+}
+
+#[derive(Serialize)]
+pub(super) struct ChatDetailResponse {
+    #[serde(with = "crate::serde_i64_string")]
+    id: i64,
+    name: String,
+    description: Option<String>,
+    #[serde(with = "crate::serde_i64_string::opt")]
+    avatar_image_id: Option<i64>,
+    avatar: Option<String>,
+    visibility: GroupVisibility,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(serde::Deserialize)]
+pub(super) struct UpdateChatBody {
+    name: Option<String>,
+    description: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde_i64_string::double_opt::deserialize"
+    )]
+    avatar_image_id: Option<Option<i64>>,
+    visibility: Option<GroupVisibility>,
+}
+
+#[derive(serde::Deserialize)]
+struct AvatarUploadUrlRequest {
+    filename: String,
+    content_type: String,
+    size: i64,
+    width: Option<i32>,
+    height: Option<i32>,
+}
+
+#[derive(Serialize)]
+struct AvatarUploadUrlResponse {
+    image_id: String,
+    upload_url: String,
+    upload_headers: BTreeMap<String, String>,
+}
+
+#[derive(serde::Deserialize)]
+pub(super) struct MuteBody {
+    /// Duration in seconds, or null/absent for indefinite mute.
+    duration_seconds: Option<i64>,
+}
+
+#[derive(Serialize)]
+pub(super) struct MuteResponse {
+    muted_until: DateTime<Utc>,
+}
+
+type DbConn = diesel::r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>;
+
+fn require_admin_role(
+    conn: &mut DbConn,
+    chat_id: i64,
+    uid: i32,
+) -> Result<(), (StatusCode, &'static str)> {
+    use crate::schema::group_membership::dsl as gm_dsl;
+
+    let role: Option<GroupRole> = group_membership::table
+        .filter(gm_dsl::chat_id.eq(chat_id).and(gm_dsl::uid.eq(uid)))
+        .select(gm_dsl::role)
+        .first(conn)
+        .optional()
+        .map_err(|e| {
+            tracing::error!("check admin role: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+        })?;
+
+    match role {
+        Some(r) if r == GroupRole::Admin => Ok(()),
+        Some(_) => Err((StatusCode::FORBIDDEN, "Admin role required")),
+        None => Err((StatusCode::FORBIDDEN, "Not a member of this chat")),
+    }
+}
+
+fn load_chat_detail(
+    conn: &mut DbConn,
+    state: &AppState,
+    chat_id: i64,
+) -> Result<ChatDetailResponse, (StatusCode, &'static str)> {
+    use crate::schema::groups::dsl as groups_dsl;
+
+    let group: crate::models::Group = groups::table
+        .filter(groups_dsl::id.eq(chat_id))
+        .select(crate::models::Group::as_select())
+        .first(conn)
+        .map_err(|_| (StatusCode::NOT_FOUND, "Chat not found"))?;
+
+    let avatar_image = match group.avatar_image_id {
+        Some(avatar_image_id) => media_images::table
+            .filter(
+                media_images::id
+                    .eq(avatar_image_id)
+                    .and(media_images::deleted_at.is_null()),
+            )
+            .select(MediaImage::as_select())
+            .first(conn)
+            .optional()
+            .map_err(|e| {
+                tracing::error!("load avatar image: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to load avatar image",
+                )
+            })?,
+        None => None,
+    };
+
+    Ok(ChatDetailResponse {
+        id: group.id,
+        name: group.name,
+        description: group.description,
+        avatar_image_id: group.avatar_image_id,
+        avatar: avatar_image
+            .as_ref()
+            .filter(|image| image.deleted_at.is_none())
+            .map(|image| build_public_object_url(state, &image.storage_key)),
+        visibility: group.visibility,
+        created_at: group.created_at,
+    })
 }
 
 /// POST /group — Create a new chat.
@@ -65,7 +200,7 @@ async fn post_group(
             id,
             name: name.clone(),
             description: None,
-            avatar: None,
+            avatar_image_id: None,
             created_at: now,
             visibility: GroupVisibility::Public,
         })
@@ -98,22 +233,6 @@ async fn post_group(
     ))
 }
 
-#[derive(serde::Deserialize)]
-pub(super) struct ChatIdPath {
-    pub(super) chat_id: i64,
-}
-
-#[derive(Serialize)]
-pub(super) struct ChatDetailResponse {
-    #[serde(with = "crate::serde_i64_string")]
-    id: i64,
-    name: String,
-    description: Option<String>,
-    avatar: Option<String>,
-    visibility: GroupVisibility,
-    created_at: DateTime<Utc>,
-}
-
 /// GET /group/:chat_id — Get chat details.
 async fn get_group(
     CurrentUid(uid): CurrentUid,
@@ -127,44 +246,82 @@ async fn get_group(
         )
     })?;
 
-    // Check membership
-    use crate::schema::group_membership::dsl as gm_dsl;
-    let is_member = group_membership::table
-        .filter(gm_dsl::chat_id.eq(chat_id).and(gm_dsl::uid.eq(uid)))
-        .count()
-        .get_result::<i64>(conn)
-        .map_err(|e| {
-            tracing::error!("check membership: {:?}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
-        })?;
+    check_membership(conn, chat_id, uid)?;
 
-    if is_member == 0 {
-        return Err((StatusCode::FORBIDDEN, "Not a member of this chat"));
-    }
-
-    // Get group details
-    use crate::schema::groups::dsl as groups_dsl;
-    let group: crate::models::Group = groups::table
-        .filter(groups_dsl::id.eq(chat_id))
-        .first(conn)
-        .map_err(|_| (StatusCode::NOT_FOUND, "Chat not found"))?;
-
-    Ok(Json(ChatDetailResponse {
-        id: group.id,
-        name: group.name,
-        description: group.description,
-        avatar: group.avatar,
-        visibility: group.visibility,
-        created_at: group.created_at,
-    }))
+    Ok(Json(load_chat_detail(conn, &state, chat_id)?))
 }
 
-#[derive(serde::Deserialize)]
-pub(super) struct UpdateChatBody {
-    name: Option<String>,
-    description: Option<String>,
-    avatar: Option<String>,
-    visibility: Option<GroupVisibility>,
+/// POST /group/:chat_id/avatar/upload-url — Create a group avatar upload URL.
+async fn post_avatar_upload_url(
+    CurrentUid(uid): CurrentUid,
+    State(state): State<AppState>,
+    Path(ChatIdPath { chat_id }): Path<ChatIdPath>,
+    Json(payload): Json<AvatarUploadUrlRequest>,
+) -> Result<impl IntoResponse, (StatusCode, &'static str)> {
+    if !payload.content_type.starts_with("image/") {
+        return Err((StatusCode::BAD_REQUEST, "Avatar uploads must be images"));
+    }
+    if payload.size <= 0 || payload.size > MAX_GROUP_AVATAR_BYTES {
+        return Err((StatusCode::BAD_REQUEST, "Avatar size is invalid"));
+    }
+
+    let conn = &mut state.db.get().map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Database connection failed",
+        )
+    })?;
+    require_admin_role(conn, chat_id, uid)?;
+
+    let id = ids::next_message_id(state.id_gen.as_ref())
+        .await
+        .map_err(|e| {
+            tracing::error!("next_message_id for group avatar: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to generate ID")
+        })?;
+
+    let s3_item_id = uuid::Uuid::new_v4().to_string();
+    let storage_key =
+        build_storage_key(&state.s3_attachment_prefix, &payload.filename, &s3_item_id);
+    let presigned_upload = presign_public_upload(
+        &state.s3_client,
+        &state.s3_bucket_name,
+        &storage_key,
+        &payload.content_type,
+        chrono::Duration::minutes(15),
+    )
+    .await?;
+
+    diesel::insert_into(media_images::table)
+        .values(&NewMediaImage {
+            id,
+            owner_group_id: chat_id,
+            content_type: payload.content_type,
+            storage_key,
+            size: payload.size,
+            created_at: Utc::now(),
+            deleted_at: None,
+            file_name: payload.filename,
+            width: payload.width,
+            height: payload.height,
+        })
+        .execute(conn)
+        .map_err(|e| {
+            tracing::error!("insert avatar image: {:?}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to create avatar record",
+            )
+        })?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(AvatarUploadUrlResponse {
+            image_id: id.to_string(),
+            upload_url: presigned_upload.upload_url,
+            upload_headers: presigned_upload.upload_headers,
+        }),
+    ))
 }
 
 /// PATCH /group/:chat_id — Update chat metadata (admin only).
@@ -181,63 +338,69 @@ async fn patch_group(
         )
     })?;
 
-    // Check if user is admin
-    use crate::schema::group_membership::dsl as gm_dsl;
-    let role: Option<GroupRole> = group_membership::table
-        .filter(gm_dsl::chat_id.eq(chat_id).and(gm_dsl::uid.eq(uid)))
-        .select(gm_dsl::role)
-        .first(conn)
-        .optional()
-        .map_err(|e| {
-            tracing::error!("check admin role: {:?}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
-        })?;
+    require_admin_role(conn, chat_id, uid)?;
 
-    match role {
-        Some(r) if r == GroupRole::Admin => {}
-        Some(_) => return Err((StatusCode::FORBIDDEN, "Admin role required")),
-        None => return Err((StatusCode::FORBIDDEN, "Not a member of this chat")),
+    let current_group: crate::models::Group = groups::table
+        .filter(groups::id.eq(chat_id))
+        .select(crate::models::Group::as_select())
+        .first(conn)
+        .map_err(|_| (StatusCode::NOT_FOUND, "Chat not found"))?;
+
+    if let Some(Some(image_id)) = body.avatar_image_id {
+        let owned_image_exists = media_images::table
+            .filter(
+                media_images::id
+                    .eq(image_id)
+                    .and(media_images::owner_group_id.eq(chat_id))
+                    .and(media_images::deleted_at.is_null()),
+            )
+            .count()
+            .get_result::<i64>(conn)
+            .map_err(|e| {
+                tracing::error!("validate avatar image: {:?}", e);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+            })?;
+        if owned_image_exists == 0 {
+            return Err((StatusCode::BAD_REQUEST, "Invalid avatar image"));
+        }
     }
 
-    // Update group in a single query
     use crate::schema::groups::dsl as groups_dsl;
-
     let changeset = UpdateGroup {
         name: body.name,
         description: body.description,
-        avatar: body.avatar,
         visibility: body.visibility,
     };
 
-    let group: crate::models::Group =
+    conn.transaction::<_, diesel::result::Error, _>(|conn| {
         diesel::update(groups::table.filter(groups_dsl::id.eq(chat_id)))
             .set(&changeset)
-            .returning(crate::models::Group::as_returning())
-            .get_result(conn)
-            .map_err(|e| {
-                tracing::error!("update group: {:?}", e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Failed to update chat")
-            })?;
+            .execute(conn)?;
 
-    Ok(Json(ChatDetailResponse {
-        id: group.id,
-        name: group.name,
-        description: group.description,
-        avatar: group.avatar,
-        visibility: group.visibility,
-        created_at: group.created_at,
-    }))
-}
+        if let Some(next_avatar_image_id) = body.avatar_image_id {
+            diesel::update(groups::table.filter(groups_dsl::id.eq(chat_id)))
+                .set(groups_dsl::avatar_image_id.eq(next_avatar_image_id))
+                .execute(conn)?;
 
-#[derive(serde::Deserialize)]
-pub(super) struct MuteBody {
-    /// Duration in seconds, or null/absent for indefinite mute.
-    duration_seconds: Option<i64>,
-}
+            if let Some(previous_avatar_image_id) = current_group.avatar_image_id {
+                if Some(previous_avatar_image_id) != next_avatar_image_id {
+                    diesel::update(
+                        media_images::table.filter(media_images::id.eq(previous_avatar_image_id)),
+                    )
+                    .set(media_images::deleted_at.eq(Some(Utc::now())))
+                    .execute(conn)?;
+                }
+            }
+        }
 
-#[derive(Serialize)]
-pub(super) struct MuteResponse {
-    muted_until: DateTime<Utc>,
+        Ok(())
+    })
+    .map_err(|e| {
+        tracing::error!("update group: {:?}", e);
+        (StatusCode::INTERNAL_SERVER_ERROR, "Failed to update chat")
+    })?;
+
+    Ok(Json(load_chat_detail(conn, &state, chat_id)?))
 }
 
 /// PUT /group/:chat_id/mute — Mute notifications for a chat.
@@ -315,6 +478,10 @@ pub fn router() -> axum::Router<crate::AppState> {
         .route(
             "/{chat_id}",
             axum::routing::get(get_group).patch(patch_group),
+        )
+        .route(
+            "/{chat_id}/avatar/upload-url",
+            axum::routing::post(post_avatar_upload_url),
         )
         .route(
             "/{chat_id}/mute",

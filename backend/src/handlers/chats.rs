@@ -12,6 +12,7 @@ use crate::{
     handlers::members::check_membership,
     models::NewMessage,
     services::{
+        media::build_public_object_url,
         push::PushJob,
         user::{lookup_user_avatars, lookup_user_profiles, UserProfile},
     },
@@ -31,6 +32,7 @@ use crate::{
         attachments,
         group_membership,
         groups,
+        media_images,
         message_reactions,
         messages, //
     },
@@ -55,8 +57,11 @@ pub struct ChatListItem {
     #[serde(with = "crate::serde_i64_string")]
     id: i64,
     name: Option<String>,
+    avatar: Option<String>,
     last_message_at: Option<DateTime<Utc>>,
     unread_count: i64,
+    #[serde(with = "crate::serde_i64_string::opt")]
+    last_read_message_id: Option<i64>,
     last_message: Option<MessageResponse>,
     muted_until: Option<DateTime<Utc>>,
 }
@@ -106,13 +111,20 @@ async fn get_chats(
     let base_query = groups::table
         .inner_join(group_membership::table)
         .left_join(messages::table.on(groups::last_message_id.eq(messages::id.nullable())))
+        .left_join(
+            media_images::table.on(groups::avatar_image_id
+                .eq(media_images::id.nullable())
+                .and(media_images::deleted_at.is_null())),
+        )
         .filter(group_membership::uid.eq(uid));
 
     type RowType = (
         i64,
         String,
+        Option<String>,
         Option<DateTime<Utc>>,
         i64,
+        Option<i64>,
         Option<crate::models::Message>,
         Option<DateTime<Utc>>,
     );
@@ -122,8 +134,10 @@ async fn get_chats(
             .select((
                 groups::id,
                 groups::name,
+                media_images::storage_key.nullable(),
                 groups::last_message_at,
                 unread_count_sq.clone(),
+                group_membership::last_read_message_id,
                 messages::all_columns.nullable(),
                 group_membership::muted_until,
             ))
@@ -166,8 +180,10 @@ async fn get_chats(
                     .select((
                         groups::id,
                         groups::name,
+                        media_images::storage_key.nullable(),
                         groups::last_message_at,
                         unread_count_sq.clone(),
+                        group_membership::last_read_message_id,
                         messages::all_columns.nullable(),
                         group_membership::muted_until,
                     ))
@@ -193,8 +209,10 @@ async fn get_chats(
                     .select((
                         groups::id,
                         groups::name,
+                        media_images::storage_key.nullable(),
                         groups::last_message_at,
                         unread_count_sq.clone(),
+                        group_membership::last_read_message_id,
                         messages::all_columns.nullable(),
                         group_membership::muted_until,
                     ))
@@ -222,7 +240,7 @@ async fn get_chats(
 
     let messages_to_process: Vec<crate::models::Message> = items_to_process
         .iter()
-        .filter_map(|(_, _, _, _, msg, _)| msg.clone())
+        .filter_map(|(_, _, _, _, _, _, msg, _)| msg.clone())
         .collect();
 
     let message_responses = attach_metadata(conn, messages_to_process, &state, uid).await;
@@ -236,13 +254,26 @@ async fn get_chats(
     let chats: Vec<ChatListItem> = items_to_process
         .into_iter()
         .map(
-            |(id, name, last_message_at, unread_count, msg, muted_until)| {
+            |(
+                id,
+                name,
+                avatar_key,
+                last_message_at,
+                unread_count,
+                last_read_message_id,
+                msg,
+                muted_until,
+            )| {
                 let mr = msg.and_then(|m| message_response_map.remove(&m.id));
                 ChatListItem {
                     id,
                     name: Some(name),
+                    avatar: avatar_key
+                        .as_deref()
+                        .map(|storage_key| build_public_object_url(&state, storage_key)),
                     last_message_at,
                     unread_count,
+                    last_read_message_id,
                     last_message: mr,
                     muted_until,
                 }
@@ -563,14 +594,9 @@ pub async fn attach_metadata(
         let mut attachments = Vec::new();
         if let Some(atts) = message_attachments_map.remove(&m.id) {
             for att in atts {
-                let base_url = state.s3_base_url.clone().unwrap_or_else(|| {
-                    format!("https://{}.s3.amazonaws.com", state.s3_bucket_name)
-                });
-                let url = format!("{}/{}", base_url, att.external_reference);
-
                 attachments.push(AttachmentResponse {
                     id: att.id,
-                    url,
+                    url: build_public_object_url(state, &att.external_reference),
                     kind: att.kind,
                     size: att.size,
                     file_name: att.file_name,

@@ -60,3 +60,32 @@ pub mod opt {
         }
     }
 }
+
+pub mod double_opt {
+    use serde::{Deserialize, Deserializer};
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Option<i64>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum StringOrNumberOrNull {
+            Str(String),
+            Num(i64),
+            Null,
+        }
+
+        let v = Option::<StringOrNumberOrNull>::deserialize(deserializer)?;
+        match v {
+            None => Ok(None),
+            Some(StringOrNumberOrNull::Null) => Ok(Some(None)),
+            Some(StringOrNumberOrNull::Str(s)) => s
+                .parse()
+                .map(Some)
+                .map(Some)
+                .map_err(serde::de::Error::custom),
+            Some(StringOrNumberOrNull::Num(n)) => Ok(Some(Some(n))),
+        }
+    }
+}
