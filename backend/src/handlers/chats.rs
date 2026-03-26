@@ -372,6 +372,8 @@ pub struct ReplyToMessage {
     message: Option<String>,
     sender: Sender,
     is_deleted: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    first_attachment_kind: Option<String>,
 }
 
 type DbConn = diesel::r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>;
@@ -451,10 +453,18 @@ pub async fn attach_metadata(
 
     let mut message_attachments_map: std::collections::HashMap<i64, Vec<Attachment>> =
         std::collections::HashMap::new();
-    if !message_ids.is_empty() {
+    let attachment_message_ids: Vec<i64> = message_ids
+        .iter()
+        .copied()
+        .chain(reply_ids.iter().copied())
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
+    if !attachment_message_ids.is_empty() {
         use crate::schema::attachments::dsl as a_dsl;
         let attachments: Vec<Attachment> = attachments::table
-            .filter(a_dsl::message_id.eq_any(&message_ids))
+            .filter(a_dsl::message_id.eq_any(&attachment_message_ids))
+            .order((a_dsl::created_at.asc(), a_dsl::id.asc()))
             .select(Attachment::as_select())
             .load(conn)
             .unwrap_or_default();
@@ -587,6 +597,10 @@ pub async fn attach_metadata(
                     },
                     sender: build_sender(reply_msg.sender_uid, &user_avatars, &user_profiles),
                     is_deleted: reply_msg.deleted_at.is_some(),
+                    first_attachment_kind: message_attachments_map
+                        .get(&reply_msg.id)
+                        .and_then(|attachments| attachments.first())
+                        .map(|attachment| attachment.kind.clone()),
                 })
             })
         });
