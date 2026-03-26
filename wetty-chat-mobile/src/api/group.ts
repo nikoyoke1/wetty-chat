@@ -6,6 +6,7 @@ export interface GroupInfoResponse {
   id: string;
   name: string;
   description: string | null;
+  avatar_image_id: string | null;
   avatar: string | null;
   visibility: string;
   created_at: string;
@@ -15,8 +16,22 @@ export interface GroupInfoResponse {
 export interface UpdateGroupInfoBody {
   name?: string;
   description?: string;
-  avatar?: string;
+  avatar_image_id?: string | null;
   visibility?: string;
+}
+
+export interface GroupAvatarUploadUrlRequest {
+  filename: string;
+  content_type: string;
+  size: number;
+  width?: number;
+  height?: number;
+}
+
+export interface GroupAvatarUploadUrlResponse {
+  image_id: string;
+  upload_url: string;
+  upload_headers: Record<string, string>;
 }
 
 export interface MemberResponse {
@@ -59,6 +74,13 @@ export function updateGroupInfo(
   body: UpdateGroupInfoBody,
 ): Promise<AxiosResponse<GroupInfoResponse>> {
   return apiClient.patch(`/group/${chatId}`, body);
+}
+
+export function requestGroupAvatarUploadUrl(
+  chatId: string | number,
+  body: GroupAvatarUploadUrlRequest,
+): Promise<AxiosResponse<GroupAvatarUploadUrlResponse>> {
+  return apiClient.post(`/group/${chatId}/avatar/upload-url`, body);
 }
 
 export function getMembers(

@@ -9,6 +9,7 @@ export interface ChatMeta {
   name: string | null;
   description?: string | null;
   avatar?: string | null;
+  avatar_image_id?: string | null;
   visibility?: string;
   created_at?: string;
 }

@@ -3,17 +3,12 @@ import {
   IonButtons,
   IonContent,
   IonHeader,
-  IonIcon,
-  IonInput,
   IonItem,
   IonLabel,
   IonList,
   IonListHeader,
   IonPage,
-  IonSelect,
-  IonSelectOption,
   IonSpinner,
-  IonTextarea,
   IonTitle,
   IonToolbar,
   useIonToast,
@@ -22,16 +17,17 @@ import { useHistory, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
-import { documentText, eye, image, people, save } from 'ionicons/icons';
 import { selectChatMeta, selectChatMutedUntil, setChatMeta, setChatMutedUntil } from '@/store/chatsSlice';
 import type { RootState } from '@/store/index';
-import { getGroupInfo, updateGroupInfo } from '@/api/group';
+import { getGroupInfo, requestGroupAvatarUploadUrl, updateGroupInfo } from '@/api/group';
+import { uploadFileToS3 } from '@/api/upload';
 import { BackButton } from '@/components/BackButton';
 import { GroupProfile } from '@/components/chat/GroupProfile';
 import { ChatMuteSettingItem } from '@/components/chat/settings/ChatMuteSettingItem';
 import type { BackAction } from '@/types/back-action';
 import styles from './ChatSettings.module.scss';
 import { FeatureGate } from '@/components/FeatureGate';
+import { ChatAdminSettings } from './ChatAdminSettings';
 
 interface ChatSettingsCoreProps {
   chatId?: string;
@@ -41,20 +37,23 @@ interface ChatSettingsCoreProps {
 interface ChatSettingsFormState {
   name: string;
   description: string;
-  avatar: string;
+  avatarUrl: string;
+  avatarImageId: string | null;
   visibility: 'public' | 'private';
 }
 
 function getInitialFormState(cachedMeta?: {
   name?: string | null;
   description?: string | null;
+  avatar_image_id?: string | null;
   avatar?: string | null;
   visibility?: string;
 }): ChatSettingsFormState {
   return {
     name: cachedMeta?.name || '',
     description: cachedMeta?.description || '',
-    avatar: cachedMeta?.avatar || '',
+    avatarUrl: cachedMeta?.avatar || '',
+    avatarImageId: cachedMeta?.avatar_image_id || null,
     visibility: (cachedMeta?.visibility as 'public' | 'private') || 'public',
   };
 }
@@ -64,10 +63,11 @@ interface ChatSettingsContentProps {
   formState: ChatSettingsFormState;
   mutedUntil: string | null;
   saving: boolean;
+  uploadingAvatar: boolean;
   onNameChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
-  onAvatarChange: (value: string) => void;
   onVisibilityChange: (value: 'public' | 'private') => void;
+  onUploadAvatar: (file: File) => Promise<void>;
   onSave: () => void;
 }
 
@@ -76,10 +76,11 @@ function ChatSettingsContent({
   formState,
   mutedUntil,
   saving,
+  uploadingAvatar,
   onNameChange,
   onDescriptionChange,
-  onAvatarChange,
   onVisibilityChange,
+  onUploadAvatar,
   onSave,
 }: ChatSettingsContentProps) {
   return (
@@ -88,7 +89,7 @@ function ChatSettingsContent({
         chatId={chatId}
         name={formState.name}
         description={formState.description}
-        avatarUrl={formState.avatar}
+        avatarUrl={formState.avatarUrl}
       />
 
       <IonListHeader>
@@ -101,69 +102,19 @@ function ChatSettingsContent({
       </IonList>
 
       <FeatureGate>
-        <IonListHeader>
-          <IonLabel>
-            <Trans>Group</Trans>
-          </IonLabel>
-        </IonListHeader>
-        <IonList inset>
-          <IonItem>
-            <IonIcon aria-hidden="true" icon={people} slot="start" color="primary" />
-            <IonLabel position="stacked">
-              <Trans>Group Name</Trans>
-            </IonLabel>
-            <IonInput
-              value={formState.name}
-              placeholder={t`Enter group name`}
-              onIonInput={(event) => onNameChange(event.detail.value ?? '')}
-            />
-          </IonItem>
-          <IonItem>
-            <IonIcon aria-hidden="true" icon={documentText} slot="start" color="tertiary" />
-            <IonLabel position="stacked">
-              <Trans>Description</Trans>
-            </IonLabel>
-            <IonTextarea
-              value={formState.description}
-              placeholder={t`Enter group description`}
-              onIonInput={(event) => onDescriptionChange(event.detail.value ?? '')}
-              rows={3}
-            />
-          </IonItem>
-          <IonItem>
-            <IonIcon aria-hidden="true" icon={image} slot="start" color="medium" />
-            <IonLabel position="stacked">
-              <Trans>Avatar URL</Trans>
-            </IonLabel>
-            <IonInput
-              type="url"
-              value={formState.avatar}
-              placeholder={t`Enter avatar URL`}
-              onIonInput={(event) => onAvatarChange(event.detail.value ?? '')}
-            />
-          </IonItem>
-          <IonItem>
-            <IonIcon aria-hidden="true" icon={eye} slot="start" color="secondary" />
-            <IonLabel>
-              <Trans>Visibility</Trans>
-            </IonLabel>
-            <IonSelect
-              value={formState.visibility}
-              onIonChange={(event) => onVisibilityChange(event.detail.value as 'public' | 'private')}
-            >
-              <IonSelectOption value="public">
-                <Trans>Public</Trans>
-              </IonSelectOption>
-              <IonSelectOption value="private">
-                <Trans>Private</Trans>
-              </IonSelectOption>
-            </IonSelect>
-          </IonItem>
-          <IonItem button detail={false} disabled={saving} onClick={onSave}>
-            <IonIcon aria-hidden="true" icon={save} slot="start" color="primary" />
-            <IonLabel color="primary">{saving ? <Trans>Saving...</Trans> : <Trans>Save Settings</Trans>}</IonLabel>
-          </IonItem>
-        </IonList>
+        <ChatAdminSettings
+          name={formState.name}
+          description={formState.description}
+          visibility={formState.visibility}
+          avatarUrl={formState.avatarUrl}
+          saving={saving}
+          uploadingAvatar={uploadingAvatar}
+          onNameChange={onNameChange}
+          onDescriptionChange={onDescriptionChange}
+          onVisibilityChange={onVisibilityChange}
+          onUploadAvatar={onUploadAvatar}
+          onSave={onSave}
+        />
       </FeatureGate>
     </>
   );
@@ -178,6 +129,7 @@ function ChatSettingsSession({ chatId, backAction }: { chatId: string; backActio
   const [formState, setFormState] = useState<ChatSettingsFormState>(() => getInitialFormState(cachedMeta));
   const [loading, setLoading] = useState(() => !cachedMeta?.visibility);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
     if (cachedMeta?.visibility) {
@@ -198,31 +150,94 @@ function ChatSettingsSession({ chatId, backAction }: { chatId: string; backActio
       .finally(() => setLoading(false));
   }, [chatId, cachedMeta, dispatch, presentToast]);
 
+  useEffect(() => {
+    return () => {
+      if (!formState.avatarUrl.startsWith('blob:')) return;
+      URL.revokeObjectURL(formState.avatarUrl);
+    };
+  }, [formState.avatarUrl]);
+
+  const handleAvatarUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      presentToast({ message: t`Please choose an image file`, duration: 3000 });
+      return;
+    }
+
+    const previousAvatarUrl = formState.avatarUrl;
+    const nextPreviewUrl = URL.createObjectURL(file);
+    const previousPreviewUrl = previousAvatarUrl.startsWith('blob:') ? previousAvatarUrl : null;
+
+    setUploadingAvatar(true);
+    setFormState((current) => ({
+      ...current,
+      avatarUrl: nextPreviewUrl,
+    }));
+
+    try {
+      const uploadRes = await requestGroupAvatarUploadUrl(chatId, {
+        filename: file.name,
+        content_type: file.type || 'application/octet-stream',
+        size: file.size,
+      });
+      const { image_id, upload_url, upload_headers } = uploadRes.data;
+      await uploadFileToS3(upload_url, file, upload_headers);
+      const patchRes = await updateGroupInfo(chatId, {
+        avatar_image_id: image_id,
+      });
+      const { id, muted_until, ...meta } = patchRes.data;
+      void id;
+
+      dispatch(setChatMeta({ chatId, meta }));
+      dispatch(setChatMutedUntil({ chatId, mutedUntil: muted_until }));
+
+      setFormState((current) => ({
+        ...current,
+        avatarImageId: image_id,
+        avatarUrl: meta.avatar || current.avatarUrl,
+      }));
+
+      if (previousPreviewUrl) {
+        URL.revokeObjectURL(previousPreviewUrl);
+      }
+      presentToast({ message: t`Avatar uploaded`, duration: 2000 });
+    } catch (err) {
+      URL.revokeObjectURL(nextPreviewUrl);
+      setFormState((current) => ({
+        ...current,
+        avatarUrl: previousAvatarUrl,
+      }));
+      presentToast({ message: err instanceof Error ? err.message : t`Failed to upload avatar`, duration: 3000 });
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const handleSave = () => {
+    if (uploadingAvatar) {
+      return;
+    }
     setSaving(true);
 
     const name = formState.name.trim();
     const description = formState.description.trim();
-    const avatar = formState.avatar.trim();
 
     updateGroupInfo(chatId, {
       name: name || undefined,
       description: description || undefined,
-      avatar: avatar || undefined,
+      avatar_image_id: formState.avatarImageId,
       visibility: formState.visibility,
     })
-      .then(() => {
+      .then((res) => {
+        const { id, muted_until, ...meta } = res.data;
+        void id;
         dispatch(
           setChatMeta({
             chatId,
-            meta: {
-              name: name || null,
-              description: description || null,
-              avatar: avatar || null,
-              visibility: formState.visibility,
-            },
+            meta,
           }),
         );
+        dispatch(setChatMutedUntil({ chatId, mutedUntil: muted_until }));
+        setFormState(getInitialFormState(meta));
         presentToast({ message: t`Settings saved`, duration: 2000 });
         history.goBack();
       })
@@ -257,10 +272,11 @@ function ChatSettingsSession({ chatId, backAction }: { chatId: string; backActio
             formState={formState}
             mutedUntil={mutedUntil}
             saving={saving}
+            uploadingAvatar={uploadingAvatar}
             onNameChange={(value) => updateFormState('name', value)}
             onDescriptionChange={(value) => updateFormState('description', value)}
-            onAvatarChange={(value) => updateFormState('avatar', value)}
             onVisibilityChange={(value) => updateFormState('visibility', value)}
+            onUploadAvatar={handleAvatarUpload}
             onSave={handleSave}
           />
         )}
