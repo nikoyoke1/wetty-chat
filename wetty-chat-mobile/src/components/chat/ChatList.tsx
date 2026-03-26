@@ -16,7 +16,13 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { checkmarkDone, mailUnreadOutline, notificationsOffOutline } from 'ionicons/icons';
 import { type ChatListItem, getChats, getUnreadCount } from '@/api/chats';
-import { markChatAsRead, selectAllChats, setChatsList, setChatUnreadCount } from '@/store/chatsSlice';
+import {
+  markChatAsRead,
+  selectAllChats,
+  setChatLastReadMessageId,
+  setChatsList,
+  setChatUnreadCount,
+} from '@/store/chatsSlice';
 import { selectEffectiveLocale } from '@/store/settingsSlice';
 import { Trans } from '@lingui/react/macro';
 import { markMessagesAsRead, type MessageResponse } from '@/api/messages';
@@ -141,7 +147,7 @@ export function ChatList({ activeChatId, onChatSelect }: ChatListProps) {
     if (!chat.last_message) return;
 
     if (chat.unread_count > 0) {
-      dispatch(markChatAsRead({ chatId: chat.id }));
+      dispatch(markChatAsRead({ chatId: chat.id, lastReadMessageId: chat.last_message.id }));
       try {
         await markMessagesAsRead(chat.id, chat.last_message.id);
         updateAppBadge();
@@ -152,6 +158,7 @@ export function ChatList({ activeChatId, onChatSelect }: ChatListProps) {
       try {
         const prevId = (BigInt(chat.last_message.id) - 1n).toString();
         dispatch(setChatUnreadCount({ chatId: chat.id, unreadCount: 1 }));
+        dispatch(setChatLastReadMessageId({ chatId: chat.id, lastReadMessageId: prevId }));
         await markMessagesAsRead(chat.id, prevId);
         updateAppBadge();
       } catch (err) {

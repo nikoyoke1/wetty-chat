@@ -17,6 +17,7 @@ export interface ChatMeta {
 interface ChatListMeta {
   last_message_at?: string | null;
   unread_count?: number;
+  last_read_message_id?: string | null;
   last_message?: MessageResponse | null;
   in_list?: boolean;
   muted_until?: string | null;
@@ -76,6 +77,7 @@ function getEffectiveListMeta(entry?: ChatStateEntry): ChatListMeta {
   return {
     in_list: live?.in_list ?? snapshot?.in_list ?? false,
     unread_count: live?.unread_count ?? snapshot?.unread_count ?? 0,
+    last_read_message_id: live?.last_read_message_id ?? snapshot?.last_read_message_id ?? null,
     last_message: latest,
     last_message_at: latest?.created_at ?? snapshot?.last_message_at ?? null,
   };
@@ -107,6 +109,7 @@ const chatsSlice = createSlice({
           last_message: chat.last_message,
           last_message_at: chat.last_message_at,
           unread_count: chat.unread_count,
+          last_read_message_id: chat.last_read_message_id,
           in_list: true,
           muted_until: chat.muted_until,
         };
@@ -214,11 +217,23 @@ const chatsSlice = createSlice({
       };
       entry.liveProjection.last_message_at = message.created_at;
     },
-    markChatAsRead(state, action: PayloadAction<{ chatId: string }>) {
+    markChatAsRead(state, action: PayloadAction<{ chatId: string; lastReadMessageId?: string | null }>) {
       const entry = getChatEntry(state, action.payload.chatId);
       entry.liveProjection = {
         ...entry.liveProjection,
         unread_count: 0,
+        last_read_message_id:
+          action.payload.lastReadMessageId !== undefined
+            ? action.payload.lastReadMessageId
+            : (entry.liveProjection?.last_read_message_id ?? entry.listSnapshot?.last_read_message_id ?? null),
+        in_list: true,
+      };
+    },
+    setChatLastReadMessageId(state, action: PayloadAction<{ chatId: string; lastReadMessageId: string | null }>) {
+      const entry = getChatEntry(state, action.payload.chatId);
+      entry.liveProjection = {
+        ...entry.liveProjection,
+        last_read_message_id: action.payload.lastReadMessageId,
         in_list: true,
       };
     },
@@ -235,6 +250,7 @@ export const {
   setChatUnreadCount,
   projectChatMessagePatched,
   markChatAsRead,
+  setChatLastReadMessageId,
 } = chatsSlice.actions;
 
 export const selectChatMeta = (state: RootState, chatId: string): ChatMeta | undefined =>
@@ -254,6 +270,11 @@ export function selectChatMutedUntil(state: RootState, chatId: string): string |
   return resolveMutedUntil(entry?.listSnapshot, entry?.liveProjection);
 }
 
+export function selectChatLastReadMessageId(state: RootState, chatId: string): string | null {
+  const entry = state.chats.byId[chatId];
+  return getEffectiveListMeta(entry).last_read_message_id ?? null;
+}
+
 const selectChatsById = (state: RootState) => state.chats.byId;
 
 export const selectAllChats = createSelector([selectChatsById], (byId): ChatListItem[] => {
@@ -267,6 +288,7 @@ export const selectAllChats = createSelector([selectChatsById], (byId): ChatList
         avatar: entry.details.avatar ?? null,
         last_message_at: listMeta.last_message_at ?? null,
         unread_count: listMeta.unread_count ?? 0,
+        last_read_message_id: listMeta.last_read_message_id ?? null,
         last_message: listMeta.last_message ?? null,
         muted_until: resolveMutedUntil(entry?.listSnapshot, entry?.liveProjection),
       };

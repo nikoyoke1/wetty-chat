@@ -41,7 +41,14 @@ import {
   sendThreadMessage,
   updateMessage,
 } from '@/api/messages';
-import { markChatAsRead, selectChatName, selectIsChatMuted, setChatMeta, setChatMutedUntil } from '@/store/chatsSlice';
+import {
+  markChatAsRead,
+  selectChatLastReadMessageId,
+  selectChatName,
+  selectIsChatMuted,
+  setChatMeta,
+  setChatMutedUntil,
+} from '@/store/chatsSlice';
 import {
   appendMessages,
   prependMessages,
@@ -81,6 +88,11 @@ const QUICK_REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🎉']
 
 function generateClientId(): string {
   return `cg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+function parseComparableMessageId(messageId: string): bigint | null {
+  if (!/^\d+$/.test(messageId)) return null;
+  return BigInt(messageId);
 }
 
 function areAttachmentIdsEqual(left: string[], right: string[]): boolean {
@@ -146,6 +158,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
   const wsConnected = useSelector((state: RootState) => state.connection.wsConnected);
   const storedName = useSelector((state: RootState) => selectChatName(state, chatId));
   const isMuted = useSelector((state: RootState) => selectIsChatMuted(state, chatId));
+  const lastReadMessageId = useSelector((state: RootState) => selectChatLastReadMessageId(state, chatId));
   const chatName = threadId ? t`Thread` : (storedName ?? t`Loading...`);
 
   useEffect(() => {
@@ -296,6 +309,10 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
   const lastReportedReadId = useRef<string | null>(null);
 
   useEffect(() => {
+    lastReportedReadId.current = null;
+  }, [storeChatId]);
+
+  useEffect(() => {
     if (!chatId || messages.length === 0 || !atBottom) return;
 
     const latestMessage = messages[messages.length - 1];
@@ -303,19 +320,25 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
     // Ignore optimistic client-generated messages
     if (latestMessage.id.startsWith('cg_')) return;
 
+    const latestComparableId = parseComparableMessageId(latestMessage.id);
+    if (latestComparableId == null) return;
+
+    const currentReadComparableId = lastReadMessageId ? parseComparableMessageId(lastReadMessageId) : null;
+    if (currentReadComparableId != null && latestComparableId <= currentReadComparableId) return;
+
     if (latestMessage.id !== lastReportedReadId.current) {
       lastReportedReadId.current = latestMessage.id;
 
       markMessagesAsRead(chatId, latestMessage.id)
         .then(() => {
-          dispatch(markChatAsRead({ chatId: chatId }));
+          dispatch(markChatAsRead({ chatId: chatId, lastReadMessageId: latestMessage.id }));
         })
         .catch((err) => {
           console.error('Failed to mark as read', err);
           lastReportedReadId.current = null;
         });
     }
-  }, [messages, atBottom, chatId, dispatch]);
+  }, [messages, atBottom, chatId, dispatch, lastReadMessageId]);
 
   const fetchLatestWindow = useCallback((options?: { forceReopen?: boolean }) => {
     const forceReopen = options?.forceReopen ?? false;

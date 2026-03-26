@@ -8,6 +8,7 @@ export interface ChatListItem {
   avatar: string | null;
   last_message_at: string | null;
   unread_count: number;
+  last_read_message_id?: string | null;
   last_message: MessageResponse | null;
   muted_until: string | null;
 }
