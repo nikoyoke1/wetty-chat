@@ -3,6 +3,7 @@ pub mod chats;
 pub mod groups;
 pub mod members;
 pub mod push;
+pub mod stickers;
 pub mod users;
 pub mod ws;
 
@@ -15,6 +16,7 @@ pub fn api_router() -> Router<AppState> {
         .nest("/chats", chats::router())
         .nest("/group", groups::router())
         .nest("/push", push::router())
+        .nest("/stickers", stickers::router())
         .nest("/users", users::router())
         .nest("/attachments", attachments::router())
 }

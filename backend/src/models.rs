@@ -113,6 +113,82 @@ pub struct NewMedia {
 }
 
 #[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]
+#[diesel(table_name = schema::sticker_packs)]
+pub struct StickerPack {
+    pub id: i64,
+    pub owner_uid: i32,
+    pub name: String,
+    pub description: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = schema::sticker_packs)]
+pub struct NewStickerPack {
+    pub id: i64,
+    pub owner_uid: i32,
+    pub name: String,
+    pub description: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, AsChangeset)]
+#[diesel(table_name = schema::sticker_packs)]
+pub struct UpdateStickerPack {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]
+#[diesel(table_name = schema::stickers)]
+pub struct Sticker {
+    pub id: i64,
+    pub media_id: i64,
+    pub emoji: String,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = schema::stickers)]
+pub struct NewSticker {
+    pub id: i64,
+    pub media_id: i64,
+    pub emoji: String,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Queryable, Selectable, Insertable)]
+#[diesel(table_name = schema::sticker_pack_stickers)]
+pub struct StickerPackSticker {
+    pub pack_id: i64,
+    pub sticker_id: i64,
+    pub added_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Queryable, Selectable, Insertable)]
+#[diesel(table_name = schema::user_sticker_pack_subscriptions)]
+pub struct UserStickerPackSubscription {
+    pub uid: i32,
+    pub pack_id: i64,
+    pub subscribed_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Queryable, Selectable, Insertable)]
+#[diesel(table_name = schema::user_favorite_stickers)]
+pub struct UserFavoriteSticker {
+    pub uid: i32,
+    pub sticker_id: i64,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]
 #[diesel(table_name = schema::group_membership)]
 pub struct GroupMembership {
     pub chat_id: i64,

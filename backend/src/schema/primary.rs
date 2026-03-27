@@ -1,19 +1,19 @@
 // @generated automatically by Diesel CLI.
 
 pub mod sql_types {
-    #[derive(diesel::sql_types::SqlType)]
+    #[derive(diesel::query_builder::QueryId, diesel::sql_types::SqlType)]
     #[diesel(postgres_type(name = "group_role"))]
     pub struct GroupRole;
 
-    #[derive(diesel::sql_types::SqlType)]
+    #[derive(diesel::query_builder::QueryId, diesel::sql_types::SqlType)]
     #[diesel(postgres_type(name = "group_visibility"))]
     pub struct GroupVisibility;
 
-    #[derive(diesel::sql_types::SqlType, diesel::query_builder::QueryId)]
+    #[derive(diesel::query_builder::QueryId, diesel::sql_types::SqlType)]
     #[diesel(postgres_type(name = "media_purpose"))]
     pub struct MediaPurpose;
 
-    #[derive(diesel::sql_types::SqlType)]
+    #[derive(diesel::query_builder::QueryId, diesel::sql_types::SqlType)]
     #[diesel(postgres_type(name = "message_type"))]
     pub struct MessageType;
 }
@@ -82,11 +82,11 @@ diesel::table! {
         #[max_length = 255]
         name -> Varchar,
         description -> Nullable<Text>,
-        avatar_image_id -> Nullable<Int8>,
         created_at -> Timestamptz,
         visibility -> GroupVisibility,
         last_message_id -> Nullable<Int8>,
         last_message_at -> Nullable<Timestamptz>,
+        avatar_image_id -> Nullable<Int8>,
     }
 }
 
@@ -158,10 +158,59 @@ diesel::table! {
 }
 
 diesel::table! {
+    sticker_pack_stickers (pack_id, sticker_id) {
+        pack_id -> Int8,
+        sticker_id -> Int8,
+        added_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    sticker_packs (id) {
+        id -> Int8,
+        owner_uid -> Int4,
+        #[max_length = 255]
+        name -> Varchar,
+        description -> Nullable<Text>,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    stickers (id) {
+        id -> Int8,
+        media_id -> Int8,
+        #[max_length = 32]
+        emoji -> Varchar,
+        #[max_length = 255]
+        name -> Nullable<Varchar>,
+        description -> Nullable<Text>,
+        created_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
     user_extra (uid) {
         uid -> Int4,
         first_seen_at -> Timestamp,
         last_seen_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    user_favorite_stickers (uid, sticker_id) {
+        uid -> Int4,
+        sticker_id -> Int8,
+        created_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    user_sticker_pack_subscriptions (uid, pack_id) {
+        uid -> Int4,
+        pack_id -> Int8,
+        subscribed_at -> Timestamptz,
     }
 }
 
@@ -177,7 +226,13 @@ diesel::table! {
 
 diesel::joinable!(attachments -> messages (message_id));
 diesel::joinable!(group_membership -> groups (chat_id));
+diesel::joinable!(groups -> media (avatar_image_id));
 diesel::joinable!(message_reactions -> messages (message_id));
+diesel::joinable!(sticker_pack_stickers -> sticker_packs (pack_id));
+diesel::joinable!(sticker_pack_stickers -> stickers (sticker_id));
+diesel::joinable!(stickers -> media (media_id));
+diesel::joinable!(user_favorite_stickers -> stickers (sticker_id));
+diesel::joinable!(user_sticker_pack_subscriptions -> sticker_packs (pack_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     activity_daily_metrics,
@@ -189,6 +244,11 @@ diesel::allow_tables_to_appear_in_same_query!(
     message_reactions,
     messages,
     push_subscriptions,
+    sticker_pack_stickers,
+    sticker_packs,
+    stickers,
     user_extra,
+    user_favorite_stickers,
+    user_sticker_pack_subscriptions,
     usergroup_extra,
 );

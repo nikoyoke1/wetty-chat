@@ -47,6 +47,7 @@ impl MakeRequestId for RequestIdMaker {
 pub(crate) const MAX_CHATS_LIMIT: i64 = 100;
 pub(crate) const MAX_MESSAGES_LIMIT: i64 = 100;
 pub(crate) const MAX_MEMBERS_LIMIT: i64 = 100;
+const MAX_REQUEST_BODY_BYTES: usize = 2 * 1024 * 1024;
 
 #[derive(Clone, Deserialize, Default)]
 pub(crate) enum AuthMethod {
@@ -217,7 +218,9 @@ async fn main() {
     let client_tracking_state = state.clone();
     let app = Router::new()
         .merge(handlers::api_router())
-        .layer(RequestBodyLimitLayer::new(256 * 1024))
+        // Keep enough headroom for sticker multipart uploads; per-feature logic still
+        // enforces tighter file-size checks where needed.
+        .layer(RequestBodyLimitLayer::new(MAX_REQUEST_BODY_BYTES))
         .layer(
             ServiceBuilder::new()
                 .set_x_request_id(RequestIdMaker)

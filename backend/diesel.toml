@@ -1,7 +1,8 @@
 [print_schema]
 file = "src/schema/primary.rs"
+custom_type_derives = ["diesel::query_builder::QueryId"]
 
 [print_schema.discuz]
 schema = "discuz"
 file = "src/schema/discuz.rs"
-except_tables = ["^common_member_profile$"]
+filter = { except_tables = ["^common_member_profile$"] }

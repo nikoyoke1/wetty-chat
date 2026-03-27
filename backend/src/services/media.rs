@@ -1,4 +1,5 @@
 use aws_sdk_s3::presigning::PresigningConfig;
+use aws_sdk_s3::primitives::ByteStream;
 use axum::http::StatusCode;
 use chrono::Duration;
 use std::collections::BTreeMap;
@@ -72,4 +73,29 @@ pub async fn presign_public_upload(
             ("x-amz-acl".to_string(), "public-read".to_string()),
         ]),
     })
+}
+
+pub async fn upload_public_object(
+    s3_client: &aws_sdk_s3::Client,
+    bucket: &str,
+    storage_key: &str,
+    content_type: &str,
+    body: ByteStream,
+) -> Result<(), (StatusCode, &'static str)> {
+    s3_client
+        .put_object()
+        .bucket(bucket)
+        .key(storage_key)
+        .content_type(content_type)
+        .cache_control(PUBLIC_MEDIA_CACHE_CONTROL)
+        .acl(aws_sdk_s3::types::ObjectCannedAcl::PublicRead)
+        .body(body)
+        .send()
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to upload object: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to upload media")
+        })?;
+
+    Ok(())
 }
