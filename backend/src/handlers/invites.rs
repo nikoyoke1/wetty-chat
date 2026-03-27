@@ -112,6 +112,7 @@ struct InviteChatResponse {
 struct InvitePreviewResponse {
     invite: InviteResponse,
     chat: InviteChatResponse,
+    already_member: bool,
 }
 
 #[derive(Serialize)]
@@ -121,7 +122,6 @@ struct RedeemInviteResponse {
 
 enum RedeemInviteError {
     InvalidCode,
-    AlreadyMember,
     Db(diesel::result::Error),
 }
 
@@ -129,6 +129,16 @@ enum PreviewInviteError {
     InvalidCode,
     Forbidden,
     Db(diesel::result::Error),
+}
+
+enum PreviewEligibility {
+    Eligible,
+    AlreadyMember,
+}
+
+enum RedeemInviteOutcome {
+    Joined(i64),
+    AlreadyMember,
 }
 
 impl From<diesel::result::Error> for RedeemInviteError {
@@ -336,7 +346,7 @@ fn preview_eligibility(
     conn: &mut DbConn,
     invite: &Invite,
     uid: i32,
-) -> Result<(), PreviewInviteError> {
+) -> Result<PreviewEligibility, PreviewInviteError> {
     let already_member = group_membership::table
         .filter(
             group_membership::chat_id
@@ -347,14 +357,14 @@ fn preview_eligibility(
         .get_result::<i64>(conn)?;
 
     if already_member > 0 {
-        return Err(PreviewInviteError::Forbidden);
+        return Ok(PreviewEligibility::AlreadyMember);
     }
 
     match invite.invite_type {
-        InviteType::Generic => Ok(()),
+        InviteType::Generic => Ok(PreviewEligibility::Eligible),
         InviteType::Targeted => {
             if invite.target_uid == Some(uid) && invite.used_at.is_none() {
-                Ok(())
+                Ok(PreviewEligibility::Eligible)
             } else {
                 Err(PreviewInviteError::Forbidden)
             }
@@ -373,7 +383,7 @@ fn preview_eligibility(
                 .get_result::<i64>(conn)?;
 
             if has_required_membership > 0 {
-                Ok(())
+                Ok(PreviewEligibility::Eligible)
             } else {
                 Err(PreviewInviteError::Forbidden)
             }
@@ -532,7 +542,7 @@ async fn get_invite_by_code(
         return Err((StatusCode::BAD_REQUEST, INVALID_INVITE_CODE_MESSAGE));
     }
 
-    preview_eligibility(conn, &invite, uid).map_err(|error| match error {
+    let eligibility = preview_eligibility(conn, &invite, uid).map_err(|error| match error {
         PreviewInviteError::InvalidCode => (StatusCode::BAD_REQUEST, INVALID_INVITE_CODE_MESSAGE),
         PreviewInviteError::Forbidden => (StatusCode::FORBIDDEN, "Not eligible for this invite"),
         PreviewInviteError::Db(other) => {
@@ -546,6 +556,7 @@ async fn get_invite_by_code(
     Ok(Json(InvitePreviewResponse {
         invite: invite_to_response(invite),
         chat,
+        already_member: matches!(eligibility, PreviewEligibility::AlreadyMember),
     }))
 }
 
@@ -624,8 +635,8 @@ async fn post_redeem_invite(
         return Err((StatusCode::BAD_REQUEST, INVALID_INVITE_CODE_MESSAGE));
     }
 
-    let chat_id = conn
-        .transaction::<i64, RedeemInviteError, _>(|conn| {
+    let outcome = conn
+        .transaction::<RedeemInviteOutcome, RedeemInviteError, _>(|conn| {
             let invite = invites::table
                 .filter(invites::code.eq(code))
                 .select(Invite::as_select())
@@ -648,7 +659,7 @@ async fn post_redeem_invite(
                 .get_result::<i64>(conn)?;
 
             if already_member > 0 {
-                return Err(RedeemInviteError::AlreadyMember);
+                return Ok(RedeemInviteOutcome::AlreadyMember);
             }
 
             match invite.invite_type {
@@ -677,7 +688,7 @@ async fn post_redeem_invite(
                 }
             }
 
-            diesel::insert_into(group_membership::table)
+            match diesel::insert_into(group_membership::table)
                 .values(&NewGroupMembership {
                     chat_id: invite.chat_id,
                     uid,
@@ -690,7 +701,17 @@ async fn post_redeem_invite(
                         "creator_uid": invite.creator_uid,
                     })),
                 })
-                .execute(conn)?;
+                .execute(conn)
+            {
+                Ok(_) => {}
+                Err(diesel::result::Error::DatabaseError(
+                    diesel::result::DatabaseErrorKind::UniqueViolation,
+                    _,
+                )) => {
+                    return Ok(RedeemInviteOutcome::AlreadyMember);
+                }
+                Err(other) => return Err(RedeemInviteError::Db(other)),
+            }
 
             if invite.invite_type == InviteType::Targeted {
                 let updated = diesel::update(
@@ -705,24 +726,24 @@ async fn post_redeem_invite(
                 }
             }
 
-            Ok(invite.chat_id)
+            Ok(RedeemInviteOutcome::Joined(invite.chat_id))
         })
         .map_err(|error| match error {
             RedeemInviteError::InvalidCode => {
                 (StatusCode::BAD_REQUEST, INVALID_INVITE_CODE_MESSAGE)
             }
-            RedeemInviteError::AlreadyMember => {
-                (StatusCode::CONFLICT, "Already a member of this chat")
-            }
-            RedeemInviteError::Db(diesel::result::Error::DatabaseError(
-                diesel::result::DatabaseErrorKind::UniqueViolation,
-                _,
-            )) => (StatusCode::CONFLICT, "Already a member of this chat"),
             RedeemInviteError::Db(other) => {
                 tracing::error!("redeem invite: {:?}", other);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Failed to redeem invite")
             }
         })?;
+
+    let chat_id = match outcome {
+        RedeemInviteOutcome::Joined(chat_id) => chat_id,
+        RedeemInviteOutcome::AlreadyMember => {
+            return Err((StatusCode::CONFLICT, "Already a member of this chat"));
+        }
+    };
 
     let chat = load_chat_response(conn, &state, chat_id)?;
     Ok(Json(RedeemInviteResponse { chat }))
