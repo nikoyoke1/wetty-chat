@@ -356,6 +356,21 @@ export function ChatVirtualScroll({
     [deriveVisibleRange, rowKeys.length],
   );
 
+  const deriveDesiredRangeForTargetIndex = useCallback(
+    (targetIndex: number, viewportHeight: number): MountedWindow | null => {
+      if (rowKeys.length === 0) return null;
+
+      const container = containerRef.current;
+      const maxScrollTop = container ? Math.max(0, container.scrollHeight - container.clientHeight) : Number.POSITIVE_INFINITY;
+      const targetScrollTop = roundScrollValue(
+        clamp(topChromeHeight() + offsetOf(targetIndex), 0, maxScrollTop),
+      );
+
+      return deriveDesiredRange(targetScrollTop, viewportHeight);
+    },
+    [deriveDesiredRange, offsetOf, rowKeys.length, topChromeHeight],
+  );
+
   const topSpacerHeight = useCallback(() => {
     const mounted = mountedRef.current;
     return mounted ? offsetOf(mounted.start) : 0;
@@ -1644,7 +1659,9 @@ export function ChatVirtualScroll({
       return;
     }
 
-    const desired = container ? deriveDesiredRange(container.scrollTop, container.clientHeight) : null;
+    const desired = container
+      ? deriveDesiredRangeForTargetIndex(targetIndex, container.clientHeight)
+      : null;
     if (!desired) {
       updateMountedRange(capRange(mounted, rowKeys.length - 1));
       setPhaseState('READY');
@@ -1705,7 +1722,7 @@ export function ChatVirtualScroll({
   }, [
     allMeasured,
     containerHeight,
-    deriveDesiredRange,
+    deriveDesiredRangeForTargetIndex,
     firstUnmeasuredInRange,
     pendingBatch,
     phase,
