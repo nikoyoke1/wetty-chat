@@ -8,12 +8,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::models::{
-    Group, GroupJoinReason, GroupRole, GroupVisibility, Invite, InviteType, Media,
-    NewGroupMembership, NewInvite,
-};
-use crate::schema::{group_membership, groups, invites, media};
-use crate::services::media::build_public_object_url;
+use crate::models::{GroupJoinReason, GroupRole, Invite, InviteType, NewGroupMembership, NewInvite};
+use crate::handlers::groups::{load_group_info, GroupInfoResponse};
+use crate::schema::{group_membership, invites};
 use crate::utils::auth::CurrentUid;
 use crate::utils::ids;
 use crate::AppState;
@@ -96,28 +93,15 @@ struct ListInvitesResponse {
 }
 
 #[derive(Serialize)]
-struct InviteChatResponse {
-    #[serde(with = "crate::serde_i64_string")]
-    id: i64,
-    name: String,
-    description: Option<String>,
-    #[serde(with = "crate::serde_i64_string::opt")]
-    avatar_image_id: Option<i64>,
-    avatar: Option<String>,
-    visibility: GroupVisibility,
-    created_at: DateTime<Utc>,
-}
-
-#[derive(Serialize)]
 struct InvitePreviewResponse {
     invite: InviteResponse,
-    chat: InviteChatResponse,
+    chat: GroupInfoResponse,
     already_member: bool,
 }
 
 #[derive(Serialize)]
 struct RedeemInviteResponse {
-    chat: InviteChatResponse,
+    chat: GroupInfoResponse,
 }
 
 enum RedeemInviteError {
@@ -275,51 +259,6 @@ fn is_unique_violation(error: &diesel::result::Error) -> bool {
         error,
         diesel::result::Error::DatabaseError(diesel::result::DatabaseErrorKind::UniqueViolation, _)
     )
-}
-
-fn load_chat_response(
-    conn: &mut DbConn,
-    state: &AppState,
-    chat_id: i64,
-) -> Result<InviteChatResponse, (StatusCode, &'static str)> {
-    let group: Group = groups::table
-        .filter(groups::id.eq(chat_id))
-        .select(Group::as_select())
-        .first(conn)
-        .map_err(|e| {
-            tracing::error!("load invite chat: {:?}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to load chat")
-        })?;
-
-    let avatar_image = match group.avatar_image_id {
-        Some(avatar_image_id) => media::table
-            .filter(
-                media::id
-                    .eq(avatar_image_id)
-                    .and(media::deleted_at.is_null()),
-            )
-            .select(Media::as_select())
-            .first(conn)
-            .optional()
-            .map_err(|e| {
-                tracing::error!("load invite chat avatar: {:?}", e);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Failed to load chat avatar",
-                )
-            })?,
-        None => None,
-    };
-
-    Ok(InviteChatResponse {
-        id: group.id,
-        name: group.name,
-        description: group.description,
-        avatar_image_id: group.avatar_image_id,
-        avatar: avatar_image.map(|image| build_public_object_url(state, &image.storage_key)),
-        visibility: group.visibility,
-        created_at: group.created_at,
-    })
 }
 
 fn load_invite_by_id(
@@ -551,7 +490,7 @@ async fn get_invite_by_code(
         }
     })?;
 
-    let chat = load_chat_response(conn, &state, invite.chat_id)?;
+    let chat = load_group_info(conn, &state, invite.chat_id)?;
 
     Ok(Json(InvitePreviewResponse {
         invite: invite_to_response(invite),
@@ -745,7 +684,7 @@ async fn post_redeem_invite(
         }
     };
 
-    let chat = load_chat_response(conn, &state, chat_id)?;
+    let chat = load_group_info(conn, &state, chat_id)?;
     Ok(Json(RedeemInviteResponse { chat }))
 }
 

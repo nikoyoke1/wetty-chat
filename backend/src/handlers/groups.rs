@@ -47,7 +47,7 @@ pub(super) struct ChatIdPath {
 }
 
 #[derive(Serialize)]
-pub(super) struct ChatDetailResponse {
+pub(super) struct GroupInfoResponse {
     #[serde(with = "crate::serde_i64_string")]
     id: i64,
     name: String,
@@ -124,11 +124,11 @@ fn require_admin_role(
     }
 }
 
-fn load_chat_detail(
+pub(super) fn load_group_info(
     conn: &mut DbConn,
     state: &AppState,
     chat_id: i64,
-) -> Result<ChatDetailResponse, (StatusCode, &'static str)> {
+) -> Result<GroupInfoResponse, (StatusCode, &'static str)> {
     use crate::schema::groups::dsl as groups_dsl;
 
     let group: crate::models::Group = groups::table
@@ -157,7 +157,7 @@ fn load_chat_detail(
         None => None,
     };
 
-    Ok(ChatDetailResponse {
+    Ok(GroupInfoResponse {
         id: group.id,
         name: group.name,
         description: group.description,
@@ -240,7 +240,7 @@ async fn get_group(
     CurrentUid(uid): CurrentUid,
     State(state): State<AppState>,
     Path(ChatIdPath { chat_id }): Path<ChatIdPath>,
-) -> Result<Json<ChatDetailResponse>, (StatusCode, &'static str)> {
+) -> Result<Json<GroupInfoResponse>, (StatusCode, &'static str)> {
     let conn = &mut state.db.get().map_err(|_| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -250,7 +250,7 @@ async fn get_group(
 
     check_membership(conn, chat_id, uid)?;
 
-    Ok(Json(load_chat_detail(conn, &state, chat_id)?))
+    Ok(Json(load_group_info(conn, &state, chat_id)?))
 }
 
 /// POST /group/:chat_id/avatar/upload-url — Create a group avatar upload URL.
@@ -333,7 +333,7 @@ async fn patch_group(
     State(state): State<AppState>,
     Path(ChatIdPath { chat_id }): Path<ChatIdPath>,
     Json(body): Json<UpdateChatBody>,
-) -> Result<Json<ChatDetailResponse>, (StatusCode, &'static str)> {
+) -> Result<Json<GroupInfoResponse>, (StatusCode, &'static str)> {
     let conn = &mut state.db.get().map_err(|_| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -401,7 +401,7 @@ async fn patch_group(
         (StatusCode::INTERNAL_SERVER_ERROR, "Failed to update chat")
     })?;
 
-    Ok(Json(load_chat_detail(conn, &state, chat_id)?))
+    Ok(Json(load_group_info(conn, &state, chat_id)?))
 }
 
 /// PUT /group/:chat_id/mute — Mute notifications for a chat.
