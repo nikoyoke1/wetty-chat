@@ -23,7 +23,7 @@ import {
   shareOutline,
 } from 'ionicons/icons';
 import './landing.scss';
-import { Redirect, useLocation } from 'react-router';
+import { useLocation } from 'react-router';
 import { useIsPWA } from '@/hooks/platformHooks';
 import { syncJwtTokenFromLanding } from '@/utils/jwtToken';
 
@@ -36,6 +36,8 @@ const platformOptions: Array<{ id: PlatformId; label: string }> = [
   { id: 'macos', label: 'macOS' },
   { id: 'linux', label: 'Linux' },
 ];
+
+const APP_ENTRY_ROUTE = '/chats';
 
 function IconText({ icon, children }: { icon: string; children: ReactNode }) {
   return (
@@ -82,7 +84,25 @@ export default function LandingPage() {
 
   useEffect(() => {
     syncJwtTokenFromLanding(location.search);
-  }, [location]);
+
+    if (!isPwa) {
+      return;
+    }
+
+    const appUrl = new URL(import.meta.env.BASE_URL, window.location.origin);
+    appUrl.pathname = `${import.meta.env.BASE_URL.replace(/\/$/, '')}${APP_ENTRY_ROUTE}`;
+    appUrl.search = '';
+    appUrl.hash = '';
+    window.location.replace(appUrl.toString());
+  }, [isPwa, location.search]);
+
+  if (isPwa) {
+    return (
+      <IonPage>
+        <IonContent fullscreen={true} className="landing-page" />
+      </IonPage>
+    );
+  }
 
   return (
     <IonPage>
@@ -99,7 +119,6 @@ export default function LandingPage() {
             <p>
               如果你要向朋友推荐，请发送论坛帖子的地址，不要直接发送当前页面地址。当前页面的地址包含你的账号登录信息。
             </p>
-            {isPwa && <Redirect to="/" />}
           </div>
         </section>
 
