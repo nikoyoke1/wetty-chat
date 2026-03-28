@@ -55,6 +55,7 @@ pub enum MessageType {
     Text,
     Audio,
     File,
+    Invite,
     System,
 }
 
@@ -323,8 +324,8 @@ mod tests {
 
     #[test]
     fn message_type_serializes_as_snake_case() {
-        let json = serde_json::to_string(&MessageType::System).expect("serialize message type");
-        assert_eq!(json, "\"system\"");
+        let json = serde_json::to_string(&MessageType::Invite).expect("serialize message type");
+        assert_eq!(json, "\"invite\"");
     }
 
     #[test]
@@ -332,6 +333,13 @@ mod tests {
         let value: MessageType =
             serde_json::from_str("\"system\"").expect("deserialize message type");
         assert_eq!(value, MessageType::System);
+    }
+
+    #[test]
+    fn message_type_deserializes_invite_variant() {
+        let value: MessageType =
+            serde_json::from_str("\"invite\"").expect("deserialize message type");
+        assert_eq!(value, MessageType::Invite);
     }
 }
 

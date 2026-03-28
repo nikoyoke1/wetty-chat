@@ -378,9 +378,148 @@ pub struct ReplyToMessage {
 
 type DbConn = diesel::r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>;
 
+pub(crate) struct PreparedMessageSend {
+    pub chat_id: i64,
+    pub sender_uid: i32,
+    pub message: Option<String>,
+    pub message_type: MessageType,
+    pub reply_to_id: Option<i64>,
+    pub reply_root_id: Option<i64>,
+    pub client_generated_id: String,
+    pub attachment_ids: Vec<i64>,
+    pub update_group_last_message: bool,
+    pub push_preview_override: Option<String>,
+}
+
+pub(crate) struct SendMessageResult {
+    pub response: MessageResponse,
+    pub member_uids: Vec<i32>,
+}
+
 fn load_username_by_uid(conn: &mut DbConn, uid: i32) -> QueryResult<Option<String>> {
     lookup_user_profiles(conn, &[uid])
         .map(|mut profiles| profiles.remove(&uid).and_then(|profile| profile.username))
+}
+
+pub(crate) async fn send_prepared_message(
+    conn: &mut DbConn,
+    state: &AppState,
+    prepared: PreparedMessageSend,
+) -> Result<SendMessageResult, (StatusCode, &'static str)> {
+    let id = ids::next_message_id(state.id_gen.as_ref())
+        .await
+        .map_err(|e| {
+            tracing::error!("ferroid next_message_id: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "ID generation failed")
+        })?;
+
+    let now = Utc::now();
+
+    let new_msg = NewMessage {
+        id,
+        message: prepared.message,
+        message_type: prepared.message_type,
+        reply_to_id: prepared.reply_to_id,
+        reply_root_id: prepared.reply_root_id,
+        created_at: now,
+        client_generated_id: prepared.client_generated_id,
+        sender_uid: prepared.sender_uid,
+        chat_id: prepared.chat_id,
+        updated_at: None,
+        deleted_at: None,
+        has_attachments: !prepared.attachment_ids.is_empty(),
+        has_thread: false,
+        has_reactions: false,
+    };
+
+    let inserted_msg: Message = diesel::insert_into(messages::table)
+        .values(&new_msg)
+        .returning(Message::as_returning())
+        .get_result(conn)
+        .map_err(|e| {
+            tracing::error!("insert message: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to send message")
+        })?;
+    state.metrics.record_message(prepared.chat_id);
+
+    if prepared.update_group_last_message {
+        use crate::schema::groups::dsl as g_dsl;
+        diesel::update(groups::table.filter(g_dsl::id.eq(prepared.chat_id)))
+            .set((
+                g_dsl::last_message_id.eq(Some(id)),
+                g_dsl::last_message_at.eq(Some(now)),
+            ))
+            .execute(conn)
+            .map_err(|e| {
+                tracing::error!("update group last_message: {:?}", e);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Failed to update group")
+            })?;
+    }
+
+    if !prepared.attachment_ids.is_empty() {
+        use crate::schema::attachments::dsl as a_dsl;
+        diesel::update(attachments::table.filter(a_dsl::id.eq_any(&prepared.attachment_ids)))
+            .set(a_dsl::message_id.eq(id))
+            .execute(conn)
+            .map_err(|e| {
+                tracing::error!("update attachments: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to link attachments",
+                )
+            })?;
+    }
+
+    let response = attach_metadata(conn, vec![inserted_msg], state, prepared.sender_uid)
+        .await
+        .into_iter()
+        .next()
+        .ok_or((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to build message response",
+        ))?;
+
+    let member_uids: Vec<i32> = {
+        use crate::schema::group_membership as gm_dsl;
+        group_membership::table
+            .filter(gm_dsl::chat_id.eq(prepared.chat_id))
+            .select(group_membership::uid)
+            .load(conn)
+            .map_err(|e| {
+                tracing::error!("list members for broadcast: {:?}", e);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+            })?
+    };
+
+    let ws_msg = std::sync::Arc::new(crate::handlers::ws::messages::ServerWsMessage::Message(
+        response.clone(),
+    ));
+    state.ws_registry.broadcast_to_uids(&member_uids, ws_msg);
+
+    let sender_username = load_username_by_uid(conn, prepared.sender_uid)
+        .map_err(|e| {
+            tracing::error!("load sender username: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+        })?
+        .unwrap_or_else(|| "Someone".to_string());
+    let chat_name = groups::table
+        .filter(groups::dsl::id.eq(prepared.chat_id))
+        .select(groups::dsl::name)
+        .first::<String>(conn)
+        .unwrap_or_else(|_| "Chat".to_string());
+    state.push_service.enqueue(PushJob {
+        chat_id: prepared.chat_id,
+        sender_uid: prepared.sender_uid,
+        sender_username,
+        chat_name,
+        message_preview: prepared.push_preview_override.or(response.message.clone()),
+        message_id: response.id,
+    });
+
+    Ok(SendMessageResult {
+        response,
+        member_uids,
+    })
 }
 
 fn load_usernames_by_uids(
@@ -825,12 +964,17 @@ pub struct CreateMessageBody {
 }
 
 const SYSTEM_MESSAGE_TYPE_FORBIDDEN: &str = "System messages cannot be sent by clients";
+const INVITE_MESSAGE_TYPE_FORBIDDEN: &str = "Invite messages must be sent through invite APIs";
 
 fn validate_client_message_type(
     message_type: &MessageType,
 ) -> Result<(), (StatusCode, &'static str)> {
     if matches!(message_type, MessageType::System) {
         return Err((StatusCode::BAD_REQUEST, SYSTEM_MESSAGE_TYPE_FORBIDDEN));
+    }
+
+    if matches!(message_type, MessageType::Invite) {
+        return Err((StatusCode::BAD_REQUEST, INVITE_MESSAGE_TYPE_FORBIDDEN));
     }
 
     Ok(())
@@ -859,118 +1003,30 @@ async fn post_message(
 
     check_membership(conn, chat_id, uid)?;
     validate_client_message_type(&body.message_type)?;
+    let attachment_ids: Vec<i64> = body
+        .attachment_ids
+        .iter()
+        .filter_map(|s| s.parse().ok())
+        .collect();
+    let send_result = send_prepared_message(
+        conn,
+        &state,
+        PreparedMessageSend {
+            chat_id,
+            sender_uid: uid,
+            message: body.message,
+            message_type: body.message_type,
+            reply_to_id: body.reply_to_id,
+            reply_root_id: None,
+            client_generated_id: body.client_generated_id,
+            attachment_ids,
+            update_group_last_message: true,
+            push_preview_override: None,
+        },
+    )
+    .await?;
 
-    let id: i64 = ids::next_message_id(state.id_gen.as_ref())
-        .await
-        .map_err(|e| {
-            tracing::error!("ferroid next_message_id: {:?}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "ID generation failed")
-        })?;
-
-    let now = Utc::now();
-
-    let new_msg = NewMessage {
-        id,
-        message: body.message,
-        message_type: body.message_type,
-        reply_to_id: body.reply_to_id,
-        reply_root_id: None,
-        created_at: now,
-        client_generated_id: body.client_generated_id,
-        sender_uid: uid,
-        chat_id,
-        updated_at: None,
-        deleted_at: None,
-        has_attachments: !body.attachment_ids.is_empty(),
-        has_thread: false,
-        has_reactions: false,
-    };
-
-    let inserted_msg: Message = diesel::insert_into(messages::table)
-        .values(&new_msg)
-        .returning(Message::as_returning())
-        .get_result(conn)
-        .map_err(|e| {
-            tracing::error!("insert message: {:?}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to send message")
-        })?;
-    state.metrics.record_message(chat_id);
-
-    use crate::schema::groups::dsl as g_dsl;
-    diesel::update(groups::table.filter(g_dsl::id.eq(chat_id)))
-        .set((
-            g_dsl::last_message_id.eq(Some(id)),
-            g_dsl::last_message_at.eq(Some(now)),
-        ))
-        .execute(conn)
-        .map_err(|e| {
-            tracing::error!("update group last_message: {:?}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to update group")
-        })?;
-
-    if !body.attachment_ids.is_empty() {
-        let attachment_ids: Vec<i64> = body
-            .attachment_ids
-            .iter()
-            .filter_map(|s| s.parse().ok())
-            .collect();
-        use crate::schema::attachments::dsl as a_dsl;
-        let _: usize = diesel::update(attachments::table.filter(a_dsl::id.eq_any(&attachment_ids)))
-            .set(a_dsl::message_id.eq(id))
-            .execute(conn)
-            .map_err(|e| {
-                tracing::error!("update attachments: {:?}", e);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Failed to link attachments",
-                )
-            })?;
-    }
-
-    let response = attach_metadata(conn, vec![inserted_msg], &state, uid)
-        .await
-        .into_iter()
-        .next()
-        .unwrap();
-
-    let member_uids: Vec<i32> = {
-        use crate::schema::group_membership as gm_dsl;
-        group_membership::table
-            .filter(gm_dsl::chat_id.eq(chat_id))
-            .select(group_membership::uid)
-            .load(conn)
-            .map_err(|e| {
-                tracing::error!("list members for broadcast: {:?}", e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
-            })?
-    };
-    let ws_msg = std::sync::Arc::new(crate::handlers::ws::messages::ServerWsMessage::Message(
-        response.clone(),
-    ));
-    state.ws_registry.broadcast_to_uids(&member_uids, ws_msg);
-
-    // Enqueue push notification job (non-blocking; runs in background).
-    let sender_username = load_username_by_uid(conn, uid)
-        .map_err(|e| {
-            tracing::error!("load sender username: {:?}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
-        })?
-        .unwrap_or_else(|| "Someone".to_string());
-    let chat_name = groups::table
-        .filter(groups::dsl::id.eq(chat_id))
-        .select(groups::dsl::name)
-        .first::<String>(conn)
-        .unwrap_or_else(|_| "Chat".to_string());
-    state.push_service.enqueue(PushJob {
-        chat_id,
-        sender_uid: uid,
-        sender_username,
-        chat_name,
-        message_preview: response.message.clone(),
-        message_id: response.id,
-    });
-
-    Ok((StatusCode::CREATED, Json(response)))
+    Ok((StatusCode::CREATED, Json(send_result.response)))
 }
 
 /// POST /chats/:chat_id/threads/:thread_id/messages — Send a message in a thread.
@@ -1004,105 +1060,30 @@ async fn post_thread_message(
     if !root_msg_exists {
         return Err((StatusCode::NOT_FOUND, "Thread root message not found"));
     }
-
-    let id = ids::next_message_id(state.id_gen.as_ref())
-        .await
-        .map_err(|e| {
-            tracing::error!("ferroid next_message_id: {:?}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "ID generation failed")
-        })?;
-
-    let now = Utc::now();
-
-    let new_msg = NewMessage {
-        id,
-        message: body.message,
-        message_type: body.message_type,
-        reply_to_id: body.reply_to_id,
-        reply_root_id: Some(thread_id),
-        created_at: now,
-        client_generated_id: body.client_generated_id,
-        sender_uid: uid,
-        chat_id,
-        updated_at: None,
-        deleted_at: None,
-        has_attachments: !body.attachment_ids.is_empty(),
-        has_thread: false,
-        has_reactions: false,
-    };
-
-    let inserted_msg: Message = diesel::insert_into(messages::table)
-        .values(&new_msg)
-        .returning(Message::as_returning())
-        .get_result(conn)
-        .map_err(|e| {
-            tracing::error!("insert threaded message: {:?}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to send message")
-        })?;
-    state.metrics.record_message(chat_id);
-
-    if !body.attachment_ids.is_empty() {
-        let attachment_ids: Vec<i64> = body
-            .attachment_ids
-            .iter()
-            .filter_map(|s| s.parse().ok())
-            .collect();
-        use crate::schema::attachments::dsl as a_dsl;
-        let _: usize = diesel::update(attachments::table.filter(a_dsl::id.eq_any(&attachment_ids)))
-            .set(a_dsl::message_id.eq(id))
-            .execute(conn)
-            .map_err(|e| {
-                tracing::error!("update attachments: {:?}", e);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Failed to link attachments",
-                )
-            })?;
-    }
-
-    let response = attach_metadata(conn, vec![inserted_msg], &state, uid)
-        .await
-        .into_iter()
-        .next()
-        .unwrap();
-
-    let member_uids: Vec<i32> = {
-        use crate::schema::group_membership as gm_dsl;
-        group_membership::table
-            .filter(gm_dsl::chat_id.eq(chat_id))
-            .select(group_membership::uid)
-            .load(conn)
-            .map_err(|e| {
-                tracing::error!("list members for broadcast: {:?}", e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
-            })?
-    };
-
-    let ws_msg = std::sync::Arc::new(crate::handlers::ws::messages::ServerWsMessage::Message(
-        response.clone(),
-    ));
-    state.ws_registry.broadcast_to_uids(&member_uids, ws_msg);
-
-    // Enqueue push notification job (non-blocking; runs in background).
-    let sender_username = load_username_by_uid(conn, uid)
-        .map_err(|e| {
-            tracing::error!("load sender username: {:?}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
-        })?
-        .unwrap_or_else(|| "Someone".to_string());
-    let chat_name = groups::table
-        .filter(groups::dsl::id.eq(chat_id))
-        .select(groups::dsl::name)
-        .first::<String>(conn)
-        .unwrap_or_else(|_| "Chat".to_string());
-    state.push_service.enqueue(PushJob {
-        chat_id,
-        sender_uid: uid,
-        sender_username,
-        chat_name,
-        message_preview: response.message.clone(),
-        message_id: response.id,
-    });
+    let attachment_ids: Vec<i64> = body
+        .attachment_ids
+        .iter()
+        .filter_map(|s| s.parse().ok())
+        .collect();
+    let send_result = send_prepared_message(
+        conn,
+        &state,
+        PreparedMessageSend {
+            chat_id,
+            sender_uid: uid,
+            message: body.message,
+            message_type: body.message_type,
+            reply_to_id: body.reply_to_id,
+            reply_root_id: Some(thread_id),
+            client_generated_id: body.client_generated_id,
+            attachment_ids,
+            update_group_last_message: false,
+            push_preview_override: None,
+        },
+    )
+    .await?;
+    let response = send_result.response;
+    let member_uids = send_result.member_uids;
 
     // Mark the root message as having a thread
     let root_msg_updated: Option<Message> =
@@ -1128,7 +1109,10 @@ async fn post_thread_message(
 
 #[cfg(test)]
 mod tests {
-    use super::{validate_client_message_type, SYSTEM_MESSAGE_TYPE_FORBIDDEN};
+    use super::{
+        validate_client_message_type, INVITE_MESSAGE_TYPE_FORBIDDEN,
+        SYSTEM_MESSAGE_TYPE_FORBIDDEN,
+    };
     use crate::models::MessageType;
     use axum::http::StatusCode;
 
@@ -1147,6 +1131,16 @@ mod tests {
         assert!(validate_client_message_type(&MessageType::Text).is_ok());
         assert!(validate_client_message_type(&MessageType::Audio).is_ok());
         assert!(validate_client_message_type(&MessageType::File).is_ok());
+    }
+
+    #[test]
+    fn rejects_invite_message_type_from_generic_message_api() {
+        let err = validate_client_message_type(&MessageType::Invite)
+            .expect_err("invite should be rejected");
+        assert_eq!(
+            err,
+            (StatusCode::BAD_REQUEST, INVITE_MESSAGE_TYPE_FORBIDDEN)
+        );
     }
 }
 

@@ -8,8 +8,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::models::{GroupJoinReason, GroupRole, Invite, InviteType, NewGroupMembership, NewInvite};
+use crate::handlers::chats::{send_prepared_message, MessageResponse, PreparedMessageSend};
 use crate::handlers::groups::{load_group_info, GroupInfoResponse};
+use crate::handlers::members::check_membership;
+use crate::models::{
+    GroupJoinReason, GroupRole, Invite, InviteType, MessageType, NewGroupMembership, NewInvite,
+};
 use crate::schema::{group_membership, invites};
 use crate::utils::auth::CurrentUid;
 use crate::utils::ids;
@@ -69,6 +73,18 @@ struct RedeemInviteBody {
     code: String,
 }
 
+#[derive(Deserialize)]
+struct SendInviteMessageBody {
+    #[serde(deserialize_with = "crate::serde_i64_string::deserialize")]
+    source_chat_id: i64,
+    #[serde(deserialize_with = "crate::serde_i64_string::deserialize")]
+    destination_chat_id: i64,
+    #[serde(default, deserialize_with = "crate::serde_i64_string::opt::deserialize")]
+    invite_id: Option<i64>,
+    expires_at: Option<DateTime<Utc>>,
+    client_generated_id: String,
+}
+
 #[derive(Serialize)]
 struct InviteResponse {
     #[serde(with = "crate::serde_i64_string")]
@@ -102,6 +118,12 @@ struct InvitePreviewResponse {
 #[derive(Serialize)]
 struct RedeemInviteResponse {
     chat: GroupInfoResponse,
+}
+
+#[derive(Serialize)]
+struct SendInviteMessageResponse {
+    invite: InviteResponse,
+    message: MessageResponse,
 }
 
 enum RedeemInviteError {
@@ -281,6 +303,111 @@ fn validate_invite_is_active(invite: &Invite, now: DateTime<Utc>) -> bool {
     invite.revoked_at.is_none() && invite.expires_at.is_none_or(|expires_at| expires_at > now)
 }
 
+async fn create_generic_invite(
+    conn: &mut DbConn,
+    state: &AppState,
+    chat_id: i64,
+    uid: i32,
+    expires_at: Option<DateTime<Utc>>,
+) -> Result<Invite, (StatusCode, &'static str)> {
+    let id = ids::next_id(state.id_gen.as_ref()).await.map_err(|e| {
+        tracing::error!("next_id for invite: {:?}", e);
+        (StatusCode::INTERNAL_SERVER_ERROR, "ID generation failed")
+    })?;
+
+    let now = Utc::now();
+    let mut inserted = None;
+
+    for _ in 0..8 {
+        let new_invite = NewInvite {
+            id,
+            code: generate_invite_code(),
+            chat_id,
+            invite_type: InviteType::Generic,
+            creator_uid: Some(uid),
+            target_uid: None,
+            required_chat_id: None,
+            created_at: now,
+            expires_at,
+            revoked_at: None,
+            used_at: None,
+        };
+
+        match diesel::insert_into(invites::table)
+            .values(&new_invite)
+            .returning(Invite::as_returning())
+            .get_result::<Invite>(conn)
+        {
+            Ok(invite) => {
+                inserted = Some(invite);
+                break;
+            }
+            Err(error) if is_unique_violation(&error) => continue,
+            Err(error) => {
+                tracing::error!("insert invite: {:?}", error);
+                return Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to create invite"));
+            }
+        }
+    }
+
+    inserted.ok_or_else(|| {
+        tracing::error!("failed to generate unique invite code after retries");
+        (StatusCode::INTERNAL_SERVER_ERROR, "Failed to create invite")
+    })
+}
+
+async fn create_invite_from_body(
+    conn: &mut DbConn,
+    state: &AppState,
+    uid: i32,
+    body: &CreateInviteBody,
+) -> Result<Invite, (StatusCode, &'static str)> {
+    let id = ids::next_id(state.id_gen.as_ref()).await.map_err(|e| {
+        tracing::error!("next_id for invite: {:?}", e);
+        (StatusCode::INTERNAL_SERVER_ERROR, "ID generation failed")
+    })?;
+
+    let now = Utc::now();
+    let mut inserted = None;
+
+    for _ in 0..8 {
+        let new_invite = NewInvite {
+            id,
+            code: generate_invite_code(),
+            chat_id: body.chat_id,
+            invite_type: body.invite_type.clone(),
+            creator_uid: Some(uid),
+            target_uid: body.target_uid,
+            required_chat_id: body.required_chat_id,
+            created_at: now,
+            expires_at: body.expires_at,
+            revoked_at: None,
+            used_at: None,
+        };
+
+        match diesel::insert_into(invites::table)
+            .values(&new_invite)
+            .returning(Invite::as_returning())
+            .get_result::<Invite>(conn)
+        {
+            Ok(invite) => {
+                inserted = Some(invite);
+                break;
+            }
+            Err(error) if is_unique_violation(&error) => continue,
+            Err(error) => {
+                tracing::error!("insert invite: {:?}", error);
+                return Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to create invite"));
+            }
+        }
+    }
+
+    inserted.ok_or_else(|| {
+        tracing::error!("failed to generate unique invite code after retries");
+        (StatusCode::INTERNAL_SERVER_ERROR, "Failed to create invite")
+    })
+}
+
 fn preview_eligibility(
     conn: &mut DbConn,
     invite: &Invite,
@@ -345,53 +472,69 @@ async fn post_invite(
     })?;
 
     require_admin_role(conn, body.chat_id, uid)?;
-
-    let id = ids::next_id(state.id_gen.as_ref()).await.map_err(|e| {
-        tracing::error!("next_id for invite: {:?}", e);
-        (StatusCode::INTERNAL_SERVER_ERROR, "ID generation failed")
-    })?;
-
-    let now = Utc::now();
-    let mut inserted = None;
-
-    for _ in 0..8 {
-        let new_invite = NewInvite {
-            id,
-            code: generate_invite_code(),
-            chat_id: body.chat_id,
-            invite_type: body.invite_type.clone(),
-            creator_uid: Some(uid),
-            target_uid: body.target_uid,
-            required_chat_id: body.required_chat_id,
-            created_at: now,
-            expires_at: body.expires_at,
-            revoked_at: None,
-            used_at: None,
-        };
-
-        match diesel::insert_into(invites::table)
-            .values(&new_invite)
-            .returning(Invite::as_returning())
-            .get_result::<Invite>(conn)
-        {
-            Ok(invite) => {
-                inserted = Some(invite);
-                break;
-            }
-            Err(error) if is_unique_violation(&error) => continue,
-            Err(error) => {
-                tracing::error!("insert invite: {:?}", error);
-                return Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to create invite"));
-            }
-        }
-    }
-
-    let invite = inserted.ok_or_else(|| {
-        tracing::error!("failed to generate unique invite code after retries");
-        (StatusCode::INTERNAL_SERVER_ERROR, "Failed to create invite")
-    })?;
+    let invite = create_invite_from_body(conn, &state, uid, &body).await?;
 
     Ok((StatusCode::CREATED, Json(invite_to_response(invite))))
+}
+
+async fn post_send_invite_message(
+    CurrentUid(uid): CurrentUid,
+    State(state): State<AppState>,
+    Json(body): Json<SendInviteMessageBody>,
+) -> Result<(StatusCode, Json<SendInviteMessageResponse>), (StatusCode, &'static str)> {
+    let conn = &mut state.db.get().map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Database connection failed",
+        )
+    })?;
+
+    require_admin_role(conn, body.source_chat_id, uid)?;
+    check_membership(conn, body.destination_chat_id, uid)?;
+
+    let now = Utc::now();
+    let invite = if let Some(invite_id) = body.invite_id {
+        let invite = load_invite_by_id(conn, invite_id)?;
+        require_admin_role(conn, invite.chat_id, uid)?;
+        if invite.chat_id != body.source_chat_id {
+            return Err((StatusCode::BAD_REQUEST, "Invite does not belong to source chat"));
+        }
+        if invite.invite_type != InviteType::Generic {
+            return Err((StatusCode::BAD_REQUEST, "Only public invites can be sent"));
+        }
+        if !validate_invite_is_active(&invite, now) {
+            return Err((StatusCode::BAD_REQUEST, "Invite is no longer active"));
+        }
+        invite
+    } else {
+        create_generic_invite(conn, &state, body.source_chat_id, uid, body.expires_at).await?
+    };
+
+    let send_result = send_prepared_message(
+        conn,
+        &state,
+        PreparedMessageSend {
+            chat_id: body.destination_chat_id,
+            sender_uid: uid,
+            message: Some(invite.code.clone()),
+            message_type: MessageType::Invite,
+            reply_to_id: None,
+            reply_root_id: None,
+            client_generated_id: body.client_generated_id,
+            attachment_ids: vec![],
+            update_group_last_message: true,
+            push_preview_override: Some("sent an invite".to_string()),
+        },
+    )
+    .await?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(SendInviteMessageResponse {
+            invite: invite_to_response(invite),
+            message: send_result.response,
+        }),
+    ))
 }
 
 async fn get_invites(
@@ -691,6 +834,7 @@ async fn post_redeem_invite(
 pub fn router() -> axum::Router<crate::AppState> {
     axum::Router::new()
         .route("/", axum::routing::post(post_invite).get(get_invites))
+        .route("/send", axum::routing::post(post_send_invite_message))
         .route("/redeem", axum::routing::post(post_redeem_invite))
         .route("/invite", axum::routing::get(get_invite_by_code))
         .route(
