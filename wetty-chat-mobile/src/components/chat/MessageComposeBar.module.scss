@@ -154,9 +154,9 @@
 .sendBtn ion-icon {
   font-size: 18px;
   color: var(--ion-color-primary-contrast, #fff);
+}
+
+.sendBtn ion-icon.moveRight {
   transform: translateX(1.5px);
 }
 
-.sendBtn ion-icon {
-  font-size: 18px;
-}

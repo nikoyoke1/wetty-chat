@@ -18,6 +18,7 @@ import { getMessagePreviewText } from '@/components/chat/messagePreview';
 import { selectChatFontSizeStyle } from '@/store/settingsSlice';
 import { UserAvatar } from '@/components/UserAvatar';
 import { useMouseDetected } from '@/hooks/platformHooks';
+import { VoiceMessageBubble } from './VoiceMessageBubble';
 
 const URL_REGEX = /(https?:\/\/[A-Za-z0-9\-._~:/?#@!$&'()*+,;=%]+)/g;
 const TRAILING_PUNCT = /[.,);!?]+$/;
@@ -85,6 +86,7 @@ type BubblePropsOverride = Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'cl
 };
 
 export interface ChatBubbleBaseProps {
+  messageType?: 'text' | 'audio' | 'system' | 'invite';
   senderName: string;
   senderGender?: number;
   senderGroup?: UserGroupInfo | null;
@@ -119,6 +121,7 @@ export interface ChatBubbleBaseProps {
 }
 
 export function ChatBubbleBase({
+  messageType = 'text',
   senderName,
   senderGender,
   senderGroup,
@@ -263,6 +266,28 @@ export function ChatBubbleBase({
         >
           {video}
         </button>
+      );
+    }
+
+    if (att.kind.startsWith('audio/')) {
+      if (messageType === 'audio') {
+        return <VoiceMessageBubble key={att.id} src={att.url} />;
+      }
+
+      if (!interactive) {
+        return (
+          <div key={att.id} className={styles.filePlaceholder}>
+            <IonIcon icon={documentOutline} className={styles.fileIcon} />
+            <span className={styles.fileName}>{att.file_name}</span>
+          </div>
+        );
+      }
+
+      return (
+        <a key={att.id} className={styles.filePlaceholder} href={att.url} target="_blank" rel="noopener noreferrer">
+          <IonIcon icon={documentOutline} className={styles.fileIcon} />
+          <span className={styles.fileName}>{att.file_name}</span>
+        </a>
       );
     }
 

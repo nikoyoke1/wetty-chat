@@ -7,6 +7,7 @@
     "format": "prettier src --write",
     "dev": "vite -c vite.config.dev.ts",
     "build": "tsc -b && vite build -c vite.config.staging.ts --mode development",
+    "dev:online": "API_PROXY_TARGET=https://chahui.app/_api vite -c vite.config.dev.ts --mode development",
     "build-prod": "tsc -b && vite build --base=/ --outDir prod-dist -c vite.config.prod.ts",
     "generate-pwa-assets": "pwa-assets-generator && rm -f public/icon/*-icon-*.png public/icon-maskable/pwa-*.png",
     "lint": "eslint .",
@@ -30,6 +31,7 @@
     "react-router": "^5.3.4",
     "react-router-dom": "^5.3.4",
     "react-virtuoso": "^4.18.3",
+    "react-voicemail-player": "^0.0.10",
     "uuid": "^13.0.0"
   },
   "devDependencies": {

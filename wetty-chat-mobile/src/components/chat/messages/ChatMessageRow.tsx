@@ -72,6 +72,7 @@ export function ChatMessageRow({
 
   return (
     <ChatBubble
+      messageType={msg.message_type}
       senderName={msg.sender.name ?? `User ${msg.sender.uid}`}
       senderGender={msg.sender.gender}
       senderGroup={msg.sender.user_group}

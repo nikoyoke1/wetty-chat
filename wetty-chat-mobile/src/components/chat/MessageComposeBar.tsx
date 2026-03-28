@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import { IonButton, IonIcon } from '@ionic/react';
 import { t } from '@lingui/core/macro';
-import { addCircleOutline, closeCircle, happyOutline, send } from 'ionicons/icons';
+import { addCircleOutline, closeCircle, happyOutline, micOutline, send } from 'ionicons/icons';
 import styles from './MessageComposeBar.module.scss';
 import { type ImageUploadDraft, UploadPreview } from './UploadPreview';
 import type { Attachment } from '@/api/messages';
@@ -219,16 +219,16 @@ export const MessageComposeBar = forwardRef<MessageComposeBarHandle, MessageComp
         prev.map((draftRecord) =>
           draftRecord.draft.localId === localId
             ? {
-              ...draftRecord,
-              abortController,
-              draft: {
-                ...draftRecord.draft,
-                status: 'uploading',
-                progress: 0,
-                errorMessage: undefined,
-                attachmentId: undefined,
-              },
-            }
+                ...draftRecord,
+                abortController,
+                draft: {
+                  ...draftRecord.draft,
+                  status: 'uploading',
+                  progress: 0,
+                  errorMessage: undefined,
+                  attachmentId: undefined,
+                },
+              }
             : draftRecord,
         ),
       );
@@ -239,13 +239,13 @@ export const MessageComposeBar = forwardRef<MessageComposeBarHandle, MessageComp
           prev.map((draftRecord) =>
             draftRecord.draft.localId === localId
               ? {
-                ...draftRecord,
-                draft: {
-                  ...draftRecord.draft,
-                  width: dimensions.width,
-                  height: dimensions.height,
-                },
-              }
+                  ...draftRecord,
+                  draft: {
+                    ...draftRecord.draft,
+                    width: dimensions.width,
+                    height: dimensions.height,
+                  },
+                }
               : draftRecord,
           ),
         );
@@ -258,12 +258,12 @@ export const MessageComposeBar = forwardRef<MessageComposeBarHandle, MessageComp
               prev.map((draftRecord) =>
                 draftRecord.draft.localId === localId
                   ? {
-                    ...draftRecord,
-                    draft: {
-                      ...draftRecord.draft,
-                      progress,
-                    },
-                  }
+                      ...draftRecord,
+                      draft: {
+                        ...draftRecord.draft,
+                        progress,
+                      },
+                    }
                   : draftRecord,
               ),
             );
@@ -274,16 +274,16 @@ export const MessageComposeBar = forwardRef<MessageComposeBarHandle, MessageComp
           prev.map((draftRecord) =>
             draftRecord.draft.localId === localId
               ? {
-                ...draftRecord,
-                abortController: undefined,
-                draft: {
-                  ...draftRecord.draft,
-                  status: 'uploaded',
-                  progress: 100,
-                  attachmentId: result.attachmentId,
-                  errorMessage: undefined,
-                },
-              }
+                  ...draftRecord,
+                  abortController: undefined,
+                  draft: {
+                    ...draftRecord.draft,
+                    status: 'uploaded',
+                    progress: 100,
+                    attachmentId: result.attachmentId,
+                    errorMessage: undefined,
+                  },
+                }
               : draftRecord,
           ),
         );
@@ -297,16 +297,16 @@ export const MessageComposeBar = forwardRef<MessageComposeBarHandle, MessageComp
           prev.map((draftRecord) =>
             draftRecord.draft.localId === localId
               ? {
-                ...draftRecord,
-                abortController: undefined,
-                draft: {
-                  ...draftRecord.draft,
-                  status: 'error',
-                  progress: 0,
-                  attachmentId: undefined,
-                  errorMessage: t`Upload failed`,
-                },
-              }
+                  ...draftRecord,
+                  abortController: undefined,
+                  draft: {
+                    ...draftRecord.draft,
+                    status: 'error',
+                    progress: 0,
+                    attachmentId: undefined,
+                    errorMessage: t`Upload failed`,
+                  },
+                }
               : draftRecord,
           ),
         );
@@ -343,6 +343,8 @@ export const MessageComposeBar = forwardRef<MessageComposeBarHandle, MessageComp
     },
     [startUpload],
   );
+
+  const handleRecordVoice = () => {};
 
   const handleSend = useCallback(() => {
     const trimmed = text.trim();
@@ -401,6 +403,7 @@ export const MessageComposeBar = forwardRef<MessageComposeBarHandle, MessageComp
     currentAttachmentIds.every((attachmentId, index) => attachmentId === originalAttachmentIds[index]);
   const canSend =
     !hasUploadingDraft && !hasFailedDraft && (trimmedText.length > 0 || hasAttachment) && !isUnchangedEdit;
+  const sendVoice = trimmedText.length === 0 && !hasAttachment && !editing; // REVIEW: 检查一下条件是否严谨
   const canRequestRecentEdit = !editing && !replyTo && text.length === 0 && !hasAttachment && drafts.length === 0;
 
   useEffect(() => {
@@ -586,17 +589,30 @@ export const MessageComposeBar = forwardRef<MessageComposeBarHandle, MessageComp
           </FeatureGate>
         </div>
       </div>
-      <IonButton
-        fill="solid"
-        color="primary"
-        size="small"
-        className={`${styles.sendBtn}${!canSend ? ` ${styles.disabled}` : ''}`}
-        onClick={handleSend}
-        aria-label={t`Send message`}
-        disabled={!canSend}
-      >
-        <IonIcon slot="icon-only" icon={send} />
-      </IonButton>
+      {sendVoice ? (
+        <IonButton
+          fill="solid"
+          color="primary"
+          size="small"
+          className={styles.sendBtn}
+          onClick={handleRecordVoice}
+          aria-label={t`Record voice`}
+        >
+          <IonIcon slot="icon-only" icon={micOutline} />
+        </IonButton>
+      ) : (
+        <IonButton
+          fill="solid"
+          color="primary"
+          size="small"
+          className={`${styles.sendBtn}${!canSend ? ` ${styles.disabled}` : ''}`}
+          onClick={handleSend}
+          aria-label={t`Send message`}
+          disabled={!canSend}
+        >
+          <IonIcon slot="icon-only" icon={send} className={styles.moveRight} />
+        </IonButton>
+      )}
     </div>
   );
 });

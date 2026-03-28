@@ -59,7 +59,7 @@ export interface ReactionDetailResponse {
 export interface MessageResponse {
   id: string;
   message: string | null;
-  message_type: string;
+  message_type: 'text' | 'audio' | 'system' | 'invite';
   reply_root_id: string | null;
   client_generated_id: string;
   sender: Sender;

@@ -15,6 +15,7 @@ export interface MessageOverlayAction {
 }
 
 interface MessageOverlayProps {
+  messageType?: 'text' | 'audio' | 'system' | 'invite';
   senderName: string;
   message: string;
   isSent: boolean;
@@ -40,6 +41,7 @@ interface MessageOverlayProps {
 }
 
 export function MessageOverlay({
+  messageType = 'text',
   senderName,
   message,
   isSent,
@@ -153,6 +155,7 @@ export function MessageOverlay({
 
         {/* Bubble clone */}
         <ChatBubbleBase
+          messageType={messageType}
           senderName={senderName}
           message={message}
           isSent={isSent}
