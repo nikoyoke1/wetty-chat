@@ -3,9 +3,6 @@ import {
   IonButtons,
   IonContent,
   IonHeader,
-  IonLabel,
-  IonList,
-  IonListHeader,
   IonPage,
   IonSpinner,
   IonTitle,
@@ -97,19 +94,12 @@ function ChatSettingsContent({
       />
 
       <div className={styles.shareActions}>
+        <ChatMuteSettingItem chatId={chatId} mutedUntil={mutedUntil} />
+
         <GroupSettingsActionButton icon={linkOutline} onClick={() => setShareModalOpen(true)}>
           <Trans>Create Share Link</Trans>
         </GroupSettingsActionButton>
       </div>
-
-      <IonListHeader>
-        <IonLabel>
-          <Trans>Notifications</Trans>
-        </IonLabel>
-      </IonListHeader>
-      <IonList inset>
-        <ChatMuteSettingItem chatId={chatId} mutedUntil={mutedUntil} />
-      </IonList>
 
       <FeatureGate>
         <ChatAdminSettings

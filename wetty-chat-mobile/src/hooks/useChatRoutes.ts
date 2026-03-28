@@ -6,7 +6,6 @@ export interface ChatRouteState {
   settingsMatch: { id: string } | null;
   membersMatch: { id: string } | null;
   invitesMatch: { id: string } | null;
-  detailsMatch: { id: string } | null;
   isNewChat: boolean;
 }
 
@@ -15,7 +14,6 @@ export function useChatRoutes(): ChatRouteState {
   const settingsRaw = useRouteMatch<{ id: string }>('/chats/chat/:id/settings');
   const membersRaw = useRouteMatch<{ id: string }>('/chats/chat/:id/members');
   const invitesRaw = useRouteMatch<{ id: string }>('/chats/chat/:id/invites');
-  const detailsRaw = useRouteMatch<{ id: string }>('/chats/chat/:id/details');
   const chatRaw = useRouteMatch<{ id: string }>('/chats/chat/:id');
   const newRaw = useRouteMatch('/chats/new');
 
@@ -23,14 +21,12 @@ export function useChatRoutes(): ChatRouteState {
   const settingsMatch = settingsRaw?.isExact ? settingsRaw.params : null;
   const membersMatch = membersRaw?.isExact ? membersRaw.params : null;
   const invitesMatch = invitesRaw?.isExact ? invitesRaw.params : null;
-  const detailsMatch = detailsRaw?.isExact ? detailsRaw.params : null;
 
   const activeChatId =
     threadRaw?.params.id ??
     settingsRaw?.params.id ??
     membersRaw?.params.id ??
     invitesRaw?.params.id ??
-    detailsRaw?.params.id ??
     chatRaw?.params.id ??
     undefined;
 
@@ -40,7 +36,6 @@ export function useChatRoutes(): ChatRouteState {
     settingsMatch,
     membersMatch,
     invitesMatch,
-    detailsMatch,
     isNewChat: !!newRaw,
   };
 }

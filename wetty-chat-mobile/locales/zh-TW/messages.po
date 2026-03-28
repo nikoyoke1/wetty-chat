@@ -627,12 +627,16 @@ msgid "Messages Font Size"
 msgstr "訊息字體大小"
 
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
+msgid "Mute"
+msgstr "靜音"
+
+#: src/components/chat/settings/ChatMuteSettingItem.tsx
 msgid "Mute notifications"
 msgstr "靜音通知"
 
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
-msgid "Mute This Group"
-msgstr "將此群組設為靜音"
+#~ msgid "Mute This Group"
+#~ msgstr "將此群組設為靜音"
 
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 msgid "Muted indefinitely"
@@ -715,8 +719,8 @@ msgid "Notification permission was not granted"
 msgstr "未授予通知權限"
 
 #: src/pages/chat-thread/chat-settings.tsx
-msgid "Notifications"
-msgstr "通知"
+#~ msgid "Notifications"
+#~ msgstr "通知"
 
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 msgid "Notifications muted"
@@ -991,8 +995,8 @@ msgid "Turn On Push Notifications"
 msgstr "開啟推播通知"
 
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
-msgid "Unmute This Group"
-msgstr "取消此群組靜音"
+#~ msgid "Unmute This Group"
+#~ msgstr "取消此群組靜音"
 
 #: src/components/chat/ChatList.tsx
 msgid "Unread"

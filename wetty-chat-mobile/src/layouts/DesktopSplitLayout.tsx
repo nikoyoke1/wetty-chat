@@ -8,7 +8,6 @@ import ChatThreadCore from '@/pages/chat-thread/chat-thread';
 import ChatSettingsCore from '@/pages/chat-thread/chat-settings';
 import ChatMembersCore from '@/pages/chat-thread/chat-members';
 import ChatInvitesCore from '@/pages/chat-thread/chat-invites';
-import GroupDetailCore from '@/pages/group-detail';
 import CreateChatCore from '@/pages/create-chat';
 import { SettingsCore } from '@/pages/settings';
 import { GeneralSettingsCore } from '@/pages/settings/general';
@@ -27,7 +26,6 @@ interface DesktopRouteMatches {
   settingsMatch: { id: string } | null;
   membersMatch: { id: string } | null;
   invitesMatch: { id: string } | null;
-  detailsMatch: { id: string } | null;
   isNewChat: boolean;
   globalSettings: boolean;
   generalSettings: boolean;
@@ -49,10 +47,6 @@ function getDesktopRouteMatches(pathname: string): DesktopRouteMatches {
   });
   const invitesRaw = matchPath<{ id: string }>(pathname, {
     path: '/chats/chat/:id/invites',
-    exact: true,
-  });
-  const detailsRaw = matchPath<{ id: string }>(pathname, {
-    path: '/chats/chat/:id/details',
     exact: true,
   });
   const chatRaw = matchPath<{ id: string }>(pathname, {
@@ -85,14 +79,12 @@ function getDesktopRouteMatches(pathname: string): DesktopRouteMatches {
       settingsRaw?.params.id ??
       membersRaw?.params.id ??
       invitesRaw?.params.id ??
-      detailsRaw?.params.id ??
       chatRaw?.params.id ??
       undefined,
     threadMatch: threadRaw?.params ?? null,
     settingsMatch: settingsRaw?.params ?? null,
     membersMatch: membersRaw?.params ?? null,
     invitesMatch: invitesRaw?.params ?? null,
-    detailsMatch: detailsRaw?.params ?? null,
     isNewChat: !!newRaw,
     globalSettings,
     generalSettings,
@@ -129,7 +121,7 @@ export function DesktopSplitLayout() {
   const currentRoute = getDesktopRouteMatches(location.pathname);
   const backgroundPath = location.state?.backgroundPath ?? '/chats';
   const baseRoute = currentRoute.globalSettings ? getDesktopRouteMatches(backgroundPath) : currentRoute;
-  const { activeChatId, threadMatch, settingsMatch, membersMatch, invitesMatch, detailsMatch, isNewChat } = baseRoute;
+  const { activeChatId, threadMatch, settingsMatch, membersMatch, invitesMatch, isNewChat } = baseRoute;
   const globalSettingsOpen = currentRoute.globalSettings;
 
   const handleChatSelect = useCallback(
@@ -186,11 +178,6 @@ export function DesktopSplitLayout() {
         backAction={{ type: 'callback', onBack: () => history.go(-1) }}
       />
     );
-  } else if (detailsMatch) {
-    const { id } = detailsMatch;
-    subPageOverlay = (
-      <GroupDetailCore key={id} chatId={id} backAction={{ type: 'callback', onBack: () => history.go(-1) }} />
-    );
   }
 
   return (
@@ -225,7 +212,7 @@ export function DesktopSplitLayout() {
           </div>
         )}
 
-        {/* Overlay layer: sub-page (details, thread) */}
+        {/* Overlay layer: sub-page (thread) */}
         {subPageOverlay && <div className={styles.desktopSplitPane}>{subPageOverlay}</div>}
 
         {/* Settings modal */}

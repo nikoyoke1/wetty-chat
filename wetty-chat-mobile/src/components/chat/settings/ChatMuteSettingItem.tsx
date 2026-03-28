@@ -1,4 +1,4 @@
-import { IonIcon, IonItem, IonLabel, IonNote, useIonActionSheet, useIonToast } from '@ionic/react';
+import { useIonActionSheet, useIonToast } from '@ionic/react';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
 import { notifications, notificationsOff } from 'ionicons/icons';
@@ -6,6 +6,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { muteChat, unmuteChat } from '@/api/group';
 import { setChatMutedUntil } from '@/store/chatsSlice';
 import { selectEffectiveLocale } from '@/store/settingsSlice';
+import { GroupSettingsActionButton } from './GroupSettingsActionButton';
 
 interface ChatMuteSettingItemProps {
   chatId: string;
@@ -57,14 +58,14 @@ function formatMutedUntil(locale: string, mutedUntil: string): string | null {
   }).format(date);
 }
 
-function renderMutedUntilLabel(locale: string, mutedUntil: string) {
+function getMutedUntilLabel(locale: string, mutedUntil: string): string {
   if (new Date(mutedUntil).getFullYear() >= 9000) {
-    return <Trans>Muted indefinitely</Trans>;
+    return t`Muted indefinitely`;
   }
 
   const formatted = formatMutedUntil(locale, mutedUntil);
 
-  return <Trans>Muted until {formatted ?? mutedUntil}</Trans>;
+  return t`Muted until ${formatted ?? mutedUntil}`;
 }
 
 export function ChatMuteSettingItem({ chatId, mutedUntil }: ChatMuteSettingItemProps) {
@@ -112,24 +113,15 @@ export function ChatMuteSettingItem({ chatId, mutedUntil }: ChatMuteSettingItemP
 
   if (muted && mutedUntil) {
     return (
-      <IonItem button detail={false} onClick={handleUnmute}>
-        <IonIcon aria-hidden="true" icon={notificationsOff} slot="start" color="danger" />
-        <IonLabel color="primary">
-          <Trans>Unmute This Group</Trans>
-        </IonLabel>
-        <IonNote slot="end" color="medium">
-          {renderMutedUntilLabel(locale, mutedUntil)}
-        </IonNote>
-      </IonItem>
+      <GroupSettingsActionButton icon={notificationsOff} onClick={handleUnmute}>
+        {getMutedUntilLabel(locale, mutedUntil)}
+      </GroupSettingsActionButton>
     );
   }
 
   return (
-    <IonItem button detail={false} onClick={showMuteActionSheet}>
-      <IonIcon aria-hidden="true" icon={notifications} slot="start" color="danger" />
-      <IonLabel color="primary">
-        <Trans>Mute This Group</Trans>
-      </IonLabel>
-    </IonItem>
+    <GroupSettingsActionButton icon={notifications} onClick={showMuteActionSheet}>
+      <Trans>Mute</Trans>
+    </GroupSettingsActionButton>
   );
 }
