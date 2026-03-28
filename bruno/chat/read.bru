@@ -1,0 +1,17 @@
+meta {
+  name: read
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseURL}}/chats/116143034872496128/read
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "message_id": "581839"
+  }
+}

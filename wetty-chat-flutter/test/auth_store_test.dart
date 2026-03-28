@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_application_1/config/auth_store.dart';
+import 'package:flutter_application_1/features/auth/application/auth_store.dart';
 
 void main() {
   String buildToken(int uid) {

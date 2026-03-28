@@ -1,14 +1,14 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:flutter_application_1/main.dart';
+import 'package:flutter_application_1/app/app.dart';
 
 void main() {
-  testWidgets('MyApp builds a Cupertino app shell', (
+  testWidgets('WettyChatApp builds a Cupertino app shell', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
-      const MyApp(
+      const WettyChatApp(
         home: CupertinoPageScaffold(child: Center(child: Text('Smoke Test'))),
       ),
     );
