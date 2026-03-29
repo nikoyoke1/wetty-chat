@@ -565,6 +565,16 @@ fn build_sender(
     }
 }
 
+fn first_attachment_kind(
+    message_attachments_map: &std::collections::HashMap<i64, Vec<Attachment>>,
+    message_id: i64,
+) -> Option<String> {
+    message_attachments_map
+        .get(&message_id)
+        .and_then(|attachments| attachments.first())
+        .map(|attachment| attachment.kind.clone())
+}
+
 /// Attach reply_to_message to a list of messages by fetching referenced messages in one query.
 pub async fn attach_metadata(
     conn: &mut DbConn,
@@ -602,12 +612,22 @@ pub async fn attach_metadata(
         .collect();
     if !attachment_message_ids.is_empty() {
         use crate::schema::attachments::dsl as a_dsl;
-        let attachments: Vec<Attachment> = attachments::table
+        let attachments: Vec<Attachment> = match attachments::table
             .filter(a_dsl::message_id.eq_any(&attachment_message_ids))
             .order((a_dsl::created_at.asc(), a_dsl::id.asc()))
             .select(Attachment::as_select())
             .load(conn)
-            .unwrap_or_default();
+        {
+            Ok(attachments) => attachments,
+            Err(err) => {
+                tracing::error!(
+                    error = ?err,
+                    message_ids = ?attachment_message_ids,
+                    "attach_metadata: failed to load attachments"
+                );
+                Vec::new()
+            }
+        };
         for att in attachments {
             if let Some(msg_id) = att.message_id {
                 message_attachments_map.entry(msg_id).or_default().push(att);
@@ -728,6 +748,19 @@ pub async fn attach_metadata(
     for m in messages_to_process {
         let reply_to_message = m.reply_to_id.and_then(|reply_id| {
             reply_messages_map.get(&reply_id).map(|reply_msg| {
+                if reply_msg.has_attachments
+                    && message_attachments_map
+                        .get(&reply_msg.id)
+                        .is_none_or(|attachments| attachments.is_empty())
+                {
+                    tracing::warn!(
+                        reply_id = reply_msg.id,
+                        parent_message_id = m.id,
+                        chat_id = m.chat_id,
+                        "attach_metadata: reply message has_attachments=true but no attachments were hydrated"
+                    );
+                }
+
                 Box::new(ReplyToMessage {
                     id: reply_msg.id,
                     message: if reply_msg.deleted_at.is_some() {
@@ -738,23 +771,23 @@ pub async fn attach_metadata(
                     message_type: reply_msg.message_type.clone(),
                     sender: build_sender(reply_msg.sender_uid, &user_avatars, &user_profiles),
                     is_deleted: reply_msg.deleted_at.is_some(),
-                    first_attachment_kind: message_attachments_map
-                        .get(&reply_msg.id)
-                        .and_then(|attachments| attachments.first())
-                        .map(|attachment| attachment.kind.clone()),
+                    first_attachment_kind: first_attachment_kind(
+                        &message_attachments_map,
+                        reply_msg.id,
+                    ),
                 })
             })
         });
 
         let mut attachments = Vec::new();
-        if let Some(atts) = message_attachments_map.remove(&m.id) {
+        if let Some(atts) = message_attachments_map.get(&m.id) {
             for att in atts {
                 attachments.push(AttachmentResponse {
                     id: att.id,
                     url: build_public_object_url(state, &att.external_reference),
-                    kind: att.kind,
+                    kind: att.kind.clone(),
                     size: att.size,
-                    file_name: att.file_name,
+                    file_name: att.file_name.clone(),
                     width: att.width,
                     height: att.height,
                 });
@@ -1112,12 +1145,14 @@ async fn post_thread_message(
 #[cfg(test)]
 mod tests {
     use super::{
-        validate_client_message_type, ReplyToMessage, INVITE_MESSAGE_TYPE_FORBIDDEN,
-        SYSTEM_MESSAGE_TYPE_FORBIDDEN,
+        first_attachment_kind, validate_client_message_type, ReplyToMessage,
+        INVITE_MESSAGE_TYPE_FORBIDDEN, SYSTEM_MESSAGE_TYPE_FORBIDDEN,
     };
-    use crate::models::{MessageType, Sender};
+    use crate::models::{Attachment, MessageType, Sender};
+    use chrono::Utc;
     use axum::http::StatusCode;
     use serde_json::json;
+    use std::collections::HashMap;
 
     #[test]
     fn rejects_system_message_type_from_clients() {
@@ -1165,6 +1200,34 @@ mod tests {
 
         let value = serde_json::to_value(reply).expect("serialize reply_to_message");
         assert_eq!(value["message_type"], json!("audio"));
+    }
+
+    #[test]
+    fn first_attachment_kind_can_be_read_multiple_times_for_same_message() {
+        let attachment = Attachment {
+            id: 1,
+            message_id: Some(42),
+            file_name: "image.png".to_string(),
+            kind: "image/png".to_string(),
+            external_reference: "attachments/image.png".to_string(),
+            size: 123,
+            created_at: Utc::now(),
+            deleted_at: None,
+            width: Some(100),
+            height: Some(100),
+        };
+
+        let mut attachments_map = HashMap::new();
+        attachments_map.insert(42, vec![attachment]);
+
+        assert_eq!(
+            first_attachment_kind(&attachments_map, 42),
+            Some("image/png".to_string())
+        );
+        assert_eq!(
+            first_attachment_kind(&attachments_map, 42),
+            Some("image/png".to_string())
+        );
     }
 }
 
