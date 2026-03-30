@@ -334,7 +334,10 @@ fn load_sticker_rows_for_pack(
     sticker_pack_stickers::table
         .inner_join(stickers::table.inner_join(media::table))
         .filter(sticker_pack_stickers::pack_id.eq(pack_id))
-        .order((stickers::created_at.asc(), stickers::id.asc()))
+        .order((
+            sticker_pack_stickers::added_at.asc(),
+            sticker_pack_stickers::sticker_id.asc(),
+        ))
         .select((Sticker::as_select(), Media::as_select()))
         .load(conn)
         .map_err(|e| {
