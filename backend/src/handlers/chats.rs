@@ -22,10 +22,12 @@ use crate::{
     models::{
         Attachment,
         AttachmentResponse,
+        Media,
         Message,
         MessageReaction,
         MessageType,
         Sender,
+        Sticker,
         ThreadInfo, //
     },
     schema::{
@@ -35,6 +37,11 @@ use crate::{
         media,
         message_reactions,
         messages, //
+        sticker_pack_stickers,
+        sticker_packs,
+        stickers,
+        user_favorite_stickers,
+        user_sticker_pack_subscriptions,
     },
 };
 use crate::{AppState, MAX_CHATS_LIMIT, MAX_MESSAGES_LIMIT};
@@ -332,6 +339,8 @@ pub struct MessageResponse {
     pub id: i64,
     pub message: Option<String>,
     pub message_type: MessageType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sticker: Option<MessageStickerResponse>,
     #[serde(with = "crate::serde_i64_string::opt")]
     pub reply_root_id: Option<i64>,
     pub client_generated_id: String,
@@ -371,10 +380,35 @@ pub struct ReplyToMessage {
     id: i64,
     message: Option<String>,
     message_type: MessageType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sticker: Option<MessageStickerResponse>,
     sender: Sender,
     is_deleted: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     first_attachment_kind: Option<String>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct StickerMediaResponse {
+    #[serde(with = "crate::serde_i64_string")]
+    pub id: i64,
+    pub url: String,
+    pub content_type: String,
+    pub size: i64,
+    pub width: Option<i32>,
+    pub height: Option<i32>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct MessageStickerResponse {
+    #[serde(with = "crate::serde_i64_string")]
+    pub id: i64,
+    pub emoji: String,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub is_favorited: bool,
+    pub media: StickerMediaResponse,
 }
 
 type DbConn = diesel::r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>;
@@ -384,6 +418,7 @@ pub(crate) struct PreparedMessageSend {
     pub sender_uid: i32,
     pub message: Option<String>,
     pub message_type: MessageType,
+    pub sticker_id: Option<i64>,
     pub reply_to_id: Option<i64>,
     pub reply_root_id: Option<i64>,
     pub client_generated_id: String,
@@ -420,6 +455,7 @@ pub(crate) async fn send_prepared_message(
         id,
         message: prepared.message,
         message_type: prepared.message_type,
+        sticker_id: prepared.sticker_id,
         reply_to_id: prepared.reply_to_id,
         reply_root_id: prepared.reply_root_id,
         created_at: now,
@@ -513,7 +549,12 @@ pub(crate) async fn send_prepared_message(
         sender_uid: prepared.sender_uid,
         sender_username,
         chat_name,
-        message_preview: prepared.push_preview_override.or(response.message.clone()),
+        message_preview: prepared.push_preview_override.or_else(|| {
+            response
+                .message
+                .clone()
+                .or_else(|| response.sticker.as_ref().map(|_| "[Sticker]".to_string()))
+        }),
         message_id: response.id,
     });
 
@@ -547,6 +588,99 @@ fn load_reply_messages(
         .select(Message::as_select())
         .load::<Message>(conn)
         .map(|rows| rows.into_iter().map(|msg| (msg.id, msg)).collect())
+}
+
+fn load_sticker_accessible_ids(
+    conn: &mut DbConn,
+    uid: i32,
+    sticker_ids: &[i64],
+) -> QueryResult<std::collections::HashSet<i64>> {
+    if sticker_ids.is_empty() {
+        return Ok(std::collections::HashSet::new());
+    }
+
+    stickers::table
+        .inner_join(sticker_pack_stickers::table)
+        .left_join(
+            user_sticker_pack_subscriptions::table.on(
+                user_sticker_pack_subscriptions::pack_id
+                    .eq(sticker_pack_stickers::pack_id)
+                    .and(user_sticker_pack_subscriptions::uid.eq(uid)),
+            ),
+        )
+        .left_join(
+            sticker_packs::table.on(sticker_packs::id.eq(sticker_pack_stickers::pack_id)),
+        )
+        .filter(stickers::id.eq_any(sticker_ids))
+        .filter(
+            user_sticker_pack_subscriptions::uid
+                .is_not_null()
+                .or(sticker_packs::owner_uid.eq(uid)),
+        )
+        .select(stickers::id)
+        .load::<i64>(conn)
+        .map(|rows| rows.into_iter().collect())
+}
+
+fn load_sticker_rows(
+    conn: &mut DbConn,
+    sticker_ids: &[i64],
+) -> QueryResult<std::collections::HashMap<i64, (Sticker, Media)>> {
+    if sticker_ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    stickers::table
+        .inner_join(media::table)
+        .filter(stickers::id.eq_any(sticker_ids))
+        .select((Sticker::as_select(), Media::as_select()))
+        .load::<(Sticker, Media)>(conn)
+        .map(|rows| {
+            rows.into_iter()
+                .map(|(sticker, media_row)| (sticker.id, (sticker, media_row)))
+                .collect()
+        })
+}
+
+fn load_favorited_sticker_ids(
+    conn: &mut DbConn,
+    uid: i32,
+    sticker_ids: &[i64],
+) -> QueryResult<std::collections::HashSet<i64>> {
+    if sticker_ids.is_empty() {
+        return Ok(std::collections::HashSet::new());
+    }
+
+    user_favorite_stickers::table
+        .filter(user_favorite_stickers::uid.eq(uid))
+        .filter(user_favorite_stickers::sticker_id.eq_any(sticker_ids))
+        .select(user_favorite_stickers::sticker_id)
+        .load::<i64>(conn)
+        .map(|rows| rows.into_iter().collect())
+}
+
+fn build_message_sticker_response(
+    state: &AppState,
+    sticker: &Sticker,
+    media_row: &Media,
+    is_favorited: bool,
+) -> MessageStickerResponse {
+    MessageStickerResponse {
+        id: sticker.id,
+        emoji: sticker.emoji.clone(),
+        name: sticker.name.clone(),
+        description: sticker.description.clone(),
+        created_at: sticker.created_at,
+        is_favorited,
+        media: StickerMediaResponse {
+            id: media_row.id,
+            url: build_public_object_url(state, &media_row.storage_key),
+            content_type: media_row.content_type.clone(),
+            size: media_row.size,
+            width: media_row.width,
+            height: media_row.height,
+        },
+    }
 }
 
 fn build_sender(
@@ -634,6 +768,17 @@ pub async fn attach_metadata(
             }
         }
     }
+
+    let sticker_ids: Vec<i64> = messages_to_process
+        .iter()
+        .filter_map(|m| m.sticker_id)
+        .chain(reply_messages_map.values().filter_map(|reply_msg| reply_msg.sticker_id))
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
+    let sticker_rows = load_sticker_rows(conn, &sticker_ids).unwrap_or_default();
+    let favorited_sticker_ids =
+        load_favorited_sticker_ids(conn, current_user_uid, &sticker_ids).unwrap_or_default();
 
     let mut thread_counts_map: std::collections::HashMap<i64, i64> =
         std::collections::HashMap::new();
@@ -769,6 +914,16 @@ pub async fn attach_metadata(
                         reply_msg.message.clone()
                     },
                     message_type: reply_msg.message_type.clone(),
+                    sticker: reply_msg.sticker_id.and_then(|sticker_id| {
+                        sticker_rows.get(&sticker_id).map(|(sticker, media_row)| {
+                            build_message_sticker_response(
+                                state,
+                                sticker,
+                                media_row,
+                                favorited_sticker_ids.contains(&sticker_id),
+                            )
+                        })
+                    }),
                     sender: build_sender(reply_msg.sender_uid, &user_avatars, &user_profiles),
                     is_deleted: reply_msg.deleted_at.is_some(),
                     first_attachment_kind: first_attachment_kind(
@@ -802,6 +957,16 @@ pub async fn attach_metadata(
                 m.message
             },
             message_type: m.message_type,
+            sticker: m.sticker_id.and_then(|sticker_id| {
+                sticker_rows.get(&sticker_id).map(|(sticker, media_row)| {
+                    build_message_sticker_response(
+                        state,
+                        sticker,
+                        media_row,
+                        favorited_sticker_ids.contains(&sticker_id),
+                    )
+                })
+            }),
             reply_root_id: m.reply_root_id,
             client_generated_id: m.client_generated_id,
             sender: build_sender(m.sender_uid, &user_avatars, &user_profiles),
@@ -988,6 +1153,11 @@ async fn get_messages(
 pub struct CreateMessageBody {
     message: Option<String>,
     message_type: MessageType,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde_i64_string::opt::deserialize"
+    )]
+    sticker_id: Option<i64>,
     client_generated_id: String,
     #[serde(
         default,
@@ -1010,6 +1180,45 @@ fn validate_client_message_type(
 
     if matches!(message_type, MessageType::Invite) {
         return Err((StatusCode::BAD_REQUEST, INVITE_MESSAGE_TYPE_FORBIDDEN));
+    }
+
+    Ok(())
+}
+
+fn validate_message_payload(
+    conn: &mut DbConn,
+    uid: i32,
+    body: &CreateMessageBody,
+    attachment_ids: &[i64],
+) -> Result<(), (StatusCode, &'static str)> {
+    if matches!(body.message_type, MessageType::Sticker) {
+        let sticker_id = body
+            .sticker_id
+            .ok_or((StatusCode::BAD_REQUEST, "Sticker ID is required"))?;
+
+        if !attachment_ids.is_empty() {
+            return Err((StatusCode::BAD_REQUEST, "Sticker messages cannot include attachments"));
+        }
+        if body
+            .message
+            .as_deref()
+            .is_some_and(|message| !message.trim().is_empty())
+        {
+            return Err((StatusCode::BAD_REQUEST, "Sticker messages cannot include text"));
+        }
+
+        let accessible = load_sticker_accessible_ids(conn, uid, &[sticker_id]).map_err(|e| {
+            tracing::error!("validate sticker access: {:?}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to validate sticker",
+            )
+        })?;
+        if !accessible.contains(&sticker_id) {
+            return Err((StatusCode::FORBIDDEN, "Sticker is not available to this user"));
+        }
+    } else if body.sticker_id.is_some() {
+        return Err((StatusCode::BAD_REQUEST, "Sticker ID is only valid for sticker messages"));
     }
 
     Ok(())
@@ -1043,14 +1252,20 @@ async fn post_message(
         .iter()
         .filter_map(|s| s.parse().ok())
         .collect();
+    validate_message_payload(conn, uid, &body, &attachment_ids)?;
     let send_result = send_prepared_message(
         conn,
         &state,
         PreparedMessageSend {
             chat_id,
             sender_uid: uid,
-            message: body.message,
+            message: if matches!(body.message_type, MessageType::Sticker) {
+                None
+            } else {
+                body.message
+            },
             message_type: body.message_type,
+            sticker_id: body.sticker_id,
             reply_to_id: body.reply_to_id,
             reply_root_id: None,
             client_generated_id: body.client_generated_id,
@@ -1100,14 +1315,20 @@ async fn post_thread_message(
         .iter()
         .filter_map(|s| s.parse().ok())
         .collect();
+    validate_message_payload(conn, uid, &body, &attachment_ids)?;
     let send_result = send_prepared_message(
         conn,
         &state,
         PreparedMessageSend {
             chat_id,
             sender_uid: uid,
-            message: body.message,
+            message: if matches!(body.message_type, MessageType::Sticker) {
+                None
+            } else {
+                body.message
+            },
             message_type: body.message_type,
+            sticker_id: body.sticker_id,
             reply_to_id: body.reply_to_id,
             reply_root_id: Some(thread_id),
             client_generated_id: body.client_generated_id,
@@ -1169,6 +1390,7 @@ mod tests {
         assert!(validate_client_message_type(&MessageType::Text).is_ok());
         assert!(validate_client_message_type(&MessageType::Audio).is_ok());
         assert!(validate_client_message_type(&MessageType::File).is_ok());
+        assert!(validate_client_message_type(&MessageType::Sticker).is_ok());
     }
 
     #[test]
@@ -1187,6 +1409,7 @@ mod tests {
             id: 42,
             message: Some("voice".to_string()),
             message_type: MessageType::Audio,
+            sticker: None,
             sender: Sender {
                 uid: 7,
                 avatar_url: None,

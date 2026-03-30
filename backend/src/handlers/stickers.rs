@@ -70,6 +70,14 @@ struct StickerSummary {
 }
 
 #[derive(Debug, Serialize, Clone)]
+struct StickerPackPreviewSticker {
+    #[serde(with = "crate::serde_i64_string")]
+    id: i64,
+    media: StickerMediaResponse,
+    emoji: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
 struct StickerPackSummary {
     #[serde(with = "crate::serde_i64_string")]
     id: i64,
@@ -81,6 +89,7 @@ struct StickerPackSummary {
     updated_at: DateTime<Utc>,
     sticker_count: i64,
     is_subscribed: bool,
+    preview_sticker: Option<StickerPackPreviewSticker>,
 }
 
 #[derive(Debug, Serialize)]
@@ -100,6 +109,11 @@ struct StickerDetailResponse {
 #[derive(Debug, Serialize)]
 struct StickerPackListResponse {
     packs: Vec<StickerPackSummary>,
+}
+
+#[derive(Debug, Serialize)]
+struct FavoriteStickerListResponse {
+    stickers: Vec<StickerSummary>,
 }
 
 fn normalize_required_name(input: &str) -> Result<String, (StatusCode, &'static str)> {
@@ -217,8 +231,47 @@ fn load_favorited_sticker_ids(
     Ok(rows.into_iter().collect())
 }
 
+fn load_first_stickers_for_packs(
+    conn: &mut DbConn,
+    state: &AppState,
+    pack_ids: &[i64],
+) -> QueryResult<HashMap<i64, StickerPackPreviewSticker>> {
+    if pack_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    // For each pack, find the sticker with the earliest added_at
+    // Using DISTINCT ON (PostgreSQL) to get one row per pack
+    let rows: Vec<(i64, Sticker, Media)> = sticker_pack_stickers::table
+        .inner_join(stickers::table.inner_join(media::table))
+        .filter(sticker_pack_stickers::pack_id.eq_any(pack_ids))
+        .order((sticker_pack_stickers::pack_id.asc(), sticker_pack_stickers::added_at.asc()))
+        .distinct_on(sticker_pack_stickers::pack_id)
+        .select((
+            sticker_pack_stickers::pack_id,
+            Sticker::as_select(),
+            Media::as_select(),
+        ))
+        .load(conn)?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(pack_id, sticker, media_row)| {
+            (
+                pack_id,
+                StickerPackPreviewSticker {
+                    id: sticker.id,
+                    media: media_response(state, &media_row),
+                    emoji: sticker.emoji,
+                },
+            )
+        })
+        .collect())
+}
+
 fn build_pack_summaries(
     conn: &mut DbConn,
+    state: &AppState,
     uid: i32,
     packs: Vec<StickerPack>,
 ) -> Result<Vec<StickerPackSummary>, (StatusCode, &'static str)> {
@@ -244,22 +297,33 @@ fn build_pack_summaries(
             "Failed to load sticker packs",
         )
     })?;
+    let mut previews = load_first_stickers_for_packs(conn, state, &pack_ids).map_err(|e| {
+        tracing::error!("load pack preview stickers: {:?}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to load sticker packs",
+        )
+    })?;
     let owner_profiles = lookup_user_profiles(conn, &owner_uids).unwrap_or_default();
 
     Ok(packs
         .into_iter()
-        .map(|pack| StickerPackSummary {
-            id: pack.id,
-            owner_uid: pack.owner_uid,
-            owner_name: owner_profiles
-                .get(&pack.owner_uid)
-                .and_then(|profile| profile.username.clone()),
-            name: pack.name,
-            description: pack.description,
-            created_at: pack.created_at,
-            updated_at: pack.updated_at,
-            sticker_count: *counts.get(&pack.id).unwrap_or(&0),
-            is_subscribed: subscribed.contains(&pack.id),
+        .map(|pack| {
+            let preview_sticker = previews.remove(&pack.id);
+            StickerPackSummary {
+                id: pack.id,
+                owner_uid: pack.owner_uid,
+                owner_name: owner_profiles
+                    .get(&pack.owner_uid)
+                    .and_then(|profile| profile.username.clone()),
+                name: pack.name,
+                description: pack.description,
+                created_at: pack.created_at,
+                updated_at: pack.updated_at,
+                sticker_count: *counts.get(&pack.id).unwrap_or(&0),
+                is_subscribed: subscribed.contains(&pack.id),
+                preview_sticker,
+            }
         })
         .collect())
 }
@@ -364,7 +428,7 @@ async fn post_pack(
             )
         })?;
 
-    let summary = build_pack_summaries(conn, uid, vec![pack])?
+    let summary = build_pack_summaries(conn, &state, uid, vec![pack])?
         .into_iter()
         .next()
         .unwrap();
@@ -410,7 +474,7 @@ async fn patch_pack(
         .select(StickerPack::as_select())
         .first(conn)
         .map_err(|_| (StatusCode::NOT_FOUND, "Sticker pack not found"))?;
-    let summary = build_pack_summaries(conn, uid, vec![pack])?
+    let summary = build_pack_summaries(conn, &state, uid, vec![pack])?
         .into_iter()
         .next()
         .unwrap();
@@ -436,7 +500,7 @@ async fn get_pack(
 
     let sticker_rows = load_sticker_rows_for_pack(conn, pack_id)?;
     let stickers = build_sticker_summaries(conn, &state, uid, sticker_rows)?;
-    let pack = build_pack_summaries(conn, uid, vec![pack])?
+    let pack = build_pack_summaries(conn, &state, uid, vec![pack])?
         .into_iter()
         .next()
         .unwrap();
@@ -469,7 +533,7 @@ async fn get_my_subscribed_packs(
         })?;
 
     Ok(AxumJson(StickerPackListResponse {
-        packs: build_pack_summaries(conn, uid, packs)?,
+        packs: build_pack_summaries(conn, &state, uid, packs)?,
     }))
 }
 
@@ -497,7 +561,7 @@ async fn get_my_owned_packs(
         })?;
 
     Ok(AxumJson(StickerPackListResponse {
-        packs: build_pack_summaries(conn, uid, packs)?,
+        packs: build_pack_summaries(conn, &state, uid, packs)?,
     }))
 }
 
@@ -866,7 +930,7 @@ async fn get_sticker(
     let packs: Vec<StickerPack> = sticker_pack_stickers::table
         .inner_join(sticker_packs::table)
         .filter(sticker_pack_stickers::sticker_id.eq(sticker_id))
-        .order((sticker_packs::created_at.asc(), sticker_packs::id.asc()))
+        .order((sticker_pack_stickers::added_at.asc(), sticker_packs::id.asc()))
         .select(StickerPack::as_select())
         .load(conn)
         .map_err(|e| {
@@ -879,7 +943,7 @@ async fn get_sticker(
 
     Ok(AxumJson(StickerDetailResponse {
         sticker: sticker_summary,
-        packs: build_pack_summaries(conn, uid, packs)?,
+        packs: build_pack_summaries(conn, &state, uid, packs)?,
     }))
 }
 
@@ -948,11 +1012,41 @@ async fn delete_favorite(
     Ok(StatusCode::NO_CONTENT)
 }
 
+async fn get_my_favorites(
+    CurrentUid(uid): CurrentUid,
+    State(state): State<AppState>,
+) -> Result<AxumJson<FavoriteStickerListResponse>, (StatusCode, &'static str)> {
+    let conn = &mut state.db.get().map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Database connection failed",
+        )
+    })?;
+    let rows: Vec<(Sticker, Media)> = user_favorite_stickers::table
+        .inner_join(stickers::table.inner_join(media::table))
+        .filter(user_favorite_stickers::uid.eq(uid))
+        .order(user_favorite_stickers::created_at.desc())
+        .select((Sticker::as_select(), Media::as_select()))
+        .load(conn)
+        .map_err(|e| {
+            tracing::error!("load favorite stickers: {:?}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to load favorite stickers",
+            )
+        })?;
+
+    Ok(AxumJson(FavoriteStickerListResponse {
+        stickers: build_sticker_summaries(conn, &state, uid, rows)?,
+    }))
+}
+
 pub fn router() -> Router<crate::AppState> {
     Router::new()
         .route("/packs", post(post_pack))
         .route("/packs/mine/subscribed", get(get_my_subscribed_packs))
         .route("/packs/mine/owned", get(get_my_owned_packs))
+        .route("/mine/favorites", get(get_my_favorites))
         .route("/packs/{pack_id}", get(get_pack).patch(patch_pack))
         .route(
             "/packs/{pack_id}/subscription",

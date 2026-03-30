@@ -55,6 +55,7 @@ pub enum MessageType {
     Text,
     Audio,
     File,
+    Sticker,
     Invite,
     System,
 }
@@ -283,6 +284,7 @@ pub struct Message {
     pub has_attachments: bool,
     pub has_thread: bool,
     pub has_reactions: bool,
+    pub sticker_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -307,6 +309,7 @@ pub struct NewMessage {
     pub has_attachments: bool,
     pub has_thread: bool,
     pub has_reactions: bool,
+    pub sticker_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, Queryable, Selectable, Insertable)]
@@ -340,6 +343,13 @@ mod tests {
         let value: MessageType =
             serde_json::from_str("\"invite\"").expect("deserialize message type");
         assert_eq!(value, MessageType::Invite);
+    }
+
+    #[test]
+    fn message_type_deserializes_sticker_variant() {
+        let value: MessageType =
+            serde_json::from_str("\"sticker\"").expect("deserialize message type");
+        assert_eq!(value, MessageType::Sticker);
     }
 }
 

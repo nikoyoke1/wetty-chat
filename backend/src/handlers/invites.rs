@@ -521,6 +521,7 @@ async fn post_send_invite_message(
             sender_uid: uid,
             message: Some(invite.code.clone()),
             message_type: MessageType::Invite,
+            sticker_id: None,
             reply_to_id: None,
             reply_root_id: None,
             client_generated_id: body.client_generated_id,

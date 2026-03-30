@@ -172,6 +172,7 @@ diesel::table! {
         has_attachments -> Bool,
         has_thread -> Bool,
         has_reactions -> Bool,
+        sticker_id -> Nullable<Int8>,
     }
 }
 
@@ -259,6 +260,7 @@ diesel::joinable!(attachments -> messages (message_id));
 diesel::joinable!(group_membership -> groups (chat_id));
 diesel::joinable!(groups -> media (avatar_image_id));
 diesel::joinable!(message_reactions -> messages (message_id));
+diesel::joinable!(messages -> stickers (sticker_id));
 diesel::joinable!(sticker_pack_stickers -> sticker_packs (pack_id));
 diesel::joinable!(sticker_pack_stickers -> stickers (sticker_id));
 diesel::joinable!(stickers -> media (media_id));
