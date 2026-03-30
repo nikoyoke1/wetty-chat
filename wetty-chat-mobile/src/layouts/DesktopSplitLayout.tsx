@@ -14,6 +14,8 @@ import { JoinChatCore } from '@/pages/join-chat';
 import { SettingsCore } from '@/pages/settings';
 import { GeneralSettingsCore } from '@/pages/settings/general';
 import { LanguagePageCore } from '@/pages/settings/language';
+import { StickerSettingsCore } from '@/pages/settings/stickers';
+import { StickerPackDetailCore } from '@/pages/settings/sticker-pack-detail';
 import type { BackAction } from '@/types/back-action';
 import styles from './DesktopSplitLayout.module.scss';
 import { HeaderActionMenu, type HeaderActionMenuItem } from '@/components/HeaderActionMenu';
@@ -35,6 +37,8 @@ interface DesktopRouteMatches {
   globalSettings: boolean;
   generalSettings: boolean;
   languageSettings: boolean;
+  stickerSettings: boolean;
+  stickerPackSettings: { packId: string } | null;
 }
 
 function getDesktopRouteMatches(pathname: string): DesktopRouteMatches {
@@ -78,13 +82,20 @@ function getDesktopRouteMatches(pathname: string): DesktopRouteMatches {
     path: '/settings/general',
     exact: true,
   });
+  const stickerPackRaw = matchPath<{ packId: string }>(pathname, {
+    path: '/settings/stickers/:packId',
+    exact: true,
+  });
+  const stickerSettings =
+    !!matchPath(pathname, { path: '/settings/stickers', exact: true }) || !!stickerPackRaw;
   const globalSettings =
     !!matchPath(pathname, {
       path: '/settings',
       exact: true,
     }) ||
     generalSettings ||
-    languageSettings;
+    languageSettings ||
+    stickerSettings;
 
   return {
     activeChatId:
@@ -104,6 +115,8 @@ function getDesktopRouteMatches(pathname: string): DesktopRouteMatches {
     globalSettings,
     generalSettings,
     languageSettings,
+    stickerSettings,
+    stickerPackSettings: stickerPackRaw?.params ?? null,
   };
 }
 
@@ -217,6 +230,20 @@ export function DesktopSplitLayout() {
     });
   }, [backgroundPath, history]);
 
+  const openStickerSettings = useCallback(() => {
+    history.push({
+      pathname: '/settings/stickers',
+      state: { backgroundPath },
+    });
+  }, [backgroundPath, history]);
+
+  const openStickerPackSettings = useCallback((packId: string) => {
+    history.push({
+      pathname: `/settings/stickers/${packId}`,
+      state: { backgroundPath },
+    });
+  }, [backgroundPath, history]);
+
   let subPageOverlay: ReactNode = null;
 
   if (threadMatch) {
@@ -294,6 +321,30 @@ export function DesktopSplitLayout() {
                   }),
               }}
             />
+          ) : currentRoute.stickerPackSettings ? (
+            <StickerPackDetailCore
+              packId={currentRoute.stickerPackSettings.packId}
+              backAction={{
+                type: 'callback',
+                onBack: () =>
+                  history.push({
+                    pathname: '/settings/stickers',
+                    state: { backgroundPath },
+                  }),
+              }}
+            />
+          ) : currentRoute.stickerSettings ? (
+            <StickerSettingsCore
+              backAction={{
+                type: 'callback',
+                onBack: () =>
+                  history.push({
+                    pathname: '/settings',
+                    state: { backgroundPath },
+                  }),
+              }}
+              onOpenPack={openStickerPackSettings}
+            />
           ) : currentRoute.generalSettings ? (
             <GeneralSettingsCore
               backAction={{
@@ -310,6 +361,7 @@ export function DesktopSplitLayout() {
             <SettingsCore
               backAction={{ type: 'close', onClose: closeGlobalSettings }}
               onOpenGeneral={openGeneralSettings}
+              onOpenStickers={openStickerSettings}
             />
           )}
         </IonModal>

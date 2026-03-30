@@ -26,13 +26,14 @@ import { AppVersionItem } from '@/components/settings/AppVersionItem';
 
 import { type PushNotificationErrorCode, usePushNotifications } from '@/hooks/usePushNotifications';
 import { t } from '@lingui/core/macro';
-import { codeWorking, cog, logIn, logOut, notifications } from 'ionicons/icons';
+import { codeWorking, cog, happyOutline, logIn, logOut, notifications } from 'ionicons/icons';
 import { BackButton } from '@/components/BackButton';
 import type { BackAction } from '@/types/back-action';
 
 interface SettingsCoreProps {
   backAction?: BackAction;
   onOpenGeneral?: () => void;
+  onOpenStickers?: () => void;
 }
 
 function getPermissionLabel(permission: NotificationPermission) {
@@ -64,7 +65,7 @@ function getPushErrorMessage(code: PushNotificationErrorCode) {
   }
 }
 
-export function SettingsCore({ backAction, onOpenGeneral }: SettingsCoreProps) {
+export function SettingsCore({ backAction, onOpenGeneral, onOpenStickers }: SettingsCoreProps) {
   const currentUid = useSelector((state: RootState) => state.user.uid);
   const [uidInput, setUidInput] = useState(() => String(currentUid || '1'));
   const [presentToast] = useIonToast();
@@ -88,6 +89,14 @@ export function SettingsCore({ backAction, onOpenGeneral }: SettingsCoreProps) {
       return;
     }
     history.push('/settings/general');
+  };
+
+  const handleOpenStickers = () => {
+    if (onOpenStickers) {
+      onOpenStickers();
+      return;
+    }
+    history.push('/settings/stickers');
   };
 
   const handleSubscribeToPush = async () => {
@@ -131,6 +140,12 @@ export function SettingsCore({ backAction, onOpenGeneral }: SettingsCoreProps) {
             <IonIcon aria-hidden="true" icon={cog} slot="start" color="primary" />
             <IonLabel>
               <Trans>General</Trans>
+            </IonLabel>
+          </IonItem>
+          <IonItem button detail={true} onClick={handleOpenStickers}>
+            <IonIcon aria-hidden="true" icon={happyOutline} slot="start" color="tertiary" />
+            <IonLabel>
+              <Trans>Stickers</Trans>
             </IonLabel>
           </IonItem>
         </IonList>

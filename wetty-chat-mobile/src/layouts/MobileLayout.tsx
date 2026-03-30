@@ -15,6 +15,8 @@ import { ChatInvitesPage } from '@/pages/chat-thread/manage-invites';
 import SettingsPage from '@/pages/settings';
 import GeneralSettingsPage from '@/pages/settings/general';
 import LanguagePage from '@/pages/settings/language';
+import StickerSettingsPage from '@/pages/settings/stickers';
+import StickerPackDetailPage from '@/pages/settings/sticker-pack-detail';
 import NotFoundPage from '@/pages/not-found';
 import ComponentDemoPage from '@/pages/component-demo';
 
@@ -72,6 +74,8 @@ const MobileLayout: React.FC = () => {
         <Route path="/demo" exact component={ComponentDemoPage} />
         <Route path="/settings/general" exact component={GeneralSettingsPage} />
         <Route path="/settings/language" exact component={LanguagePage} />
+        <Route path="/settings/stickers/:packId" exact component={StickerPackDetailPage} />
+        <Route path="/settings/stickers" exact component={StickerSettingsPage} />
         <Route path="/settings" exact component={SettingsPage} />
         <Redirect exact from="/" to="/chats" />
         <Route component={NotFoundPage} />

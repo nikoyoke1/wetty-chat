@@ -182,7 +182,9 @@ const MessageComposeBarInner = forwardRef<MessageComposeBarHandle, MessageCompos
     if (!stickerPickerOpen) return;
 
     const handlePointerDown = (e: MouseEvent | TouchEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as HTMLElement;
+      if (target.closest('ion-alert, ion-action-sheet, ion-modal, ion-backdrop, ion-toast')) return;
+      if (containerRef.current && !containerRef.current.contains(target)) {
         setStickerPickerOpen(false);
       }
     };

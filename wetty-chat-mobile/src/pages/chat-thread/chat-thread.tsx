@@ -25,6 +25,7 @@ import {
   informationCircleOutline,
   notificationsOffOutline,
   people,
+  starOutline,
   trashOutline,
 } from 'ionicons/icons';
 import { useDispatch, useSelector } from 'react-redux';
@@ -1002,6 +1003,16 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
               },
             ],
           });
+        },
+      });
+    }
+    if (msg.message_type === 'sticker') {
+      actions.push({
+        key: 'favorite-sticker',
+        label: t`Add to Favorites`,
+        icon: starOutline,
+        handler: () => {
+          console.log('Add sticker to favorites (placeholder):', msg.id);
         },
       });
     }

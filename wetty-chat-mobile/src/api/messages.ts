@@ -19,7 +19,7 @@ export interface Sender {
 export interface ReplyToMessage {
   id: string;
   message: string | null;
-  message_type: 'text' | 'audio' | 'file' | 'system' | 'invite';
+  message_type: 'text' | 'audio' | 'file' | 'system' | 'invite' | 'sticker';
   sender: Sender;
   is_deleted: boolean;
   attachments?: Attachment[];
@@ -60,7 +60,7 @@ export interface ReactionDetailResponse {
 export interface MessageResponse {
   id: string;
   message: string | null;
-  message_type: 'text' | 'audio' | 'system' | 'invite';
+  message_type: 'text' | 'audio' | 'system' | 'invite' | 'sticker';
   reply_root_id: string | null;
   client_generated_id: string;
   sender: Sender;

@@ -39,6 +39,23 @@
   }
 }
 
+.addStickerBtn {
+  border: 2px dashed var(--ion-background-color-step-300, #ccc);
+  color: var(--ion-text-color-step-500, #888);
+
+  &:hover {
+    border-color: var(--ion-color-primary, #3880ff);
+    color: var(--ion-color-primary, #3880ff);
+  }
+}
+
+.addStickerIcon {
+  pointer-events: none;
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 300;
+}
+
 .stickerEmoji {
   pointer-events: none;
   font-size: 40px;
@@ -102,7 +119,19 @@
   }
 }
 
+.createPackBtn {
+  color: var(--ion-text-color-step-500, #888);
+  margin-left: auto;
+
+  &:hover {
+    color: var(--ion-color-primary, #3880ff);
+  }
+}
+
 .packIcon {
   pointer-events: none;
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

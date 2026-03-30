@@ -16,7 +16,7 @@ export interface MessageOverlayAction {
 }
 
 interface MessageOverlayProps {
-  messageType?: 'text' | 'audio' | 'system' | 'invite';
+  messageType?: 'text' | 'audio' | 'system' | 'invite' | 'sticker';
   senderName: string;
   message: string;
   isSent: boolean;
