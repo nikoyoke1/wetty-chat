@@ -13,7 +13,7 @@ use crate::{
     models::NewMessage,
     services::{
         media::build_public_object_url,
-        push::PushJob,
+        push::{PushJob, PushMessagePreview, PushMessagePreviewSticker},
         user::{lookup_user_avatars, lookup_user_profiles, UserProfile},
     },
     utils::{auth::CurrentUid, ids},
@@ -561,16 +561,14 @@ pub(crate) async fn send_prepared_message(
         sender_uid: prepared.sender_uid,
         sender_username,
         chat_name,
-        message_preview: prepared.push_preview_override.or_else(|| {
-            response
-                .message
-                .clone()
-                .or_else(|| {
-                    response
-                        .sticker
-                        .as_ref()
-                        .map(|sticker| sticker_preview_text(Some(&sticker.emoji)))
-                })
+        message_preview: push_message_preview_from_response(&response),
+        legacy_message_preview: prepared.push_preview_override.or_else(|| {
+            response.message.clone().or_else(|| {
+                response
+                    .sticker
+                    .as_ref()
+                    .map(|sticker| sticker_preview_text(Some(&sticker.emoji)))
+            })
         }),
         message_id: response.id,
     });
@@ -585,6 +583,20 @@ fn sticker_preview_text(emoji: Option<&str>) -> String {
     match emoji.filter(|value| !value.trim().is_empty()) {
         Some(emoji) => format!("[Sticker] {emoji}"),
         None => "[Sticker]".to_string(),
+    }
+}
+
+fn push_message_preview_from_response(response: &MessageResponse) -> PushMessagePreview {
+    PushMessagePreview {
+        message: response.message.clone(),
+        message_type: response.message_type.clone(),
+        sticker: response.sticker.as_ref().and_then(|sticker| {
+            (!sticker.emoji.trim().is_empty()).then(|| PushMessagePreviewSticker {
+                emoji: sticker.emoji.clone(),
+            })
+        }),
+        first_attachment_kind: response.attachments.first().map(|attachment| attachment.kind.clone()),
+        is_deleted: response.is_deleted,
     }
 }
 

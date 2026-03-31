@@ -13,41 +13,11 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/components/chat/messagePreview.ts
-#: src/components/chat/messagePreview.ts
-msgid "[Attachment]"
-msgstr "[附件]"
-
-#: src/components/chat/messagePreview.ts
 #: src/components/chat/messages/ChatMessageRow.tsx
 #: src/components/chat/messages/ChatMessageRow.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 msgid "[Deleted]"
 msgstr "[已删除]"
-
-#: src/components/chat/messagePreview.ts
-#: src/components/chat/messagePreview.ts
-msgid "[Image]"
-msgstr "[图片]"
-
-#: src/components/chat/messagePreview.ts
-msgid "[Invite]"
-msgstr "[邀请]"
-
-#: src/components/chat/messagePreview.ts
-msgid "[Sticker]"
-msgstr "[表情]"
-
-#: src/components/chat/messagePreview.ts
-#: src/components/chat/messagePreview.ts
-msgid "[Video]"
-msgstr "[视频]"
-
-#: src/components/chat/messagePreview.ts
-#: src/components/chat/messagePreview.ts
-#: src/components/chat/messagePreview.ts
-msgid "[Voice message]"
-msgstr "[语音消息]"
 
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 msgid "1 day"
@@ -179,6 +149,7 @@ msgstr "已阻止"
 #: src/pages/chat-thread/manage-invites.tsx
 #: src/pages/settings/sticker-pack-detail.tsx
 #: src/pages/settings/sticker-pack-detail.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
 #: src/pages/settings/stickers.tsx
 msgid "Cancel"
 msgstr "取消"
@@ -207,7 +178,7 @@ msgstr "检查更新"
 
 #: src/pages/settings.tsx
 msgid "Checking..."
-msgstr ""
+msgstr "检查中..."
 
 #: src/components/chat/settings/ShareInviteModal.tsx
 msgid "Choose a destination group"
@@ -306,6 +277,7 @@ msgstr "创建新的表情包"
 
 #: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/chat-thread.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
 msgid "Delete"
 msgstr "撤回"
 
@@ -313,9 +285,21 @@ msgstr "撤回"
 msgid "Delete Message"
 msgstr "撤回消息"
 
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Delete pack"
+msgstr "删除表情包"
+
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Delete Pack"
+msgstr "删除表情包"
+
 #: src/components/chat/compose/VoiceRecorderPanel.tsx
 msgid "Delete recording"
 msgstr "删除录音"
+
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Delete this sticker pack? Stickers will stay available elsewhere, but this pack and its contents list will be removed."
+msgstr "删除这个表情包吗？表情本身会保留，但这个表情包以及其中的收录关系将被移除。"
 
 #: src/pages/chat-thread/chat-members.tsx
 msgid "Demote"
@@ -442,6 +426,10 @@ msgstr "创建表情包失败"
 #: src/pages/chat-thread/chat-thread.tsx
 msgid "Failed to delete message"
 msgstr "撤回消息失败"
+
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Failed to delete sticker pack"
+msgstr "删除表情包失败"
 
 #: src/pages/chat-thread/chat-thread.tsx
 msgid "Failed to edit message"
@@ -640,7 +628,7 @@ msgstr "邀请链接"
 #: src/components/chat/settings/ShareInviteModal.tsx
 #: src/pages/chat-thread/manage-invites.tsx
 msgid "Invite link copied"
-msgstr ""
+msgstr "邀请链接已复制"
 
 #: src/components/chat/settings/ShareInviteModal.tsx
 msgid "Invite Link Created"
@@ -1227,6 +1215,10 @@ msgstr "已订阅"
 #: src/pages/settings/stickers.tsx
 msgid "Subscribed Packs"
 msgstr "已订阅的表情包"
+
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Tap a sticker to remove it from this pack."
+msgstr "点击表情即可将其从这个表情包中移除。"
 
 #: src/pages/chat-thread/manage-invites.tsx
 msgid "Targeted"

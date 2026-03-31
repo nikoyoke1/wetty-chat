@@ -14,8 +14,8 @@ import { useSelector } from 'react-redux';
 import styles from './ChatBubble.module.scss';
 import type { Attachment, ReactionSummary, UserGroupInfo } from '@/api/messages';
 import { ImageViewer } from '@/components/chat/ImageViewer';
-import { getMessagePreviewText } from '@/components/chat/messagePreview';
-import { selectChatFontSizeStyle } from '@/store/settingsSlice';
+import { formatMessagePreview, type PreviewMessage, getNotificationPreviewLabels } from '@/utils/messagePreview';
+import { selectChatFontSizeStyle, selectEffectiveLocale } from '@/store/settingsSlice';
 import { UserAvatar } from '@/components/UserAvatar';
 import { useMouseDetected } from '@/hooks/platformHooks';
 import { parseInviteCodeFromUrl } from '@/utils/inviteUrl';
@@ -107,7 +107,7 @@ export interface ChatBubbleBaseProps {
   onAvatarClick?: () => void;
   replyTo?: {
     senderName: string;
-    preview: Parameters<typeof getMessagePreviewText>[0];
+    preview: PreviewMessage;
   };
   timestamp?: string;
   edited?: boolean;
@@ -155,6 +155,7 @@ export function ChatBubbleBase({
   const [viewingAttachmentIndex, setViewingAttachmentIndex] = useState<number | null>(null);
   const mouseDetected = useMouseDetected();
   const chatFontSizeStyle = useSelector(selectChatFontSizeStyle);
+  const locale = useSelector(selectEffectiveLocale);
   const interactive = interactionMode === 'interactive';
   const imageAttachments =
     attachments?.filter((att) => att.kind.startsWith('image/') || att.kind.startsWith('video/')) ?? [];
@@ -343,7 +344,9 @@ export function ChatBubbleBase({
           onClick={interactive ? onReplyTap : undefined}
         >
           <div className={styles.replyPreviewName}>{replyTo.senderName}</div>
-          <div className={styles.replyPreviewText}>{getMessagePreviewText(replyTo.preview)}</div>
+          <div className={styles.replyPreviewText}>
+            {formatMessagePreview(replyTo.preview, getNotificationPreviewLabels(locale))}
+          </div>
         </div>
       )}
       {attachments && attachments.length > 0 && (

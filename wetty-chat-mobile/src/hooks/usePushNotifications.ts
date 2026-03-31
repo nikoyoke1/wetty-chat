@@ -82,7 +82,7 @@ async function ensurePushSubscription(registration: ServiceWorkerRegistration) {
   }
 
   const vapidRes = await apiClient.get('/push/vapid-public-key');
-  const publicKey = urlBase64ToUint8Array(vapidRes.data.public_key);
+  const publicKey = urlBase64ToUint8Array(vapidRes.data.publicKey);
   const newSubscription = await registration.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey: publicKey,

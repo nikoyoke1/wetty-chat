@@ -1,9 +1,22 @@
 /// <reference lib="webworker" />
 import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
-import { getHighWaterMark, setHighWaterMark } from './utils/db';
+import { getHighWaterMark, kvGet, setHighWaterMark } from './utils/db';
+import { formatNotificationBody, getNotificationPreviewLabels, type PreviewMessage } from './utils/messagePreview';
 
 declare let self: ServiceWorkerGlobalScope;
+
+interface PushPayload {
+  type?: 'newMessage';
+  title?: string;
+  body?: string;
+  senderName?: string;
+  messagePreview?: PreviewMessage;
+  data?: {
+    chatId?: string;
+    messageId?: string;
+  };
+}
 
 async function updateHighWaterMarkIdb(chatId: string, messageId: string): Promise<void> {
   try {
@@ -69,12 +82,25 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     (async () => {
       try {
-        const payload = event.data!.json();
+        const payload = event.data!.json() as PushPayload;
         const title = payload.title || 'New Message';
-        const body = payload.body;
+        let body = payload.body ?? '';
 
-        const chatId = payload.data?.chat_id;
-        const messageId = payload.data?.message_id;
+        if (payload.messagePreview) {
+          try {
+            const locale = await kvGet<string>('effective_locale');
+            body = formatNotificationBody(
+              payload.senderName ?? 'Someone',
+              payload.messagePreview,
+              getNotificationPreviewLabels(locale),
+            );
+          } catch (err) {
+            console.error('Failed to localize push preview, using legacy body', err);
+          }
+        }
+
+        const chatId = payload.data?.chatId;
+        const messageId = payload.data?.messageId;
 
         if (chatId && messageId && (await isAlreadyNotified(String(chatId), String(messageId)))) {
           return;
@@ -87,7 +113,7 @@ self.addEventListener('push', (event) => {
         const tag = messageId ? `msg_${messageId}` : undefined;
 
         await self.registration.showNotification(title, {
-          body: body,
+          body,
           icon: '/icon/pwa-192x192.png',
           badge: '/icon/pwa-64x64.png',
           tag,

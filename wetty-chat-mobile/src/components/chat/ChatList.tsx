@@ -30,7 +30,7 @@ import { t } from '@lingui/core/macro';
 import { syncAppBadgeCount } from '@/utils/badges';
 import { getChatDisplayName } from '@/utils/chatDisplay';
 import { UserAvatar } from '@/components/UserAvatar';
-import { getMessagePreviewText } from './messagePreview';
+import { formatMessagePreview, getNotificationPreviewLabels } from '@/utils/messagePreview';
 import styles from './ChatList.module.scss';
 
 function formatLastActivity(isoString: string | null, locale: string): string {
@@ -75,11 +75,11 @@ function isChatMuted(chat: ChatListEntry): boolean {
   return new Date(chat.mutedUntil) > new Date();
 }
 
-function getMessagePreview(message: MessageResponse | null): ReactNode {
+function getMessagePreview(message: MessageResponse | null, locale: string): ReactNode {
   if (!message) return t`No messages yet`;
 
   const senderName = message.sender?.name || 'User';
-  const previewText = getMessagePreviewText(message);
+  const previewText = formatMessagePreview(message, getNotificationPreviewLabels(locale));
 
   return (
     <>
@@ -252,7 +252,7 @@ export function ChatList({ activeChatId, onChatSelect }: ChatListProps) {
                       />
                     ) : null}
                   </h2>
-                  <p className={styles.chatsListPreview}>{getMessagePreview(chat.lastMessage)}</p>
+                  <p className={styles.chatsListPreview}>{getMessagePreview(chat.lastMessage, locale)}</p>
                 </IonLabel>
                 <div slot="end" className={styles.chatsListEndSlot}>
                   <div className={styles.chatsListTime}>{formatLastActivity(chat.lastMessageAt, locale)}</div>

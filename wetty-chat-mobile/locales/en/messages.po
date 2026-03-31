@@ -14,11 +14,9 @@ msgstr ""
 "Plural-Forms: \n"
 
 #: src/components/chat/messagePreview.ts
-#: src/components/chat/messagePreview.ts
-msgid "[Attachment]"
-msgstr "[Attachment]"
+#~ msgid "[Attachment]"
+#~ msgstr "[Attachment]"
 
-#: src/components/chat/messagePreview.ts
 #: src/components/chat/messages/ChatMessageRow.tsx
 #: src/components/chat/messages/ChatMessageRow.tsx
 #: src/pages/chat-thread/chat-thread.tsx
@@ -26,28 +24,24 @@ msgid "[Deleted]"
 msgstr "[Deleted]"
 
 #: src/components/chat/messagePreview.ts
-#: src/components/chat/messagePreview.ts
-msgid "[Image]"
-msgstr "[Image]"
+#~ msgid "[Image]"
+#~ msgstr "[Image]"
 
 #: src/components/chat/messagePreview.ts
-msgid "[Invite]"
-msgstr "[Invite]"
+#~ msgid "[Invite]"
+#~ msgstr "[Invite]"
 
 #: src/components/chat/messagePreview.ts
-msgid "[Sticker]"
-msgstr "[Sticker]"
+#~ msgid "[Sticker]"
+#~ msgstr "[Sticker]"
 
 #: src/components/chat/messagePreview.ts
-#: src/components/chat/messagePreview.ts
-msgid "[Video]"
-msgstr "[Video]"
+#~ msgid "[Video]"
+#~ msgstr "[Video]"
 
 #: src/components/chat/messagePreview.ts
-#: src/components/chat/messagePreview.ts
-#: src/components/chat/messagePreview.ts
-msgid "[Voice message]"
-msgstr "[Voice message]"
+#~ msgid "[Voice message]"
+#~ msgstr "[Voice message]"
 
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 msgid "1 day"
@@ -179,6 +173,7 @@ msgstr "Blocked"
 #: src/pages/chat-thread/manage-invites.tsx
 #: src/pages/settings/sticker-pack-detail.tsx
 #: src/pages/settings/sticker-pack-detail.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
 #: src/pages/settings/stickers.tsx
 msgid "Cancel"
 msgstr "Cancel"
@@ -306,6 +301,7 @@ msgstr "Create new sticker pack"
 
 #: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/chat-thread.tsx
+#: src/pages/settings/sticker-pack-detail.tsx
 msgid "Delete"
 msgstr "Delete"
 
@@ -313,9 +309,21 @@ msgstr "Delete"
 msgid "Delete Message"
 msgstr "Delete Message"
 
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Delete pack"
+msgstr "Delete pack"
+
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Delete Pack"
+msgstr "Delete Pack"
+
 #: src/components/chat/compose/VoiceRecorderPanel.tsx
 msgid "Delete recording"
 msgstr "Delete recording"
+
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Delete this sticker pack? Stickers will stay available elsewhere, but this pack and its contents list will be removed."
+msgstr "Delete this sticker pack? Stickers will stay available elsewhere, but this pack and its contents list will be removed."
 
 #: src/pages/chat-thread/chat-members.tsx
 msgid "Demote"
@@ -442,6 +450,10 @@ msgstr "Failed to create sticker pack"
 #: src/pages/chat-thread/chat-thread.tsx
 msgid "Failed to delete message"
 msgstr "Failed to delete message"
+
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Failed to delete sticker pack"
+msgstr "Failed to delete sticker pack"
 
 #: src/pages/chat-thread/chat-thread.tsx
 msgid "Failed to edit message"
@@ -1227,6 +1239,10 @@ msgstr "Subscribed"
 #: src/pages/settings/stickers.tsx
 msgid "Subscribed Packs"
 msgstr "Subscribed Packs"
+
+#: src/pages/settings/sticker-pack-detail.tsx
+msgid "Tap a sticker to remove it from this pack."
+msgstr "Tap a sticker to remove it from this pack."
 
 #: src/pages/chat-thread/manage-invites.tsx
 msgid "Targeted"

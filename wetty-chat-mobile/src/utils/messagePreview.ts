@@ -1,0 +1,177 @@
+export const MESSAGE_PREVIEW_MAX = 100;
+
+export interface PreviewAttachmentLike {
+  kind: string;
+}
+
+export interface PreviewStickerLike {
+  emoji?: string | null;
+}
+
+export interface PreviewMessage {
+  message?: string | null;
+  text?: string | null;
+  messageType?: string | null;
+  sticker?: PreviewStickerLike | null;
+  attachments?: PreviewAttachmentLike[];
+  firstAttachmentKind?: string | null;
+  isDeleted?: boolean;
+}
+
+export interface PreviewLabels {
+  attachment: string;
+  deleted: string;
+  image: string;
+  invite: string;
+  sticker: string;
+  video: string;
+  voiceMessage: string;
+}
+
+export interface NotificationPreviewLabels extends PreviewLabels {
+  sentMessage: string;
+}
+
+const PREVIEW_LABELS_BY_LOCALE: Record<string, NotificationPreviewLabels> = {
+  en: {
+    attachment: '[Attachment]',
+    deleted: '[Deleted]',
+    image: '[Image]',
+    invite: '[Invite]',
+    sticker: '[Sticker]',
+    video: '[Video]',
+    voiceMessage: '[Voice message]',
+    sentMessage: 'sent a message',
+  },
+  'zh-CN': {
+    attachment: '[附件]',
+    deleted: '[已删除]',
+    image: '[图片]',
+    invite: '[邀请]',
+    sticker: '[表情]',
+    video: '[视频]',
+    voiceMessage: '[语音消息]',
+    sentMessage: '发送了一条消息',
+  },
+  'zh-TW': {
+    attachment: '[附件]',
+    deleted: '[已刪除]',
+    image: '[圖片]',
+    invite: '[邀請]',
+    sticker: '[表情]',
+    video: '[影片]',
+    voiceMessage: '[語音訊息]',
+    sentMessage: '傳送了一則訊息',
+  },
+};
+
+function normalizePreviewMessage({
+  message,
+  text,
+  messageType,
+  sticker,
+  attachments,
+  firstAttachmentKind,
+  isDeleted,
+}: PreviewMessage) {
+  return {
+    message: message ?? text,
+    messageType,
+    sticker,
+    attachments,
+    firstAttachmentKind,
+    isDeleted,
+  };
+}
+
+export function truncatePreview(preview: string, maxLength = MESSAGE_PREVIEW_MAX): string {
+  const truncated = preview.slice(0, maxLength);
+  return preview.length > maxLength ? `${truncated}...`.slice(0, maxLength) + '…' : truncated;
+}
+
+export function resolvePreviewLocale(locale?: string | null): keyof typeof PREVIEW_LABELS_BY_LOCALE {
+  if (!locale) return 'en';
+
+  const normalized = locale.toLowerCase();
+  if (normalized === 'zh-tw' || normalized.startsWith('zh-hant') || normalized.startsWith('zh-hk')) {
+    return 'zh-TW';
+  }
+  if (normalized === 'zh-cn' || normalized.startsWith('zh-hans') || normalized.startsWith('zh')) {
+    return 'zh-CN';
+  }
+  return 'en';
+}
+
+export function getNotificationPreviewLabels(locale?: string | null): NotificationPreviewLabels {
+  return PREVIEW_LABELS_BY_LOCALE[resolvePreviewLocale(locale)];
+}
+
+export function formatMessagePreview(preview: PreviewMessage, labels: PreviewLabels): string {
+  const { message, messageType, sticker, attachments, firstAttachmentKind, isDeleted } = normalizePreviewMessage(preview);
+
+  if (isDeleted) {
+    return labels.deleted;
+  }
+
+  if (messageType === 'invite') {
+    return labels.invite;
+  }
+
+  if (messageType === 'sticker') {
+    return sticker?.emoji ? `${labels.sticker} ${sticker.emoji}` : labels.sticker;
+  }
+
+  if (messageType === 'audio') {
+    return labels.voiceMessage;
+  }
+
+  if (message?.trim()) {
+    return message;
+  }
+
+  if (attachments?.some((attachment) => attachment.kind.startsWith('audio/'))) {
+    return labels.voiceMessage;
+  }
+
+  if (firstAttachmentKind?.startsWith('audio/')) {
+    return labels.voiceMessage;
+  }
+
+  if (attachments?.some((attachment) => attachment.kind.startsWith('image/'))) {
+    return labels.image;
+  }
+
+  if (firstAttachmentKind?.startsWith('image/')) {
+    return labels.image;
+  }
+
+  if (attachments?.some((attachment) => attachment.kind.startsWith('video/'))) {
+    return labels.video;
+  }
+
+  if (firstAttachmentKind?.startsWith('video/')) {
+    return labels.video;
+  }
+
+  if (attachments && attachments.length > 0) {
+    return labels.attachment;
+  }
+
+  if (firstAttachmentKind) {
+    return labels.attachment;
+  }
+
+  return '';
+}
+
+export function formatNotificationBody(
+  senderName: string,
+  preview: PreviewMessage | null | undefined,
+  labels: NotificationPreviewLabels,
+): string {
+  const previewText = preview ? formatMessagePreview(preview, labels) : '';
+  if (previewText) {
+    return `${senderName}: ${truncatePreview(previewText)}`;
+  }
+  return `${senderName} ${labels.sentMessage}`;
+}

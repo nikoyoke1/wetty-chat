@@ -1,7 +1,9 @@
 import { IonIcon } from '@ionic/react';
 import { t } from '@lingui/core/macro';
 import { closeCircle } from 'ionicons/icons';
-import { getMessagePreviewText } from '../messagePreview';
+import { useSelector } from 'react-redux';
+import { selectEffectiveLocale } from '@/store/settingsSlice';
+import { formatMessagePreview, getNotificationPreviewLabels } from '@/utils/messagePreview';
 import type { EditingMessage, ReplyTo } from './types';
 import styles from './MessageComposeBar.module.scss';
 
@@ -13,6 +15,8 @@ interface ComposeContextBannerProps {
 }
 
 export function ComposeContextBanner({ editing, replyTo, onCancelEdit, onCancelReply }: ComposeContextBannerProps) {
+  const locale = useSelector(selectEffectiveLocale);
+
   if (editing) {
     return (
       <div className={styles.replyPreview}>
@@ -35,7 +39,9 @@ export function ComposeContextBanner({ editing, replyTo, onCancelEdit, onCancelR
     <div className={styles.replyPreview}>
       <div className={styles.replyText}>
         <span className={styles.replyUsername}>{t`Replying to ${replyTo.username}`}</span>
-        <span className={styles.replySnippet}>{getMessagePreviewText(replyTo)}</span>
+        <span className={styles.replySnippet}>
+          {formatMessagePreview(replyTo, getNotificationPreviewLabels(locale))}
+        </span>
       </div>
       <button type="button" className={styles.replyClose} aria-label={t`Cancel reply`} onClick={onCancelReply}>
         <IonIcon icon={closeCircle} />

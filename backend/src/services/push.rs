@@ -3,6 +3,7 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::PgConnection;
 use futures::future::FutureExt;
 use futures::stream::{self, StreamExt};
+use serde::Serialize;
 use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
@@ -11,7 +12,7 @@ use tracing::{debug, error, info, warn};
 use web_push::{HyperWebPushClient, WebPushClient};
 
 use crate::metrics::Metrics;
-use crate::models::PushSubscription;
+use crate::models::{MessageType, PushSubscription};
 use crate::schema::push_subscriptions;
 use crate::services::ws_registry::ConnectionRegistry;
 
@@ -27,13 +28,58 @@ const PUSH_SUPPRESSION_FRESHNESS_SECS: u64 = 30;
 const PUSH_WORKER_RESTART_DELAY: Duration = Duration::from_secs(1);
 
 /// A push notification job enqueued when a new message is created.
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+enum PushPayloadType {
+    NewMessage,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PushMessagePreviewSticker {
+    pub emoji: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PushMessagePreview {
+    pub message: Option<String>,
+    pub message_type: MessageType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sticker: Option<PushMessagePreviewSticker>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub first_attachment_kind: Option<String>,
+    pub is_deleted: bool,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct PushPayloadData {
+    chat_id: String,
+    message_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct PushPayload {
+    #[serde(rename = "type")]
+    type_: PushPayloadType,
+    title: String,
+    body: String,
+    sender_name: String,
+    message_preview: PushMessagePreview,
+    unread_count: i64,
+    data: PushPayloadData,
+}
+
 #[derive(Debug, Clone)]
 pub struct PushJob {
     pub chat_id: i64,
     pub sender_uid: i32,
     pub sender_username: String,
     pub chat_name: String,
-    pub message_preview: Option<String>,
+    pub message_preview: PushMessagePreview,
+    pub legacy_message_preview: Option<String>,
     pub message_id: i64,
 }
 
@@ -313,7 +359,7 @@ async fn process_push_job(
         });
 
     // 4. Build the push payload base text.
-    let body_text = format_push_body(&job.sender_username, job.message_preview.as_deref());
+    let body_text = format_push_body(&job.sender_username, job.legacy_message_preview.as_deref());
 
     // 5. Send concurrently with bounded parallelism.
     let stale_endpoints: Vec<String> = stream::iter(subs.into_iter())
@@ -321,17 +367,8 @@ async fn process_push_job(
             let service = service.clone();
 
             let unread = unread_counts.get(&sub.user_id).copied().unwrap_or(0);
-            let payload = serde_json::to_vec(&serde_json::json!({
-                "type": "new_message",
-                "title": job.chat_name,
-                "body": body_text,
-                "unread_count": unread,
-                "data": {
-                    "chat_id": job.chat_id.to_string(),
-                    "message_id": job.message_id.to_string(),
-                }
-            }))
-            .unwrap_or_default();
+            let payload = serde_json::to_vec(&build_push_payload(job, unread, &body_text))
+                .unwrap_or_default();
 
             async move {
                 match service.send_to_subscription(&sub, &payload).await {
@@ -363,6 +400,21 @@ async fn process_push_job(
     }
 
     Ok(())
+}
+
+fn build_push_payload(job: &PushJob, unread_count: i64, body_text: &str) -> PushPayload {
+    PushPayload {
+        type_: PushPayloadType::NewMessage,
+        title: job.chat_name.clone(),
+        body: body_text.to_string(),
+        sender_name: job.sender_username.clone(),
+        message_preview: job.message_preview.clone(),
+        unread_count,
+        data: PushPayloadData {
+            chat_id: job.chat_id.to_string(),
+            message_id: job.message_id.to_string(),
+        },
+    }
 }
 
 fn format_push_body(sender_username: &str, preview: Option<&str>) -> String {
@@ -461,6 +513,50 @@ mod tests {
     #[test]
     fn format_push_body_uses_fallback_for_missing_preview() {
         assert_eq!(format_push_body("alice", None), "alice sent a message");
+    }
+
+    #[test]
+    fn build_push_payload_includes_structured_preview_and_legacy_body() {
+        let job = PushJob {
+            chat_id: 10,
+            sender_uid: 42,
+            sender_username: "alice".to_string(),
+            chat_name: "General".to_string(),
+            message_preview: PushMessagePreview {
+                message: None,
+                message_type: MessageType::Sticker,
+                sticker: Some(PushMessagePreviewSticker {
+                    emoji: "🙂".to_string(),
+                }),
+                first_attachment_kind: None,
+                is_deleted: false,
+            },
+            legacy_message_preview: Some("[Sticker] 🙂".to_string()),
+            message_id: 99,
+        };
+
+        let payload = build_push_payload(&job, 3, "alice: [Sticker] 🙂");
+        assert_eq!(payload.sender_name, "alice");
+        assert_eq!(payload.body, "alice: [Sticker] 🙂");
+        assert_eq!(payload.message_preview.message_type, MessageType::Sticker);
+        assert_eq!(
+            payload.message_preview.sticker,
+            Some(PushMessagePreviewSticker {
+                emoji: "🙂".to_string(),
+            })
+        );
+        assert_eq!(payload.data.chat_id, "10");
+        assert_eq!(payload.data.message_id, "99");
+        assert_eq!(payload.unread_count, 3);
+
+        let serialized = serde_json::to_value(&payload).expect("serialize push payload");
+        assert_eq!(serialized["type"], "newMessage");
+        assert_eq!(serialized["senderName"], "alice");
+        assert_eq!(serialized["messagePreview"]["messageType"], "sticker");
+        assert_eq!(serialized["data"]["chatId"], "10");
+        assert_eq!(serialized["data"]["messageId"], "99");
+        assert!(serialized.get("sender_name").is_none());
+        assert!(serialized["data"].get("chat_id").is_none());
     }
 
     #[tokio::test]

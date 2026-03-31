@@ -2,9 +2,9 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { IonIcon } from '@ionic/react';
 import type { Attachment } from '@/api/messages';
+import type { PreviewMessage } from '@/utils/messagePreview';
 import { ChatBubbleBase } from './messages/ChatBubbleBase';
 import { StickerBubble } from './messages/StickerBubble';
-import type { PreviewMessage } from './messagePreview';
 import styles from './MessageOverlay.module.scss';
 
 export interface MessageOverlayAction {

@@ -2,8 +2,10 @@ import type { CSSProperties, HTMLAttributes, Ref } from 'react';
 import { IonIcon } from '@ionic/react';
 import { arrowUndo, chatbubbles, checkmarkCircle, checkmarkCircleOutline } from 'ionicons/icons';
 import { t } from '@lingui/core/macro';
+import { useSelector } from 'react-redux';
 import styles from './ChatBubble.module.scss';
-import { getMessagePreviewText } from '@/components/chat/messagePreview';
+import { formatMessagePreview, type PreviewMessage, getNotificationPreviewLabels } from '@/utils/messagePreview';
+import { selectEffectiveLocale } from '@/store/settingsSlice';
 import { UserAvatar } from '@/components/UserAvatar';
 import { useMouseDetected } from '@/hooks/platformHooks';
 
@@ -31,7 +33,7 @@ export interface StickerBubbleProps {
   onAvatarClick?: () => void;
   replyTo?: {
     senderName: string;
-    preview: Parameters<typeof getMessagePreviewText>[0];
+    preview: PreviewMessage;
   };
   timestamp?: string;
   edited?: boolean;
@@ -66,6 +68,7 @@ export function StickerBubble({
   bubbleRef,
 }: StickerBubbleProps) {
   const mouseDetected = useMouseDetected();
+  const locale = useSelector(selectEffectiveLocale);
   const interactive = interactionMode === 'interactive';
   const { className: bubbleClassName, style: bubbleStyle, ...bubbleRestProps } = bubblePropOverrides ?? {};
 
@@ -84,7 +87,9 @@ export function StickerBubble({
           onClick={interactive ? onReplyTap : undefined}
         >
           <div className={styles.replyPreviewName}>{replyTo.senderName}</div>
-          <div className={styles.replyPreviewText}>{getMessagePreviewText(replyTo.preview)}</div>
+          <div className={styles.replyPreviewText}>
+            {formatMessagePreview(replyTo.preview, getNotificationPreviewLabels(locale))}
+          </div>
         </div>
       )}
       <div className={styles.stickerContainer}>

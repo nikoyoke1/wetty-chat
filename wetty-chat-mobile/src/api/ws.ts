@@ -2,9 +2,11 @@ import apiClient from '@/api/client';
 import { syncApp } from '@/api/sync';
 import type { MessageResponse, ReactionSummary } from '@/api/messages';
 import { setActiveConnections, setWsConnected } from '@/store/connectionSlice';
+import { selectEffectiveLocale } from '@/store/settingsSlice';
 import store from '@/store/index';
 import { messageAdded, messageConfirmed, messagePatched, reactionsUpdated } from '@/store/messageEvents';
 import { getStoredJwtToken } from '@/utils/jwtToken';
+import { formatNotificationBody, getNotificationPreviewLabels } from '@/utils/messagePreview';
 
 const WS_PATH = __API_BASE__ + '/ws';
 const PING_INTERVAL_MS = 10_000;
@@ -102,8 +104,6 @@ function allMessagesForChat(chatId: string): MessageResponse[] {
   return chat.windows.flatMap((window) => window.messages);
 }
 
-const MESSAGE_PREVIEW_MAX = 100;
-
 function showLocalNotification(message: MessageResponse): void {
   if (currentAppState !== 'inactive') return;
 
@@ -127,19 +127,12 @@ function showLocalNotification(message: MessageResponse): void {
   if (mutedUntil && new Date(mutedUntil) > new Date()) return;
 
   const chatName = chatEntry?.details?.name ?? 'New Message';
-
-  let body: string;
-  if (message.messageType === 'invite') {
-    body = `${message.sender.name ?? 'Someone'} sent an invite`;
-  } else if (message.message) {
-    const preview =
-      message.message.length > MESSAGE_PREVIEW_MAX
-        ? message.message.slice(0, MESSAGE_PREVIEW_MAX) + '…'
-        : message.message;
-    body = `${message.sender.name ?? 'Someone'}: ${preview}`;
-  } else {
-    body = `${message.sender.name ?? 'Someone'} sent a message`;
-  }
+  const locale = selectEffectiveLocale(store.getState());
+  const body = formatNotificationBody(
+    message.sender.name ?? 'Someone',
+    message,
+    getNotificationPreviewLabels(locale),
+  );
 
   const tag = `msg_${message.id}`;
 
