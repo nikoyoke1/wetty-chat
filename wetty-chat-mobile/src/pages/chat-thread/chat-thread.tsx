@@ -218,7 +218,9 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
   const loadingNewerRef = useRef(false);
   const pendingSendScrollKeyRef = useRef<string | null>(null);
   const [initialAnchor, setInitialAnchor] = useState<VirtualScrollAnchor>({ type: 'bottom', token: 0 });
-  const [pendingResumeRequest, setPendingResumeRequest] = useState<ChatThreadResumeRequest | null>(initialResumeRequest);
+  const [pendingResumeRequest, setPendingResumeRequest] = useState<ChatThreadResumeRequest | null>(
+    initialResumeRequest,
+  );
   const [lastFullyVisibleMessageId, setLastFullyVisibleMessageId] = useState<string | null>(null);
 
   const chatRows = useChatRows(messages, formatDateSeparator);
@@ -321,10 +323,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
     pendingSendScrollKeyRef.current = null;
   }, [chatId, chatRows, storeChatId, threadId]);
 
-  const getMessageKey = useCallback(
-    (message: MessageResponse) => `msg:${message.clientGeneratedId || message.id}`,
-    [],
-  );
+  const getMessageKey = useCallback((message: MessageResponse) => `msg:${message.clientGeneratedId || message.id}`, []);
 
   const startEditingMessage = useCallback((message: MessageResponse) => {
     setReplyingTo(null);
@@ -1119,12 +1118,12 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         .catch((err: Error) => {
           showToast(err.message || t`Failed to send`);
           dispatch(
-              messagePatched({
-                chatId,
-                messageId: clientGeneratedId,
-                message: { ...optimistic, isDeleted: true },
-              }),
-            );
+            messagePatched({
+              chatId,
+              messageId: clientGeneratedId,
+              message: { ...optimistic, isDeleted: true },
+            }),
+          );
         })
         .finally(() => {
           revoke();
@@ -1347,7 +1346,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
           onError={(message) => showToast(message, 2200, { positionAnchor: 'message-compose-bar' })}
           onFocusChange={handleComposeFocusChange}
           replyTo={
-          replyingTo
+            replyingTo
               ? {
                   messageId: replyingTo.id,
                   username: replyingTo.sender.name ?? `User ${replyingTo.sender.uid}`,

@@ -95,7 +95,7 @@ export function MessageOverlay(props: MessageOverlayProps) {
       const spaceBelow = offsetTop + vh - sourceRect.bottom;
       // Required space: action list height + flex gap (8px) + visual margin (pad)
       const requiredSpace = actionListEl.offsetHeight + 8 + pad;
-      
+
       // If space below is less than the required space, swap the layout
       if (spaceBelow < requiredSpace) {
         // We move the action list to the top and reaction bar to the bottom

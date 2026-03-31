@@ -10,8 +10,7 @@ export async function dynamicActivate(locale: string) {
 }
 
 export async function activateDetectedLocale(savedLocale?: string | null) {
-  const locale =
-    savedLocale && supportedLocales.includes(savedLocale) ? savedLocale : detectLocale();
+  const locale = savedLocale && supportedLocales.includes(savedLocale) ? savedLocale : detectLocale();
   await dynamicActivate(locale);
   void kvSet('effective_locale', locale);
 }

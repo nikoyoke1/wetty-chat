@@ -156,19 +156,19 @@ export function StickerSettingsCore({ backAction, onOpenPack }: StickerSettingsC
           ) : (
             subscribedPacks.map((pack) => (
               <IonItem key={pack.id} button detail onClick={() => handleOpenPack(pack.id)}>
-              {pack.previewSticker ? (
-                <img
-                  slot="start"
-                  src={pack.previewSticker.media.url}
-                  alt=""
-                  style={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 4 }}
-                />
+                {pack.previewSticker ? (
+                  <img
+                    slot="start"
+                    src={pack.previewSticker.media.url}
+                    alt=""
+                    style={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 4 }}
+                  />
                 ) : (
                   <IonIcon aria-hidden="true" icon={cubeOutline} slot="start" color="medium" />
                 )}
                 <IonLabel>{pack.name}</IonLabel>
                 <IonNote slot="end" color="medium">
-                {pack.stickerCount}
+                  {pack.stickerCount}
                 </IonNote>
               </IonItem>
             ))

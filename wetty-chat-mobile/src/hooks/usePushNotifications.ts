@@ -134,7 +134,6 @@ async function reconcilePushSubscription({
 }: {
   repairIfMissing: boolean;
 }): Promise<ReconcilePushSubscriptionResult> {
-
   const permission = getCurrentPermission();
   const supportResult = checkPushSupport();
 
@@ -231,18 +230,21 @@ export function usePushNotifications() {
   const [loading, setLoading] = useState(false);
   const [isCheckingSubscription, setIsCheckingSubscription] = useState(false);
 
-  const refreshSubscriptionState = useCallback(async ({ repairIfMissing = true }: { repairIfMissing?: boolean } = {}) => {
-    setIsCheckingSubscription(true);
+  const refreshSubscriptionState = useCallback(
+    async ({ repairIfMissing = true }: { repairIfMissing?: boolean } = {}) => {
+      setIsCheckingSubscription(true);
 
-    try {
-      const result = await reconcilePushSubscription({ repairIfMissing });
-      setPermission(result.permission);
-      setIsSubscribed(result.isSubscribed);
-      return result;
-    } finally {
-      setIsCheckingSubscription(false);
-    }
-  }, []);
+      try {
+        const result = await reconcilePushSubscription({ repairIfMissing });
+        setPermission(result.permission);
+        setIsSubscribed(result.isSubscribed);
+        return result;
+      } finally {
+        setIsCheckingSubscription(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     void refreshSubscriptionState();

@@ -129,11 +129,7 @@ function showLocalNotification(message: MessageResponse): void {
 
   const chatName = chatEntry?.details?.name ?? 'New Message';
   const locale = selectEffectiveLocale(store.getState());
-  const body = formatNotificationBody(
-    message.sender.name ?? 'Someone',
-    message,
-    getNotificationPreviewLabels(locale),
-  );
+  const body = formatNotificationBody(message.sender.name ?? 'Someone', message, getNotificationPreviewLabels(locale));
 
   const tag = `msg_${message.id}`;
 

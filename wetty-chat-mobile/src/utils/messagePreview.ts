@@ -107,7 +107,8 @@ export function getNotificationPreviewLabels(locale?: string | null): Notificati
 }
 
 export function formatMessagePreview(preview: PreviewMessage, labels: PreviewLabels): string {
-  const { message, messageType, sticker, attachments, firstAttachmentKind, isDeleted } = normalizePreviewMessage(preview);
+  const { message, messageType, sticker, attachments, firstAttachmentKind, isDeleted } =
+    normalizePreviewMessage(preview);
 
   if (isDeleted) {
     return labels.deleted;

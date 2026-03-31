@@ -274,7 +274,7 @@ export function ChatBubbleBase({
       );
     }
 
-  if (att.kind.startsWith('audio/')) {
+    if (att.kind.startsWith('audio/')) {
       if (messageType === 'audio') {
         return <VoiceMessageBubble key={att.id} src={att.url} />;
       }

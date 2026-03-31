@@ -16,12 +16,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { checkmarkDone, mailUnreadOutline, notificationsOffOutline } from 'ionicons/icons';
 import { type ChatListEntry, getChats } from '@/api/chats';
-import {
-  selectAllChats,
-  setChatLastReadMessageId,
-  setChatsList,
-  setChatUnreadCount,
-} from '@/store/chatsSlice';
+import { selectAllChats, setChatLastReadMessageId, setChatsList, setChatUnreadCount } from '@/store/chatsSlice';
 import { selectEffectiveLocale } from '@/store/settingsSlice';
 import { Trans } from '@lingui/react/macro';
 import { markChatAsUnread, markMessagesAsRead, type MessageResponse } from '@/api/messages';
