@@ -4,6 +4,7 @@ import { IonIcon } from '@ionic/react';
 import { t } from '@lingui/core/macro';
 import { chevronBack, chevronForward, close, contractOutline, download, expandOutline } from 'ionicons/icons';
 import { useIsDesktop } from '@/hooks/platformHooks';
+import { appHistory } from '@/utils/navigationHistory';
 import styles from './ImageViewer.module.scss';
 
 const MAX_SCALE = 5;
@@ -85,6 +86,39 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
       }
     | null
   >(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const historyPushedRef = useRef(false);
+
+  const closeViaHistory = useCallback(() => {
+    if (historyPushedRef.current) {
+      appHistory.goBack();
+    } else {
+      onCloseRef.current();
+    }
+  }, []);
+
+  useEffect(() => {
+    const loc = appHistory.location;
+    appHistory.push(loc.pathname + loc.search + '#image-viewer');
+    historyPushedRef.current = true;
+
+    const unlisten = appHistory.listen((_location, action) => {
+      if (action === 'POP' && historyPushedRef.current) {
+        historyPushedRef.current = false;
+        onCloseRef.current();
+      }
+    });
+
+    return () => {
+      unlisten();
+      if (historyPushedRef.current) {
+        historyPushedRef.current = false;
+        appHistory.goBack();
+      }
+    };
+  }, []);
+
   const activeImage = images[activeIndex];
   const activeImageSize = useMemo(() => {
     const measured = imageSizes[activeIndex];
@@ -183,17 +217,17 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
   const handleDismissClick = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
       if (event.target === event.currentTarget) {
-        onClose();
+        closeViaHistory();
       }
     },
-    [onClose],
+    [closeViaHistory],
   );
 
   useEffect(() => {
     if (!images.length) {
-      onClose();
+      closeViaHistory();
     }
-  }, [images.length, onClose]);
+  }, [images.length, closeViaHistory]);
 
   useEffect(() => {
     const bodyOverflow = document.body.style.overflow;
@@ -267,7 +301,7 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose();
+        closeViaHistory();
         return;
       }
 
@@ -285,7 +319,7 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [activeIndex, navigateTo, onClose]);
+  }, [activeIndex, navigateTo, closeViaHistory]);
 
   const handleDownload = async (event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
@@ -538,7 +572,7 @@ export function ImageViewer({ images, initialIndex = 0, onClose }: ImageViewerPr
               <IonIcon icon={isFullscreen ? contractOutline : expandOutline} />
             </button>
           )}
-          <button className={styles.iconButton} onClick={onClose} title={t`Close`} aria-label={t`Close viewer`}>
+          <button className={styles.iconButton} onClick={closeViaHistory} title={t`Close`} aria-label={t`Close viewer`}>
             <IonIcon icon={close} />
           </button>
         </div>
