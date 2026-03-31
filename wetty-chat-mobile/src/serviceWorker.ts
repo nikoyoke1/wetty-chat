@@ -20,7 +20,32 @@ interface PushPayload {
   body?: string;
   senderName?: string;
   messagePreview?: PreviewMessage;
+  unreadCount?: number;
   data?: NotificationNavigationData;
+}
+
+type BadgeCapableWorkerNavigator = WorkerNavigator & {
+  setAppBadge?: (contents?: number) => Promise<void>;
+  clearAppBadge?: () => Promise<void>;
+};
+
+async function syncAppBadgeFromPushPayload(unreadCount: unknown): Promise<void> {
+  if (typeof unreadCount !== 'number' || !Number.isFinite(unreadCount) || unreadCount < 0) {
+    return;
+  }
+
+  const navigatorWithBadge = self.navigator as BadgeCapableWorkerNavigator;
+
+  try {
+    if (unreadCount > 0) {
+      await navigatorWithBadge.setAppBadge?.(unreadCount);
+      return;
+    }
+
+    await navigatorWithBadge.clearAppBadge?.();
+  } catch (err) {
+    console.error('Failed to sync app badge from push payload', err);
+  }
 }
 
 async function updateHighWaterMarkIdb(chatId: string, messageId: string): Promise<void> {
@@ -129,6 +154,8 @@ self.addEventListener('push', (event) => {
           tag,
           data: notificationData,
         });
+
+        await syncAppBadgeFromPushPayload(payload.unreadCount);
       } catch (err) {
         console.error('Failed to parse push event payload', err);
       }
