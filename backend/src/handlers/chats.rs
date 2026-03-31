@@ -595,7 +595,10 @@ fn push_message_preview_from_response(response: &MessageResponse) -> PushMessage
                 emoji: sticker.emoji.clone(),
             })
         }),
-        first_attachment_kind: response.attachments.first().map(|attachment| attachment.kind.clone()),
+        first_attachment_kind: response
+            .attachments
+            .first()
+            .map(|attachment| attachment.kind.clone()),
         is_deleted: response.is_deleted,
     }
 }
