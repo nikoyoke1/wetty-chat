@@ -1,7 +1,6 @@
 /// <reference lib="webworker" />
 import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
-import { loadClientIdForServiceWorker } from './utils/clientId';
 
 declare let self: ServiceWorkerGlobalScope;
 
@@ -101,44 +100,6 @@ self.addEventListener('push', (event) => {
     }
   }
 });
-
-self.addEventListener('pushsubscriptionchange', ((
-  event: Event & { newSubscription?: PushSubscription; oldSubscription?: PushSubscription },
-) => {
-  const newSub = event.newSubscription;
-  if (!newSub) return;
-
-  const p256dh = btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(newSub.getKey('p256dh')!))));
-  const auth = btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(newSub.getKey('auth')!))));
-  const p256dhUrlSafe = p256dh.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  const authUrlSafe = auth.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-  const apiBase = (__API_BASE__ ?? import.meta.env.BASE_URL) + '_api';
-  (event as ExtendableEvent).waitUntil(
-    loadClientIdForServiceWorker()
-      .then((clientId) => {
-        if (!clientId) {
-          throw new Error('Missing client id for rotated push subscription');
-        }
-
-        return fetch(`${apiBase}/push/subscribe`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Client-Id': clientId,
-          },
-          credentials: 'same-origin',
-          body: JSON.stringify({
-            endpoint: newSub.endpoint,
-            keys: { p256dh: p256dhUrlSafe, auth: authUrlSafe },
-          }),
-        });
-      })
-      .catch((err) => {
-        console.error('Failed to re-register rotated push subscription', err);
-      }),
-  );
-}) as EventListener);
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();

@@ -6,7 +6,7 @@ import store from '@/store/index';
 import { messageAdded, messageConfirmed, messagePatched, reactionsUpdated } from '@/store/messageEvents';
 import { getStoredJwtToken } from '@/utils/jwtToken';
 
-const WS_PATH = (__API_BASE__ ?? import.meta.env.BASE_URL + '_api') + '/ws';
+const WS_PATH = __API_BASE__ + '/ws';
 const PING_INTERVAL_MS = 10_000;
 const MAX_RECONNECT_DELAY_MS = 30_000;
 const RETRY_BASE_DELAY_MS = 1_000;
@@ -55,14 +55,16 @@ function resolveWebSocketUrl(path: string): string {
     return path;
   }
 
-  const baseUrl = new URL(path, location.href);
-  if (baseUrl.protocol === 'http:') {
-    baseUrl.protocol = 'ws:';
-  } else if (baseUrl.protocol === 'https:') {
-    baseUrl.protocol = 'wss:';
+  // Full URL — map http(s) → ws(s) directly
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    const url = new URL(path);
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    return url.toString();
   }
 
-  return baseUrl.toString();
+  // Relative path — derive protocol from the current page
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${location.host}${path}`;
 }
 
 function clearPingInterval(): void {

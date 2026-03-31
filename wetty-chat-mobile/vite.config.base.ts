@@ -16,7 +16,7 @@ export function createBaseConfig(options: BaseConfigOptions = {}) {
 
   return defineConfig({
     define: {
-      __API_BASE__: JSON.stringify(null),
+      __API_BASE__: JSON.stringify('/_api'),
       __AUTH_REDIRECT_URL__: JSON.stringify(null),
       __FEATURE_GATES_ENABLED__: JSON.stringify(false),
     },
