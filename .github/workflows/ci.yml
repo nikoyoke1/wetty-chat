@@ -8,12 +8,8 @@ on:
     paths:
       - "backend/**"
       - "wetty-chat-mobile/**"
-      - ".github/workflows/ci.yml"
+      - ".github/workflows/**"
   pull_request:
-    paths:
-      - "backend/**"
-      - "wetty-chat-mobile/**"
-      - ".github/workflows/ci.yml"
 
 permissions:
   contents: read
@@ -77,3 +73,28 @@ jobs:
         run: npm run typecheck
       - name: npm run lint
         run: npm run lint
+
+  check:
+    name: check
+    needs:
+      - changes
+      - backend
+      - frontend
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate CI results
+        run: |
+          backend_result="${{ needs.backend.result }}"
+          frontend_result="${{ needs.frontend.result }}"
+
+          echo "backend result: ${backend_result}"
+          echo "frontend result: ${frontend_result}"
+
+          if [[ "${backend_result}" != "success" && "${backend_result}" != "skipped" ]]; then
+            exit 1
+          fi
+
+          if [[ "${frontend_result}" != "success" && "${frontend_result}" != "skipped" ]]; then
+            exit 1
+          fi
