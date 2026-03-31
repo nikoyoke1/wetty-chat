@@ -34,6 +34,8 @@ export function EmojiInput({
 }: EmojiInputProps) {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [triggerEvent, setTriggerEvent] = useState<Event | undefined>();
+  const [popoverSide, setPopoverSide] = useState<'top' | 'bottom'>('bottom');
+  const [pickerHeight, setPickerHeight] = useState(350);
 
   const handleEmojiClick = (emojiData: EmojiClickData) => {
     const currentGraphemes = getGraphemes(value);
@@ -66,6 +68,12 @@ export function EmojiInput({
           aria-label={t`Open emoji picker`}
           className={styles.triggerButton}
           onClick={(event) => {
+            const y = event.clientY;
+            const vh = window.innerHeight;
+            const margin = 24;
+            const openUp = y > vh / 2;
+            setPopoverSide(openUp ? 'top' : 'bottom');
+            setPickerHeight(Math.min(350, Math.max(200, (openUp ? y : vh - y) - margin)));
             setTriggerEvent(event.nativeEvent);
             setIsPickerOpen(true);
           }}
@@ -82,7 +90,7 @@ export function EmojiInput({
           setTriggerEvent(undefined);
         }}
         alignment="end"
-        side="bottom"
+        side={popoverSide}
         className={styles.popover}
       >
         <div className={styles.pickerCard}>
@@ -95,6 +103,7 @@ export function EmojiInput({
             previewConfig={{ showPreview: false }}
             skinTonesDisabled
             width="100%"
+            height={pickerHeight}
           />
         </div>
       </IonPopover>

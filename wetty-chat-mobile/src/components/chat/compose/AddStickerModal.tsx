@@ -26,7 +26,7 @@ export function AddStickerModal({ file, onDismiss, onAdd }: AddStickerModalProps
   const fileKey = file ? `${file.name}:${file.size}:${file.lastModified}` : 'empty';
 
   return (
-    <IonModal isOpen={file != null} onDidDismiss={onDismiss} initialBreakpoint={0.6} breakpoints={[0, 0.6]}>
+    <IonModal isOpen={file != null} onDidDismiss={onDismiss} initialBreakpoint={0.8} breakpoints={[0, 0.8]}>
       {file ? <AddStickerModalForm key={fileKey} file={file} onDismiss={onDismiss} onAdd={onAdd} /> : null}
     </IonModal>
   );
