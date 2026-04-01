@@ -390,6 +390,15 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
     return true;
   }, [currentUserId, editingSession, messages, replyingTo, startEditingMessage]);
 
+  // Auto-focus compose input when entering reply or edit mode
+  useEffect(() => {
+    if (replyingTo || editingSession) {
+      requestAnimationFrame(() => {
+        composeBarRef.current?.focusInput();
+      });
+    }
+  }, [replyingTo, editingSession]);
+
   const showToast = useCallback(
     (
       text: string,
@@ -701,6 +710,17 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
       fetchLatestWindow();
     }
   }, [chatId, fetchLatestWindow, dispatch, pendingResumeRequest, storeChatId, threadId]);
+
+  // Auto-focus compose input after initial messages load
+  const didAutoFocusRef = useRef(false);
+  useEffect(() => {
+    if (messages.length > 0 && !didAutoFocusRef.current) {
+      didAutoFocusRef.current = true;
+      requestAnimationFrame(() => {
+        composeBarRef.current?.focusInput();
+      });
+    }
+  }, [messages.length]);
 
   const loadMore = useCallback(() => {
     const st = store.getState();
