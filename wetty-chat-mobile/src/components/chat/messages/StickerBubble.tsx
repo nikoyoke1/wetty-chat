@@ -93,13 +93,26 @@ export function StickerBubble({
         </div>
       )}
       <div className={styles.stickerContainer}>
-        <img
-          src={stickerUrl}
-          alt={t`Sticker`}
-          className={styles.stickerImage}
-          onClick={interactive && onStickerTap ? onStickerTap : undefined}
-          style={interactive && onStickerTap ? { cursor: 'pointer' } : undefined}
-        />
+        {stickerUrl.toLowerCase().endsWith('.webm') ? (
+          <video
+            src={stickerUrl}
+            autoPlay
+            loop
+            muted
+            playsInline
+            className={styles.stickerImage}
+            onClick={interactive && onStickerTap ? onStickerTap : undefined}
+            style={interactive && onStickerTap ? { cursor: 'pointer' } : undefined}
+          />
+        ) : (
+          <img
+            src={stickerUrl}
+            alt={t`Sticker`}
+            className={styles.stickerImage}
+            onClick={interactive && onStickerTap ? onStickerTap : undefined}
+            style={interactive && onStickerTap ? { cursor: 'pointer' } : undefined}
+          />
+        )}
         {timestamp && (
           <span className={styles.stickerTimestamp}>
             {formatTime(timestamp)}
