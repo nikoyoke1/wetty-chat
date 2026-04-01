@@ -388,6 +388,11 @@ async fn patch_member(
     // Check if requester is admin
     check_admin_role(conn, chat_id, requester_uid)?;
 
+    // Prevent self-demotion
+    if requester_uid == target_uid {
+        return Err((StatusCode::BAD_REQUEST, "Cannot change your own role"));
+    }
+
     // Check if target is a member
     use crate::schema::group_membership::dsl as gm_dsl;
     let is_member = group_membership::table

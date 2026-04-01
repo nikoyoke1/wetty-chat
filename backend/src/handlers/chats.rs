@@ -9,7 +9,8 @@ use diesel::prelude::*;
 use serde::Serialize;
 
 use crate::{
-    handlers::members::check_membership,
+    handlers::{groups::load_requester_group_role, members::check_membership},
+    models::GroupRole,
     models::NewMessage,
     services::{
         media::build_public_object_url,
@@ -1943,10 +1944,14 @@ async fn delete_message(
         .map_err(|_| (StatusCode::NOT_FOUND, "Message not found"))?;
 
     if message.sender_uid != uid {
-        return Err((
-            StatusCode::FORBIDDEN,
-            "You can only delete your own messages",
-        ));
+        // Not the sender — allow if requester is an admin
+        let role = load_requester_group_role(conn, chat_id, uid)?;
+        if role != Some(GroupRole::Admin) {
+            return Err((
+                StatusCode::FORBIDDEN,
+                "You can only delete your own messages",
+            ));
+        }
     }
 
     if message.deleted_at.is_some() {

@@ -88,6 +88,7 @@ import type { BackAction } from '@/types/back-action';
 import { requestUploadUrl, uploadFileToS3 } from '@/api/upload';
 import { syncAppBadgeCount } from '@/utils/badges';
 import { useIsDesktop } from '@/hooks/platformHooks';
+import { useChatRole } from '@/components/chat/permissions/useChatRole';
 import { ChatMessageRow } from '@/components/chat/messages/ChatMessageRow';
 import type { ChatThreadRouteState, ChatThreadResumeRequest } from '@/types/chatThreadNavigation';
 import { READ_REQUEST_COOLDOWN_MS } from '@/constants/chatTiming';
@@ -178,6 +179,8 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
   const currentUserAvatarUrl = useSelector((state: RootState) => state.user.avatarUrl);
   const wsConnected = useSelector((state: RootState) => state.connection.wsConnected);
   const isDesktop = useIsDesktop();
+  const { role: myRole } = useChatRole(chatId);
+  const isAdmin = myRole === 'admin';
   const storedName = useSelector((state: RootState) => selectChatName(state, chatId));
   const isMuted = useSelector((state: RootState) => selectIsChatMuted(state, chatId));
   const lastReadMessageId = useSelector((state: RootState) => selectChatLastReadMessageId(state, chatId));
@@ -1357,7 +1360,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         handler: () => startEditingMessage(msg),
       });
     }
-    if (isOwn) {
+    if (isOwn || isAdmin) {
       actions.push({
         key: 'delete',
         label: t`Delete`,
@@ -1366,7 +1369,9 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         handler: () => {
           presentAlert({
             header: t`Delete Message`,
-            message: t`Are you sure you want to delete this message?`,
+            message: isOwn
+              ? t`Are you sure you want to delete this message?`
+              : t`Are you sure you want to delete this message from ${msg.sender.name ?? 'this user'}?`,
             buttons: [
               { text: t`Cancel`, role: 'cancel' as const },
               {
@@ -1403,6 +1408,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
   }, [
     overlayMessage,
     currentUserId,
+    isAdmin,
     threadId,
     chatId,
     history,
