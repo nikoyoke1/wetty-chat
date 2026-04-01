@@ -229,7 +229,7 @@ export function ChatList({ activeChatId, isThreadsActive, onChatSelect, onThread
                   </span>
                 </h2>
                 <p className={styles.chatsListPreview}>
-                  {unreadThreadCount > 0 ? <Trans>Thread conversations</Trans> : <Trans>No new replies</Trans>}
+                  {unreadThreadCount > 0 ? <Trans>Click to view new replies</Trans> : <Trans>No new replies</Trans>}
                 </p>
               </IonLabel>
               <div slot="end" className={styles.chatsListEndSlot}>

@@ -192,6 +192,10 @@ msgstr "选择一张新图片以替换当前头像。"
 msgid "Choose the member group first"
 msgstr "请先选择成员群组"
 
+#: src/components/chat/ChatList.tsx
+msgid "Click to view new replies"
+msgstr "点击查看新回复"
+
 #: src/components/chat/settings/ShareInviteModal.tsx
 #: src/pages/chat-thread/manage-invites.tsx
 msgid "Clipboard is not available on this device"
@@ -738,6 +742,10 @@ msgstr "成员已移除"
 msgid "Membership"
 msgstr "成员资格"
 
+#: src/components/chat/compose/MentionAutocomplete.tsx
+msgid "Mention suggestions"
+msgstr "提及建议"
+
 #: src/components/chat/compose/ComposeInput.tsx
 msgid "Message"
 msgstr "消息"
@@ -830,6 +838,10 @@ msgstr "未找到成员。"
 #: src/components/chat/ChatVirtualScroll.tsx
 msgid "No messages yet"
 msgstr "暂无消息"
+
+#: src/components/chat/ChatList.tsx
+msgid "No new replies"
+msgstr "没有新回复"
 
 #: src/components/settings/CheckForUpdateItem.tsx
 msgid "No service worker registered"
@@ -1044,8 +1056,8 @@ msgid "Remove this sticker from the pack?"
 msgstr "要从表情包中移除此表情吗？"
 
 #: src/components/chat/ThreadListRow.tsx
-msgid "replied to:"
-msgstr "回复了："
+#~ msgid "replied to:"
+#~ msgstr "回复了："
 
 #: src/components/chat/messages/ChatBubbleBase.tsx
 #: src/components/chat/messages/StickerBubble.tsx
@@ -1108,6 +1120,10 @@ msgstr "搜索群组"
 #: src/pages/chat-thread/chat-members.tsx
 msgid "Search members"
 msgstr "搜索成员"
+
+#: src/components/chat/compose/MentionAutocomplete.tsx
+msgid "Searching..."
+msgstr "搜索中..."
 
 #: src/components/chat/settings/ShareInviteModal.tsx
 #: src/components/chat/settings/ShareInviteModal.tsx
@@ -1243,13 +1259,17 @@ msgstr "这是你的消息在聊天中的显示效果。"
 msgid "Thread"
 msgstr "话题"
 
+#: src/components/chat/ChatList.tsx
+#~ msgid "Thread conversations"
+#~ msgstr "话题对话"
+
 #. placeholder {0}: thread.chatName
 #: src/components/chat/ThreadListRow.tsx
 msgid "Thread in {0}"
 msgstr "{0} 中的话题"
 
+#: src/components/chat/ChatList.tsx
 #: src/layouts/DesktopSplitLayout.tsx
-#: src/layouts/MobileLayout.tsx
 #: src/pages/threads.tsx
 msgid "Threads"
 msgstr "话题"
