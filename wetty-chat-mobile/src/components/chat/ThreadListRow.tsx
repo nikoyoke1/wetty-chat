@@ -2,7 +2,7 @@ import { IonBadge, IonIcon, IonItem } from '@ionic/react';
 import { chatbubblesOutline } from 'ionicons/icons';
 import { Trans } from '@lingui/react/macro';
 import type { ThreadListItem, ThreadParticipant, ThreadReplyPreview } from '@/api/threads';
-import { UserAvatar } from '@/components/UserAvatar';
+import { OverlayAvatar } from '@/components/OverlayAvatar';
 import { formatMessagePreview, getNotificationPreviewLabels } from '@/utils/messagePreview';
 import styles from './ThreadListRow.module.scss';
 
@@ -93,18 +93,20 @@ export function ThreadListRow({ thread, locale, isActive, onSelect }: ThreadList
 
         {/* Rows 2-4: avatar + content */}
         <div className={styles.bodyRow}>
-          <UserAvatar name={thread.chatName} avatarUrl={thread.chatAvatar} size={40} />
+          <OverlayAvatar
+            primaryName={thread.chatName}
+            primaryAvatarUrl={thread.chatAvatar}
+            secondaryName={lastReply?.sender.name ?? null}
+            secondaryAvatarUrl={lastReply?.sender.avatarUrl}
+            size={40}
+          />
           <div className={styles.bodyContent}>
-            {/* Row 2: participants */}
-            <div className={styles.participants}>{formatParticipants(thread.participants)}</div>
-            {/* Row 3: replied to */}
-            <div className={styles.repliedTo}>
-              <span className={styles.repliedToLabel}>
-                <Trans>replied to:</Trans>
-              </span>{' '}
-              {rootPreview || rootMsg.sender.name}
-            </div>
-            {/* Row 4: latest reply */}
+            {/* This is commented out, so we can re-enable it later */}
+            {void formatParticipants}
+            {/* <div className={styles.participants}>{formatParticipants(thread.participants)}</div> */}
+            {/* Row 2: replied to */}
+            <div className={styles.repliedTo}>{rootPreview || rootMsg.sender.name}</div>
+            {/* Row 3: latest reply */}
             {lastReply && lastReplyPreview && (
               <div className={styles.latestReply}>
                 <span className={styles.latestReplySender}>{lastReply.sender.name ?? 'User'}:</span> {lastReplyPreview}
