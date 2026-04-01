@@ -24,6 +24,7 @@ import { initializeClientId } from '@/utils/clientId';
 import { syncJwtTokenToIdb } from '@/utils/jwtToken';
 import { kvGet } from '@/utils/db';
 import { defaultChatFontSize, isChatFontSizeOption, type SettingsState } from '@/store/settingsSlice';
+import { installBootstrapRecoveryHandlers } from '@/bootstrapRecovery';
 import App from './App';
 import { setupIonicReact } from '@ionic/react';
 
@@ -33,6 +34,7 @@ setupIonicReact({
 });
 
 console.log(`Running in ${import.meta.env.MODE} mode, dev=${import.meta.env.DEV}`);
+installBootstrapRecoveryHandlers();
 
 async function bootstrap() {
   // Load persisted state from IndexedDB

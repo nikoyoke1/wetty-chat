@@ -196,6 +196,10 @@ self.addEventListener('message', (event) => {
   }
 });
 
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 const manifest = self.__WB_MANIFEST;
 precacheAndRoute(manifest);
 

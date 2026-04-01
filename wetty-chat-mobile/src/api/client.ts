@@ -12,6 +12,7 @@ import { getStoredJwtToken } from '@/utils/jwtToken';
 const apiClient = axios.create({ baseURL: __API_BASE__ });
 
 apiClient.interceptors.request.use((config) => {
+  config.headers['X-App-Version'] = __APP_VERSION__;
   const jwtToken = getStoredJwtToken();
   if (jwtToken) {
     config.headers.Authorization = `Bearer ${jwtToken}`;
