@@ -3,7 +3,8 @@ import { syncApp } from '@/api/sync';
 import type { MessageResponse, ReactionSummary } from '@/api/messages';
 import { setActiveConnections, setWsConnected } from '@/store/connectionSlice';
 import { selectEffectiveLocale } from '@/store/settingsSlice';
-import { updateThreadFromWs, type ThreadUpdatePayload } from '@/store/threadsSlice';
+import { updateThreadFromWs, setThreadsList, type ThreadUpdatePayload } from '@/store/threadsSlice';
+import { getThreads } from '@/api/threads';
 import store from '@/store/index';
 import { messageAdded, messageConfirmed, messagePatched, reactionsUpdated } from '@/store/messageEvents';
 import { getStoredJwtToken } from '@/utils/jwtToken';
@@ -360,7 +361,16 @@ async function connectWebSocket(): Promise<void> {
         if (message.type === 'threadUpdate' && message.payload != null) {
           const payload = message.payload as ThreadUpdatePayload;
           if (payload.threadRootId && payload.chatId) {
+            const threadsState = store.getState().threads;
+            const alreadyKnown = threadsState.items.some((t) => t.threadRootMessage.id === payload.threadRootId);
             store.dispatch(updateThreadFromWs(payload));
+            if (!alreadyKnown && threadsState.isLoaded) {
+              getThreads({ limit: 20 })
+                .then((res) => {
+                  store.dispatch(setThreadsList({ threads: res.data.threads, nextCursor: res.data.nextCursor }));
+                })
+                .catch((err) => console.error('Failed to refresh threads after new subscription', err));
+            }
           }
         }
       } catch {

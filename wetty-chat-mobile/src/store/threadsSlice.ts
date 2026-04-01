@@ -1,7 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from './index';
-import type { ThreadListItem } from '@/api/threads';
+import type { ThreadListItem, ThreadReplyPreview } from '@/api/threads';
 
 export interface ThreadUpdatePayload {
   threadRootId: string;
@@ -49,13 +49,22 @@ const threadsSlice = createSlice({
         const thread = state.items[idx];
         thread.replyCount = replyCount;
         thread.lastReplyAt = lastReplyAt;
-        thread.unreadCount = (thread.unreadCount ?? 0) + 1;
         // Move to top of list
         state.items.splice(idx, 1);
         state.items.unshift(thread);
-      } else if (state.isLoaded) {
-        // Thread not in list yet — will be fetched on next load
-        // But we can still increment the badge
+      }
+      state.totalUnreadCount = state.items.filter((t) => t.unreadCount > 0).length;
+    },
+    updateThreadLastReply(state, action: PayloadAction<{ threadRootId: string; lastReply: ThreadReplyPreview }>) {
+      const thread = state.items.find((t) => t.threadRootMessage.id === action.payload.threadRootId);
+      if (thread) {
+        thread.lastReply = action.payload.lastReply;
+      }
+    },
+    incrementThreadUnread(state, action: PayloadAction<{ threadRootId: string }>) {
+      const thread = state.items.find((t) => t.threadRootMessage.id === action.payload.threadRootId);
+      if (thread) {
+        thread.unreadCount = (thread.unreadCount ?? 0) + 1;
       }
       state.totalUnreadCount = state.items.filter((t) => t.unreadCount > 0).length;
     },
@@ -83,6 +92,8 @@ export const {
   appendThreads,
   setTotalUnreadCount,
   updateThreadFromWs,
+  updateThreadLastReply,
+  incrementThreadUnread,
   markThreadRead,
   removeThread,
   clearThreads,

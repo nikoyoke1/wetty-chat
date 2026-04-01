@@ -2,7 +2,7 @@ import { configureStore, createListenerMiddleware } from '@reduxjs/toolkit';
 import connectionReducer from './connectionSlice';
 import messagesReducer from './messagesSlice';
 import settingsReducer, { type SettingsState } from './settingsSlice';
-import threadsReducer from './threadsSlice';
+import threadsReducer, { incrementThreadUnread, updateThreadLastReply } from './threadsSlice';
 import chatsReducer, {
   projectChatMessageAdded,
   projectChatMessageConfirmed,
@@ -29,6 +29,36 @@ listenerMiddleware.startListening({
           action.payload.message.sender.uid !== (state.user.uid ?? 0),
       }),
     );
+
+    if (
+      action.payload.scope === 'thread' &&
+      action.payload.origin === 'ws' &&
+      action.payload.message.replyRootId != null
+    ) {
+      const { message } = action.payload;
+      const threadRootId = message.replyRootId!;
+      const isSubscribed = state.threads.items.some((t) => t.threadRootMessage.id === threadRootId);
+      if (isSubscribed) {
+        if (!message.isDeleted) {
+          api.dispatch(
+            updateThreadLastReply({
+              threadRootId,
+              lastReply: {
+                sender: { uid: message.sender.uid, name: message.sender.name, avatarUrl: message.sender.avatarUrl },
+                message: message.message,
+                messageType: message.messageType,
+                stickerEmoji: message.sticker?.emoji ?? null,
+                firstAttachmentKind: message.attachments?.[0]?.kind ?? null,
+                isDeleted: false,
+              },
+            }),
+          );
+        }
+        if (!message.isDeleted && message.sender.uid !== (state.user.uid ?? 0)) {
+          api.dispatch(incrementThreadUnread({ threadRootId }));
+        }
+      }
+    }
   },
 });
 
@@ -96,7 +126,8 @@ export function setStoreInstance(s: AppStore) {
   storeInstance = s;
 }
 
-/** @deprecated Prefer useSelector/useDispatch in React components. Use for imperative code only. */
+/** Prefer useSelector/useDispatch in React components.
+ *  Use for imperative code only. */
 const store = new Proxy({} as AppStore, {
   get(_target, prop: keyof AppStore) {
     if (!storeInstance) throw new Error('Store not initialized yet');
