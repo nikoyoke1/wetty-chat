@@ -285,3 +285,26 @@
     box-shadow: 0 0 0 9px rgba(217, 52, 43, 0);
   }
 }
+
+.dragOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--ion-color-primary-rgb, 56, 128, 255), 0.08);
+  border: 2px dashed var(--ion-color-primary, #3880ff);
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+.dragOverlayLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ion-color-primary, #3880ff);
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: var(--ion-background-color, #fff);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}

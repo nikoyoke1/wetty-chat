@@ -81,6 +81,8 @@ const MessageComposeBarInner = forwardRef<MessageComposeBarHandle, MessageCompos
     const [text, setText] = useState(() => editing?.text ?? '');
     const [stickerPickerOpen, setStickerPickerOpen] = useState(false);
     const stickerOverlayActiveRef = useRef(false);
+    const [isDragOver, setIsDragOver] = useState(false);
+    const dragCounterRef = useRef(0);
 
     const {
       mentionState,
@@ -129,7 +131,11 @@ const MessageComposeBarInner = forwardRef<MessageComposeBarHandle, MessageCompos
       removeDraft,
       retryDraft,
       removeExistingAttachment,
-    } = useComposeAttachments({ uploadAttachment, initialExistingAttachments: editing?.attachments ?? [] });
+    } = useComposeAttachments({
+      uploadAttachment,
+      initialExistingAttachments: editing?.attachments ?? [],
+      containerRef,
+    });
 
     useLayoutEffect(() => {
       resizeTextarea();
@@ -211,6 +217,45 @@ const MessageComposeBarInner = forwardRef<MessageComposeBarHandle, MessageCompos
       canStartVoice || voiceRecorder?.phase === 'requesting' || voiceRecorder?.phase === 'recording';
     const showVoiceSendButton = voiceRecorder?.phase === 'recorded' || voiceRecorder?.phase === 'uploading';
 
+    const handleDragEnter = useCallback((e: React.DragEvent) => {
+      e.preventDefault();
+      dragCounterRef.current += 1;
+      if (dragCounterRef.current === 1 && e.dataTransfer.types.includes('Files')) {
+        setIsDragOver(true);
+      }
+    }, []);
+
+    const handleDragOver = useCallback((e: React.DragEvent) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    }, []);
+
+    const handleDragLeave = useCallback((e: React.DragEvent) => {
+      e.preventDefault();
+      dragCounterRef.current -= 1;
+      if (dragCounterRef.current === 0) {
+        setIsDragOver(false);
+      }
+    }, []);
+
+    const handleDrop = useCallback(
+      (e: React.DragEvent) => {
+        e.preventDefault();
+        dragCounterRef.current = 0;
+        setIsDragOver(false);
+
+        if (containerRef.current && containerRef.current.offsetParent === null) return;
+
+        const files = Array.from(e.dataTransfer.files).filter(
+          (file) => file.type.startsWith('image/') || file.type.startsWith('video/'),
+        );
+        if (files.length > 0) {
+          queueFiles(files);
+        }
+      },
+      [queueFiles],
+    );
+
     useEffect(() => {
       if (!stickerPickerOpen) return;
 
@@ -253,7 +298,19 @@ const MessageComposeBarInner = forwardRef<MessageComposeBarHandle, MessageCompos
     };
 
     return (
-      <div ref={containerRef} style={{ position: 'relative' }}>
+      <div
+        ref={containerRef}
+        style={{ position: 'relative' }}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {isDragOver && (
+          <div className={styles.dragOverlay}>
+            <span className={styles.dragOverlayLabel}>{t`Drop images or videos`}</span>
+          </div>
+        )}
         {mentionState.isOpen && (
           <MentionAutocomplete
             results={mentionState.results}

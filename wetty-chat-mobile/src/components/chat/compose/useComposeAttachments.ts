@@ -1,3 +1,4 @@
+import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { t } from '@lingui/core/macro';
 import type { Attachment } from '@/api/messages';
@@ -52,11 +53,13 @@ const getMediaDimensions = (file: File): Promise<{ width?: number; height?: numb
 interface UseComposeAttachmentsArgs {
   uploadAttachment: (input: ComposeUploadInput) => Promise<ComposeUploadResult>;
   initialExistingAttachments?: Attachment[];
+  containerRef?: React.RefObject<HTMLElement | null>;
 }
 
 export function useComposeAttachments({
   uploadAttachment,
   initialExistingAttachments = [],
+  containerRef,
 }: UseComposeAttachmentsArgs) {
   const [drafts, setDrafts] = useState<DraftUploadRecord[]>([]);
   const [existingAttachments, setExistingAttachments] = useState<Attachment[]>(initialExistingAttachments);
@@ -220,6 +223,8 @@ export function useComposeAttachments({
 
   useEffect(() => {
     const handleGlobalPaste = (event: ClipboardEvent) => {
+      if (containerRef?.current && containerRef.current.offsetParent === null) return;
+
       const items = event.clipboardData?.items;
       if (!items) return;
 
@@ -241,7 +246,7 @@ export function useComposeAttachments({
 
     document.addEventListener('paste', handleGlobalPaste);
     return () => document.removeEventListener('paste', handleGlobalPaste);
-  }, [queueFiles]);
+  }, [containerRef, queueFiles]);
 
   const removeDraft = useCallback(
     (localId: string) => {
