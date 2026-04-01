@@ -1654,8 +1654,8 @@ async fn post_thread_message(
 #[cfg(test)]
 mod tests {
     use super::{
-        first_attachment_kind, sticker_preview_text, validate_client_message_type, ReplyToMessage,
-        INVITE_MESSAGE_TYPE_FORBIDDEN, SYSTEM_MESSAGE_TYPE_FORBIDDEN,
+        first_attachment_kind, sticker_preview_text, validate_client_message_type, validate_emoji,
+        ReplyToMessage, INVITE_MESSAGE_TYPE_FORBIDDEN, SYSTEM_MESSAGE_TYPE_FORBIDDEN,
     };
     use crate::models::{Attachment, MessageType, Sender};
     use axum::http::StatusCode;
@@ -1695,6 +1695,23 @@ mod tests {
     fn sticker_preview_text_includes_emoji_when_available() {
         assert_eq!(sticker_preview_text(Some("🙂")), "[Sticker] 🙂");
         assert_eq!(sticker_preview_text(None), "[Sticker]");
+    }
+
+    #[test]
+    fn reaction_emoji_must_be_exactly_one_grapheme() {
+        for emoji in ["🙂", "👍🏽", "👨‍👩‍👧‍👦", "❤️"] {
+            assert_eq!(
+                validate_emoji(emoji).expect("single grapheme emoji should pass"),
+                emoji
+            );
+        }
+
+        for emoji in ["🙂👍", "👍🏽🙂", "❤️🔥", "👨‍👩‍👧‍👦🙂"] {
+            assert_eq!(
+                validate_emoji(emoji).expect_err("multiple grapheme emoji should fail"),
+                (StatusCode::BAD_REQUEST, "Invalid emoji")
+            );
+        }
     }
 
     #[test]
@@ -2213,6 +2230,10 @@ fn validate_emoji(input: &str) -> Result<String, (StatusCode, &'static str)> {
     }
 
     let graphemes: Vec<&str> = input.graphemes(true).collect();
+
+    if graphemes.len() != 1 {
+        return Err((StatusCode::BAD_REQUEST, "Invalid emoji"));
+    }
 
     if !graphemes.iter().all(|g| emojis::get(g).is_some()) {
         return Err((StatusCode::BAD_REQUEST, "Invalid emoji"));
