@@ -1,6 +1,5 @@
 import { IonContent, IonPage, useIonToast } from '@ionic/react';
 import { useEffect, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
 import { t } from '@lingui/core/macro';
 import { getMessage } from '@/api/messages';
 import { decodePermalink } from '@/utils/permalinkUrl';
@@ -8,21 +7,25 @@ import { navigateToNotificationTarget } from '@/utils/notificationTargetNavigato
 
 interface PermalinkPageProps {
   isDesktop: boolean;
+  encoded: string;
 }
 
-export default function PermalinkPage({ isDesktop }: PermalinkPageProps) {
-  const { encoded } = useParams<{ encoded: string }>();
+export default function PermalinkPage({ isDesktop, encoded }: PermalinkPageProps) {
   const [presentToast] = useIonToast();
 
   const decoded = useMemo(() => {
     try {
+      console.debug('[PermalinkPage] attempting decode', { encoded });
       return decodePermalink(encoded);
-    } catch {
+    } catch (error) {
+      console.debug('[PermalinkPage] decode failed', { encoded, error });
       return null;
     }
   }, [encoded]);
 
   useEffect(() => {
+    console.debug('[PermalinkPage] resolved decoded payload', { encoded, decoded });
+
     if (!decoded) {
       presentToast({ message: t`Invalid link`, duration: 2000, color: 'danger' });
       navigateToNotificationTarget('/chats', isDesktop);
@@ -33,6 +36,12 @@ export default function PermalinkPage({ isDesktop }: PermalinkPageProps) {
 
     getMessage(chatId, messageId)
       .then((res) => {
+        console.debug('[PermalinkPage] fetched message target', {
+          encoded,
+          chatId,
+          messageId,
+          replyRootId: res.data.replyRootId,
+        });
         const msg = res.data;
         const threadRootId = msg.replyRootId;
         const target = threadRootId
@@ -47,6 +56,13 @@ export default function PermalinkPage({ isDesktop }: PermalinkPageProps) {
         navigateToNotificationTarget(target, isDesktop, state);
       })
       .catch((err) => {
+        console.debug('[PermalinkPage] failed to fetch permalink target', {
+          encoded,
+          chatId,
+          messageId,
+          status: err?.response?.status,
+          err,
+        });
         // 401 is handled by the axios interceptor (auth redirect)
         if (err?.response?.status !== 401) {
           presentToast({
@@ -57,7 +73,7 @@ export default function PermalinkPage({ isDesktop }: PermalinkPageProps) {
           navigateToNotificationTarget('/chats', isDesktop);
         }
       });
-  }, [decoded, isDesktop, presentToast]);
+  }, [decoded, encoded, isDesktop, presentToast]);
 
   return (
     <IonPage>

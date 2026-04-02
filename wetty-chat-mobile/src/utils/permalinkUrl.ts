@@ -21,11 +21,19 @@ export function encodePermalink(chatId: string, messageId: string): string {
 }
 
 export function decodePermalink(encoded: string): { chatId: string; messageId: string } {
+  if (!encoded) {
+    throw new Error('Missing permalink segment');
+  }
+
   // Restore standard base64
   let b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
   while (b64.length % 4 !== 0) b64 += '=';
 
   const binary = atob(b64);
+  if (binary.length !== 16) {
+    throw new Error(`Invalid permalink payload length: ${binary.length}`);
+  }
+
   const buf = new ArrayBuffer(16);
   const bytes = new Uint8Array(buf);
   for (let i = 0; i < binary.length; i++) {

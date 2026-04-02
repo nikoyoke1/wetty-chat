@@ -45,7 +45,7 @@ function AppRouter({ isDesktop }: { isDesktop: boolean }) {
   } else if (isPushOpenRoute?.isExact) {
     return <PushOpenPage isDesktop={isDesktop} />;
   } else if (isPermalinkRoute) {
-    return <PermalinkPage isDesktop={isDesktop} />;
+    return <PermalinkPage isDesktop={isDesktop} encoded={isPermalinkRoute.params.encoded} />;
   } else if (!hasCompletedOobe()) {
     return <Redirect to="/oobe" />;
   }
