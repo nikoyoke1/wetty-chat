@@ -1391,15 +1391,28 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         label: existingPin ? t`Unpin` : t`Pin`,
         icon: existingPin ? pinIcon : pinOutline,
         handler: () => {
-          if (existingPin) {
-            deletePin(chatId, existingPin.id).catch((e: any) => {
-              showToast(e.message || t`Failed to unpin message`);
-            });
-          } else {
-            createPin(chatId, msg.id).catch((e: any) => {
-              showToast(e.message || t`Failed to pin message`);
-            });
-          }
+          presentAlert({
+            header: existingPin ? t`Unpin Message` : t`Pin Message`,
+            message: existingPin ? t`Are you sure you want to unpin this message?` : t`Are you sure you want to pin this message?`,
+            buttons: [
+              { text: t`Cancel`, role: 'cancel' },
+              {
+                text: existingPin ? t`Unpin` : t`Pin`,
+                role: existingPin ? 'destructive' : undefined,
+                handler: () => {
+                  if (existingPin) {
+                    deletePin(chatId, existingPin.id).catch((e: any) => {
+                      showToast(e.message || t`Failed to unpin message`);
+                    });
+                  } else {
+                    createPin(chatId, msg.id).catch((e: any) => {
+                      showToast(e.message || t`Failed to pin message`);
+                    });
+                  }
+                },
+              },
+            ],
+          });
         },
       });
     }

@@ -25,16 +25,17 @@ export function PinBanner({ chatId, onClickPin, onClickThread, onClickCounter }:
 
   const handleUnpin = useCallback(
     (e: React.MouseEvent) => {
+      e.preventDefault();
       e.stopPropagation();
       if (!latestPin) return;
       presentAlert({
         header: t`Unpin Message`,
         message: t`Are you sure you want to unpin this message?`,
         buttons: [
-          { text: t`Cancel`, role: 'cancel' as const },
+          { text: t`Cancel`, role: 'cancel' },
           {
             text: t`Unpin`,
-            role: 'destructive' as const,
+            role: 'destructive',
             handler: () => {
               deletePin(chatId, latestPin.id).catch(() => {});
             },

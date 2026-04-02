@@ -1,4 +1,4 @@
-import { IonButton, IonContent, IonIcon, IonItem, IonList, IonModal } from '@ionic/react';
+import { IonButton, IonContent, IonIcon, IonItem, IonList, IonModal, useIonAlert } from '@ionic/react';
 import { chatbubbles } from 'ionicons/icons';
 import { useCallback } from 'react';
 import { useSelector } from 'react-redux';
@@ -20,6 +20,7 @@ interface PinListModalProps {
 }
 
 export function PinListModal({ chatId, isOpen, onDismiss, onSelectPin, onSelectThread }: PinListModalProps) {
+  const [presentAlert] = useIonAlert();
   const pins = useSelector((state: RootState) => selectPinsForChat(state, chatId));
   const locale = useSelector(selectEffectiveLocale);
 
@@ -33,10 +34,24 @@ export function PinListModal({ chatId, isOpen, onDismiss, onSelectPin, onSelectT
 
   const handleUnpin = useCallback(
     (e: React.MouseEvent, pin: PinResponse) => {
+      e.preventDefault();
       e.stopPropagation();
-      deletePin(chatId, pin.id).catch(() => {});
+      presentAlert({
+        header: t`Unpin Message`,
+        message: t`Are you sure you want to unpin this message?`,
+        buttons: [
+          { text: t`Cancel`, role: 'cancel' },
+          {
+            text: t`Unpin`,
+            role: 'destructive',
+            handler: () => {
+              deletePin(chatId, pin.id).catch(() => {});
+            },
+          },
+        ],
+      });
     },
-    [chatId],
+    [chatId, presentAlert],
   );
 
   const handleThreadClick = useCallback(

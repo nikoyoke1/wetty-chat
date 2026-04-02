@@ -104,7 +104,13 @@ msgstr "確定要收回這則訊息嗎？"
 msgid "Are you sure you want to leave this group?"
 msgstr "確定要退出這個群組嗎？"
 
+#: src/pages/chat-thread/chat-thread.tsx
+msgid "Are you sure you want to pin this message?"
+msgstr "確定要釘選這則訊息嗎？"
+
 #: src/components/chat/PinBanner.tsx
+#: src/components/chat/PinListModal.tsx
+#: src/pages/chat-thread/chat-thread.tsx
 msgid "Are you sure you want to unpin this message?"
 msgstr "確定要取消釘選這則訊息嗎？"
 
@@ -152,6 +158,7 @@ msgstr "已封鎖"
 #: src/components/chat/compose/AddStickerModal.tsx
 #: src/components/chat/compose/StickerPicker.tsx
 #: src/components/chat/PinBanner.tsx
+#: src/components/chat/PinListModal.tsx
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 #: src/components/chat/settings/ShareInviteModal.tsx
 #: src/pages/chat-thread/chat-members.tsx
@@ -159,6 +166,7 @@ msgstr "已封鎖"
 #: src/pages/chat-thread/chat-members.tsx
 #: src/pages/chat-thread/chat-members.tsx
 #: src/pages/chat-thread/chat-settings.tsx
+#: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/manage-invites.tsx
 #: src/pages/settings/sticker-pack-detail.tsx
@@ -985,8 +993,13 @@ msgid "Permission"
 msgstr "權限"
 
 #: src/pages/chat-thread/chat-thread.tsx
+#: src/pages/chat-thread/chat-thread.tsx
 msgid "Pin"
 msgstr "釘選"
+
+#: src/pages/chat-thread/chat-thread.tsx
+msgid "Pin Message"
+msgstr "釘選訊息"
 
 #: src/components/chat/PinBanner.tsx
 msgid "Pinned message"
@@ -1364,11 +1377,15 @@ msgstr "開啟推播通知"
 #: src/components/chat/PinBanner.tsx
 #: src/components/chat/PinBanner.tsx
 #: src/components/chat/PinListModal.tsx
+#: src/components/chat/PinListModal.tsx
+#: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 msgid "Unpin"
 msgstr "取消釘選"
 
 #: src/components/chat/PinBanner.tsx
+#: src/components/chat/PinListModal.tsx
+#: src/pages/chat-thread/chat-thread.tsx
 msgid "Unpin Message"
 msgstr "取消釘選訊息"
 
