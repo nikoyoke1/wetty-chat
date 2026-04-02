@@ -50,6 +50,8 @@ diesel-derive-enum = { version = "2.1.0", features = ["postgres"] }
 jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
 emojis = "0.8"
 unicode-segmentation = "1.13.2"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
+matroska = "0.30"
 
 [profile.dev]
 overflow-checks = false

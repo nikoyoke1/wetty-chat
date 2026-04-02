@@ -24,6 +24,7 @@ use crate::{
         user_sticker_pack_subscriptions,
     },
     services::{
+        image_processing::process_sticker,
         media::{build_public_object_url, build_storage_key, upload_public_object},
         user::lookup_user_profiles,
     },
@@ -31,7 +32,7 @@ use crate::{
     AppState,
 };
 
-const MAX_STICKER_UPLOAD_BYTES: usize = 1024 * 1024;
+const MAX_STICKER_UPLOAD_BYTES: usize = 10 * 1024 * 1024;
 const STICKER_STORAGE_PREFIX: &str = "stickers";
 const MAX_STICKER_EMOJI_GRAPHEMES: usize = 4;
 
@@ -653,8 +654,8 @@ async fn post_pack_sticker(
         (!trimmed.is_empty()).then_some(trimmed)
     });
 
-    // TODO: Convert or normalize uploads to webp/webm if we later need stronger
-    // client compatibility and file-size guarantees.
+    let processed = process_sticker(&content_type, &file_bytes);
+
     let media_id = ids::next_id(state.id_gen.as_ref()).await.map_err(|e| {
         tracing::error!("next_id for sticker media: {:?}", e);
         AppError::Internal("Failed to generate ID")
@@ -670,8 +671,8 @@ async fn post_pack_sticker(
         &state.s3_client,
         &state.s3_bucket_name,
         &storage_key,
-        &content_type,
-        ByteStream::from(file_bytes.clone()),
+        &processed.content_type,
+        ByteStream::from(processed.data.clone()),
     )
     .await?;
 
@@ -681,14 +682,14 @@ async fn post_pack_sticker(
         diesel::insert_into(media::table)
             .values(&NewMedia {
                 id: media_id,
-                content_type: content_type.clone(),
+                content_type: processed.content_type.clone(),
                 storage_key: storage_key.clone(),
-                size: file_bytes.len() as i64,
+                size: processed.data.len() as i64,
                 created_at: now,
                 deleted_at: None,
                 file_name: file_name.clone(),
-                width: None,
-                height: None,
+                width: processed.width,
+                height: processed.height,
                 purpose: MediaPurpose::Sticker,
                 reference: None,
             })

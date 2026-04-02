@@ -49,7 +49,7 @@ impl MakeRequestId for RequestIdMaker {
 pub(crate) const MAX_CHATS_LIMIT: i64 = 100;
 pub(crate) const MAX_MESSAGES_LIMIT: i64 = 100;
 pub(crate) const MAX_MEMBERS_LIMIT: i64 = 100;
-const MAX_REQUEST_BODY_BYTES: usize = 2 * 1024 * 1024;
+const MAX_REQUEST_BODY_BYTES: usize = 50 * 1024 * 1024;
 
 #[derive(Clone, Deserialize, Default)]
 pub(crate) enum AuthMethod {
