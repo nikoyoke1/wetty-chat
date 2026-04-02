@@ -344,9 +344,16 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
 
     const target = visualViewport ?? window;
     target.addEventListener('resize', updateViewportMetrics);
+    // Also listen for scroll events on visualViewport (iOS fires these when keyboard pushes viewport)
+    if (visualViewport) {
+      visualViewport.addEventListener('scroll', updateViewportMetrics);
+    }
 
     return () => {
       target.removeEventListener('resize', updateViewportMetrics);
+      if (visualViewport) {
+        visualViewport.removeEventListener('scroll', updateViewportMetrics);
+      }
     };
   }, [composeFocused, isDesktop]);
 
@@ -1475,7 +1482,17 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
 
   return (
     <ChatContext.Provider value={chatCtx}>
-      <div className="ion-page chat-thread-page">
+      <div
+        className="ion-page chat-thread-page"
+        style={
+          isKeyboardOpen
+            ? {
+                height: `${viewportHeight}px`,
+                top: `${window.visualViewport?.offsetTop ?? 0}px`,
+              }
+            : undefined
+        }
+      >
         <IonHeader>
           <IonToolbar>
             <IonButtons slot="start">{backAction && <BackButton action={backAction} />}</IonButtons>
@@ -1556,7 +1573,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
           </IonFab>
         </IonContent>
 
-        <IonFooter className="chat-thread-footer">
+        <IonFooter className={`chat-thread-footer${isKeyboardOpen ? ' keyboard-open' : ''}`}>
           <MessageComposeBar
             ref={composeBarRef}
             chatId={chatId}

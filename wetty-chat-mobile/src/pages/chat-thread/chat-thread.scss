@@ -266,6 +266,10 @@
 
 .chat-thread-footer {
   padding-bottom: env(safe-area-inset-bottom);
+
+  &.keyboard-open {
+    padding-bottom: 0;
+  }
 }
 
 .reply-preview-close {
