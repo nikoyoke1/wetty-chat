@@ -70,6 +70,7 @@
   font-size: 14px;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .mouseSelectable {
@@ -106,6 +107,7 @@
   width: 100%;
   border-radius: 8px;
   object-fit: contain;
+  -webkit-touch-callout: none;
 }
 
 .stickerTimestamp {
@@ -163,6 +165,7 @@
   height: 100%;
   max-width: 100%;
   object-fit: contain;
+  -webkit-touch-callout: none;
 }
 
 .filePlaceholder {
