@@ -92,7 +92,7 @@ import { requestUploadUrl, uploadFileToS3 } from '@/api/upload';
 import { syncAppBadgeCount } from '@/utils/badges';
 import { buildPermalinkUrl } from '@/utils/permalinkUrl';
 import { ChatContext } from '@/components/chat/messages/ChatContext';
-import { useIsDesktop } from '@/hooks/platformHooks';
+import { useIsDesktop, useMouseDetected } from '@/hooks/platformHooks';
 import { useChatRole } from '@/components/chat/permissions/useChatRole';
 import { ChatMessageRow } from '@/components/chat/messages/ChatMessageRow';
 import type { ChatThreadRouteState, ChatThreadResumeRequest } from '@/types/chatThreadNavigation';
@@ -188,6 +188,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
   const currentUserAvatarUrl = useSelector((state: RootState) => state.user.avatarUrl);
   const wsConnected = useSelector((state: RootState) => state.connection.wsConnected);
   const isDesktop = useIsDesktop();
+  const hasPointerDevice = useMouseDetected();
   const { role: myRole } = useChatRole(chatId);
   const isAdmin = myRole === 'admin';
   const storedName = useSelector((state: RootState) => selectChatName(state, chatId));
@@ -733,16 +734,17 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
     }
   }, [chatId, fetchLatestWindow, dispatch, pendingResumeRequest, storeChatId, threadId]);
 
-  // Auto-focus compose input after initial messages load
+  // Auto-focus compose input after initial messages load (only on devices with a
+  // physical keyboard — on touch-only devices this would pop up the virtual keyboard)
   const didAutoFocusRef = useRef(false);
   useEffect(() => {
-    if (messages.length > 0 && !didAutoFocusRef.current) {
+    if (hasPointerDevice && messages.length > 0 && !didAutoFocusRef.current) {
       didAutoFocusRef.current = true;
       requestAnimationFrame(() => {
         composeBarRef.current?.focusInput();
       });
     }
-  }, [messages.length]);
+  }, [hasPointerDevice, messages.length]);
 
   const loadMore = useCallback(() => {
     const st = store.getState();
