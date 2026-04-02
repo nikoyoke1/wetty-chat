@@ -34,8 +34,8 @@ export function PermalinkInline({ targetChatId, targetMessageId, encoded, url }:
           url,
         });
 
-        if (ctx && ctx.chatId === targetChatId) {
-          // Same chat/thread — scroll to message in place
+        if (ctx && ctx.chatId === targetChatId && !ctx.threadId) {
+          // Same main chat (not inside a thread) — scroll to message in place
           console.debug('[PermalinkInline] jumping within current chat', { targetMessageId });
           ctx.jumpToMessage(targetMessageId);
         } else {
