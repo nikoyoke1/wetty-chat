@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   IonButtons,
   IonContent,
@@ -28,19 +28,25 @@ import { BackButton } from '@/components/BackButton';
 import { ThreadListRow } from '@/components/chat/ThreadListRow';
 import styles from './threads.module.scss';
 
-interface ThreadsListCoreProps {
+export interface ThreadsListInnerProps {
   activeThreadId?: string;
   onThreadSelect: (chatId: string, threadRootId: string) => void;
 }
 
-export function ThreadsListCore({ activeThreadId, onThreadSelect }: ThreadsListCoreProps) {
+/**
+ * Inner thread list content that does NOT own IonContent.
+ * Can be embedded inside another scrollable container (e.g. ChatList).
+ * Uses IntersectionObserver for infinite scroll.
+ */
+export function ThreadsListInner({ activeThreadId, onThreadSelect }: ThreadsListInnerProps) {
   const dispatch = useDispatch();
   const threads = useSelector(selectThreads);
   const isLoaded = useSelector(selectThreadsLoaded);
   const nextCursor = useSelector(selectThreadsNextCursor);
   const locale = useSelector(selectEffectiveLocale);
-  const [, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<(() => Promise<void>) | undefined>(undefined);
 
   const fetchThreads = useCallback(async () => {
     try {
@@ -57,19 +63,6 @@ export function ThreadsListCore({ activeThreadId, onThreadSelect }: ThreadsListC
     }
   }, [isLoaded, fetchThreads]);
 
-  const handleRefresh = useCallback(
-    async (event: CustomEvent<RefresherEventDetail>) => {
-      setIsRefreshing(true);
-      try {
-        await fetchThreads();
-      } finally {
-        setIsRefreshing(false);
-        event.detail.complete();
-      }
-    },
-    [fetchThreads],
-  );
-
   const handleLoadMore = useCallback(async () => {
     if (!nextCursor || isLoadingMore) return;
     setIsLoadingMore(true);
@@ -83,49 +76,48 @@ export function ThreadsListCore({ activeThreadId, onThreadSelect }: ThreadsListC
     }
   }, [nextCursor, isLoadingMore, dispatch]);
 
-  const handleScroll = useCallback(
-    (e: CustomEvent) => {
-      const target = e.detail as { scrollTop: number; scrollHeight: number; clientHeight: number };
-      if (target.scrollHeight - target.scrollTop - target.clientHeight < 200) {
-        void handleLoadMore();
-      }
-    },
-    [handleLoadMore],
-  );
+  // Keep a ref so the IntersectionObserver callback always calls the latest handleLoadMore
+  loadMoreRef.current = handleLoadMore;
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          void loadMoreRef.current?.();
+        }
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
 
   if (!isLoaded) {
     return (
-      <IonContent>
-        <div className={styles.emptyState}>
-          <IonSpinner />
-        </div>
-      </IonContent>
+      <div className={styles.emptyState}>
+        <IonSpinner />
+      </div>
     );
   }
 
   if (threads.length === 0) {
     return (
-      <IonContent>
-        <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
-          <IonRefresherContent />
-        </IonRefresher>
-        <div className={styles.emptyState}>
-          <p className={styles.emptyText}>
-            <Trans>No threads yet</Trans>
-          </p>
-          <p className={styles.emptySubtext}>
-            <Trans>Threads you create or reply to will appear here</Trans>
-          </p>
-        </div>
-      </IonContent>
+      <div className={styles.emptyState}>
+        <p className={styles.emptyText}>
+          <Trans>No threads yet</Trans>
+        </p>
+        <p className={styles.emptySubtext}>
+          <Trans>Threads you create or reply to will appear here</Trans>
+        </p>
+      </div>
     );
   }
 
   return (
-    <IonContent scrollEvents onIonScroll={handleScroll}>
-      <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
-        <IonRefresherContent />
-      </IonRefresher>
+    <>
       <IonList>
         {threads.map((thread) => (
           <ThreadListRow
@@ -142,6 +134,56 @@ export function ThreadsListCore({ activeThreadId, onThreadSelect }: ThreadsListC
           <IonSpinner name="dots" />
         </div>
       )}
+      <div ref={sentinelRef} />
+    </>
+  );
+}
+
+interface ThreadsListCoreProps {
+  activeThreadId?: string;
+  onThreadSelect: (chatId: string, threadRootId: string) => void;
+}
+
+export function ThreadsListCore({ activeThreadId, onThreadSelect }: ThreadsListCoreProps) {
+  const dispatch = useDispatch();
+  const isLoaded = useSelector(selectThreadsLoaded);
+
+  const fetchThreads = useCallback(async () => {
+    try {
+      const res = await getThreads({ limit: 20 });
+      dispatch(setThreadsList({ threads: res.data.threads, nextCursor: res.data.nextCursor }));
+    } catch (err) {
+      console.error('Failed to fetch threads', err);
+    }
+  }, [dispatch]);
+
+  const handleRefresh = useCallback(
+    async (event: CustomEvent<RefresherEventDetail>) => {
+      try {
+        await fetchThreads();
+      } finally {
+        event.detail.complete();
+      }
+    },
+    [fetchThreads],
+  );
+
+  if (!isLoaded) {
+    return (
+      <IonContent>
+        <div className={styles.emptyState}>
+          <IonSpinner />
+        </div>
+      </IonContent>
+    );
+  }
+
+  return (
+    <IonContent>
+      <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
+        <IonRefresherContent />
+      </IonRefresher>
+      <ThreadsListInner activeThreadId={activeThreadId} onThreadSelect={onThreadSelect} />
     </IonContent>
   );
 }

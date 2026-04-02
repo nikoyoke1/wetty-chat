@@ -1,10 +1,9 @@
-import { type ReactNode, useCallback, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useRef } from 'react';
 import { matchPath, useHistory, useLocation } from 'react-router-dom';
 import { Trans } from '@lingui/react/macro';
 import { IonButton, IonButtons, IonHeader, IonIcon, IonModal, IonTitle, IonToolbar } from '@ionic/react';
-import { addCircleOutline, arrowBack, settings } from 'ionicons/icons';
+import { addCircleOutline, settings } from 'ionicons/icons';
 import { ChatList } from '@/components/chat/ChatList';
-import { ThreadsListCore } from '@/pages/threads';
 import ChatThreadCore from '@/pages/chat-thread/chat-thread';
 import ChatSettingsCore from '@/pages/chat-thread/chat-settings';
 import ChatMembersCore from '@/pages/chat-thread/chat-members';
@@ -160,13 +159,10 @@ function ChatModal({
   );
 }
 
-type SidebarView = 'chats' | 'threads';
-
 export function DesktopSplitLayout() {
   const history = useHistory();
   const location = useLocation<DesktopRouteState | undefined>();
   const isFeatureGateEnabled = useFeatureGate();
-  const [sidebarView, setSidebarView] = useState<SidebarView>('chats');
   const skipNextGlobalSettingsDismiss = useRef(false);
   const headerActions: HeaderActionMenuItem[] = [
     ...(isFeatureGateEnabled
@@ -288,47 +284,27 @@ export function DesktopSplitLayout() {
   return (
     <div className={styles.desktopSplitLayout}>
       <div className={styles.desktopSplitLeft}>
-        {sidebarView === 'chats' ? (
-          <>
-            <IonHeader>
-              <IonToolbar>
-                <IonButtons slot="start">
-                  <IonButton onClick={openSettingsModal} aria-label="Open settings">
-                    <IonIcon slot="icon-only" icon={settings} />
-                  </IonButton>
-                </IonButtons>
-                <IonTitle>
-                  <Trans>Chats</Trans>
-                </IonTitle>
-                <IonButtons slot="end">
-                  <HeaderActionMenu icon={addCircleOutline} actions={headerActions} />
-                </IonButtons>
-              </IonToolbar>
-            </IonHeader>
-            <ChatList
-              activeChatId={threadMatch ? undefined : activeChatId}
-              isThreadsActive={!!threadMatch}
-              onChatSelect={handleChatSelect}
-              onThreadsSelect={() => setSidebarView('threads')}
-            />
-          </>
-        ) : (
-          <>
-            <IonHeader>
-              <IonToolbar>
-                <IonButtons slot="start">
-                  <IonButton onClick={() => setSidebarView('chats')} aria-label="Back to chats">
-                    <IonIcon slot="icon-only" icon={arrowBack} />
-                  </IonButton>
-                </IonButtons>
-                <IonTitle>
-                  <Trans>Threads</Trans>
-                </IonTitle>
-              </IonToolbar>
-            </IonHeader>
-            <ThreadsListCore activeThreadId={threadMatch?.threadId} onThreadSelect={handleThreadSelect} />
-          </>
-        )}
+        <IonHeader>
+          <IonToolbar>
+            <IonButtons slot="start">
+              <IonButton onClick={openSettingsModal} aria-label="Open settings">
+                <IonIcon slot="icon-only" icon={settings} />
+              </IonButton>
+            </IonButtons>
+            <IonTitle>
+              <Trans>Chats</Trans>
+            </IonTitle>
+            <IonButtons slot="end">
+              <HeaderActionMenu icon={addCircleOutline} actions={headerActions} />
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <ChatList
+          activeChatId={activeChatId}
+          activeThreadId={threadMatch?.threadId}
+          onChatSelect={handleChatSelect}
+          onThreadSelect={handleThreadSelect}
+        />
       </div>
       <div className={styles.desktopSplitRight}>
         {/* Base layer: always render ChatThreadCore when a chat is selected */}

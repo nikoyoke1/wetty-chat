@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   IonBadge,
   IonContent,
@@ -14,7 +14,7 @@ import {
   type RefresherEventDetail,
 } from '@ionic/react';
 import { useDispatch, useSelector } from 'react-redux';
-import { chatbubbleEllipses, checkmarkDone, mailUnreadOutline, notificationsOffOutline } from 'ionicons/icons';
+import { checkmarkDone, mailUnreadOutline, notificationsOffOutline } from 'ionicons/icons';
 import { type ChatListEntry, getChats } from '@/api/chats';
 import { selectAllChats, setChatLastReadMessageId, setChatsList, setChatUnreadCount } from '@/store/chatsSlice';
 import { selectEffectiveLocale } from '@/store/settingsSlice';
@@ -28,12 +28,11 @@ import { formatMessagePreview, getNotificationPreviewLabels } from '@/utils/mess
 import { buildChatThreadRouteState, type ChatThreadRouteState } from '@/types/chatThreadNavigation';
 import { CHAT_LIST_REFRESH_MIN_DURATION_MS } from '@/constants/chatTiming';
 import { getThreads } from '@/api/threads';
-import {
-  selectShouldShowThreadsRow,
-  selectThreadsLoaded,
-  selectTotalUnreadThreadCount,
-  setThreadsList,
-} from '@/store/threadsSlice';
+import { selectThreads, selectThreadsLoaded, selectTotalUnreadThreadCount, setThreadsList } from '@/store/threadsSlice';
+import { selectTotalUnreadChatCount } from '@/store/chatsSlice';
+import { ThreadsListInner } from '@/pages/threads';
+import { type ChatListTab, ChatListSegment } from './ChatListSegment';
+import { ThreadListRow } from '@/components/chat/ThreadListRow';
 import styles from './ChatList.module.scss';
 
 function formatLastActivity(isoString: string | null, locale: string): string {
@@ -92,22 +91,28 @@ function getMessagePreview(message: MessageResponse | null, locale: string): Rea
   );
 }
 
+type MergedItem =
+  | { type: 'group'; chat: ChatListEntry; sortTime: number }
+  | { type: 'thread'; thread: import('@/api/threads').ThreadListItem; sortTime: number };
+
 interface ChatListProps {
   activeChatId?: string;
-  isThreadsActive?: boolean;
+  activeThreadId?: string;
   onChatSelect: (chatId: string, routeState?: ChatThreadRouteState) => void;
-  onThreadsSelect?: () => void;
+  onThreadSelect?: (chatId: string, threadRootId: string) => void;
 }
 
-export function ChatList({ activeChatId, isThreadsActive, onChatSelect, onThreadsSelect }: ChatListProps) {
+export function ChatList({ activeChatId, activeThreadId, onChatSelect, onThreadSelect }: ChatListProps) {
   const dispatch = useDispatch();
   const locale = useSelector(selectEffectiveLocale);
   const chats = useSelector(selectAllChats);
-  const showThreadsRow = useSelector(selectShouldShowThreadsRow);
+  const threads = useSelector(selectThreads);
   const threadsLoaded = useSelector(selectThreadsLoaded);
   const unreadThreadCount = useSelector(selectTotalUnreadThreadCount);
+  const unreadChatCount = useSelector(selectTotalUnreadChatCount);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<ChatListTab>('all');
 
   const updateAppBadge = useCallback(async () => {
     await syncAppBadgeCount();
@@ -127,9 +132,10 @@ export function ChatList({ activeChatId, isThreadsActive, onChatSelect, onThread
     void updateAppBadge();
   }, [dispatch, updateAppBadge]);
 
+  // Load threads on mount so the "All" tab can interleave them
   useEffect(() => {
     if (!threadsLoaded) {
-      void getThreads({ limit: 1 }).then((res) => {
+      void getThreads({ limit: 20 }).then((res) => {
         dispatch(setThreadsList({ threads: res.data.threads, nextCursor: res.data.nextCursor }));
       });
     }
@@ -163,7 +169,7 @@ export function ChatList({ activeChatId, isThreadsActive, onChatSelect, onThread
 
   const handleRefresh = (event: CustomEvent<RefresherEventDetail>) => {
     const startTime = Date.now();
-    getChats()
+    const refreshChats = getChats()
       .then((res) => {
         const chatList = res.data.chats || [];
         dispatch(setChatsList(chatList));
@@ -171,23 +177,123 @@ export function ChatList({ activeChatId, isThreadsActive, onChatSelect, onThread
       })
       .catch((err: Error) => {
         setError(err.message || t`Failed to refresh chats`);
-      })
-      .finally(() => {
-        const elapsed = Date.now() - startTime;
-        const delay = Math.max(0, CHAT_LIST_REFRESH_MIN_DURATION_MS - elapsed);
-        setTimeout(() => {
-          event.detail.complete();
-        }, delay);
       });
+    const refreshThreads = getThreads({ limit: 20 })
+      .then((res) => {
+        dispatch(setThreadsList({ threads: res.data.threads, nextCursor: res.data.nextCursor }));
+      })
+      .catch(() => {
+        // threads refresh failure is non-critical
+      });
+
+    Promise.all([refreshChats, refreshThreads]).finally(() => {
+      const elapsed = Date.now() - startTime;
+      const delay = Math.max(0, CHAT_LIST_REFRESH_MIN_DURATION_MS - elapsed);
+      setTimeout(() => {
+        event.detail.complete();
+      }, delay);
+    });
     void updateAppBadge();
   };
 
-  return (
-    <IonContent fullscreen>
-      <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
-        <IonRefresherContent />
-      </IonRefresher>
-      {error && (
+  // Merged interleaved list for "All" tab
+  const mergedItems = useMemo((): MergedItem[] => {
+    const items: MergedItem[] = [];
+    for (const chat of chats) {
+      items.push({
+        type: 'group',
+        chat,
+        sortTime: chat.lastMessageAt ? new Date(chat.lastMessageAt).getTime() : 0,
+      });
+    }
+    for (const thread of threads) {
+      items.push({
+        type: 'thread',
+        thread,
+        sortTime: thread.lastReplyAt ? new Date(thread.lastReplyAt).getTime() : 0,
+      });
+    }
+    items.sort((a, b) => b.sortTime - a.sortTime);
+    return items;
+  }, [chats, threads]);
+
+  const handleThreadSelect = useCallback(
+    (chatId: string, threadRootId: string) => {
+      onThreadSelect?.(chatId, threadRootId);
+    },
+    [onThreadSelect],
+  );
+
+  const renderChatItem = (chat: ChatListEntry) => (
+    <IonItemSliding key={chat.id}>
+      <IonItemOptions
+        side="start"
+        onIonSwipe={(e) => {
+          const slidingItem = (e.target as HTMLElement).closest('ion-item-sliding');
+          handleToggleRead(chat, slidingItem as HTMLIonItemSlidingElement | null);
+        }}
+      >
+        <IonItemOption
+          color="primary"
+          expandable
+          onClick={(e) => {
+            const slidingItem = (e.target as HTMLElement).closest('ion-item-sliding');
+            handleToggleRead(chat, slidingItem as HTMLIonItemSlidingElement | null);
+          }}
+        >
+          <IonIcon slot="top" icon={chat.unreadCount > 0 ? checkmarkDone : mailUnreadOutline} />
+          {chat.unreadCount > 0 ? <Trans>Read</Trans> : <Trans>Unread</Trans>}
+        </IonItemOption>
+      </IonItemOptions>
+      <IonItem
+        id={chat.id}
+        button
+        detail={false}
+        className={`${styles.chatListItem} ${activeChatId === chat.id ? styles.active : ''}`}
+        onClick={() =>
+          onChatSelect(
+            chat.id,
+            buildChatThreadRouteState({
+              unreadCount: chat.unreadCount,
+              lastReadMessageId: chat.lastReadMessageId,
+            }),
+          )
+        }
+      >
+        <span slot="start">
+          <UserAvatar
+            name={getChatDisplayName(chat.id, chat.name)}
+            avatarUrl={chat.avatar}
+            size={48}
+            className={styles.chatsListAvatar}
+          />
+        </span>
+        <IonLabel className={styles.chatsListLabel}>
+          <h2 className={styles.chatsListTitle}>
+            <span className={styles.chatsListTitleText}>{getChatDisplayName(chat.id, chat.name)}</span>
+            {isChatMuted(chat) ? (
+              <IonIcon aria-hidden="true" icon={notificationsOffOutline} className={styles.chatsListMutedIcon} />
+            ) : null}
+          </h2>
+          <p className={styles.chatsListPreview}>{getMessagePreview(chat.lastMessage, locale)}</p>
+        </IonLabel>
+        <div slot="end" className={styles.chatsListEndSlot}>
+          <div className={styles.chatsListTime}>{formatLastActivity(chat.lastMessageAt, locale)}</div>
+          <div className={styles.chatsListBadge}>
+            {chat.unreadCount > 0 && (
+              <IonBadge mode="ios" color={isChatMuted(chat) ? 'medium' : 'primary'}>
+                {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
+              </IonBadge>
+            )}
+          </div>
+        </div>
+      </IonItem>
+    </IonItemSliding>
+  );
+
+  const renderContent = () => {
+    if (error) {
+      return (
         <IonList>
           <IonItem>
             <IonLabel>
@@ -198,8 +304,11 @@ export function ChatList({ activeChatId, isThreadsActive, onChatSelect, onThread
             </IonLabel>
           </IonItem>
         </IonList>
-      )}
-      {loading && !error && (
+      );
+    }
+
+    if (loading) {
+      return (
         <IonList>
           <IonItem>
             <IonLabel>
@@ -207,121 +316,74 @@ export function ChatList({ activeChatId, isThreadsActive, onChatSelect, onThread
             </IonLabel>
           </IonItem>
         </IonList>
-      )}
-      {!loading && !error && (
-        <IonList>
-          {showThreadsRow && onThreadsSelect && (
-            <IonItem
-              button
-              detail={false}
-              onClick={onThreadsSelect}
-              className={`${styles.chatListItem} ${isThreadsActive ? styles.active : ''}`}
-            >
-              <span slot="start">
-                <span className={styles.threadsRowIcon}>
-                  <IonIcon icon={chatbubbleEllipses} />
-                </span>
-              </span>
-              <IonLabel className={styles.chatsListLabel}>
-                <h2 className={styles.chatsListTitle}>
-                  <span className={styles.chatsListTitleText}>
-                    <Trans>Threads</Trans>
-                  </span>
-                </h2>
-                <p className={styles.chatsListPreview}>
-                  {unreadThreadCount > 0 ? <Trans>Click to view new replies</Trans> : <Trans>No new replies</Trans>}
-                </p>
-              </IonLabel>
-              <div slot="end" className={styles.chatsListEndSlot}>
-                <div className={styles.chatsListBadge}>
-                  {unreadThreadCount > 0 && (
-                    <IonBadge mode="ios" color="primary">
-                      {unreadThreadCount > 99 ? '99+' : unreadThreadCount}
-                    </IonBadge>
-                  )}
-                </div>
-              </div>
-            </IonItem>
-          )}
-          {chats.length === 0 && (
+      );
+    }
+
+    if (activeTab === 'threads') {
+      return <ThreadsListInner activeThreadId={activeThreadId} onThreadSelect={handleThreadSelect} />;
+    }
+
+    if (activeTab === 'groups') {
+      if (chats.length === 0) {
+        return (
+          <IonList>
             <IonItem>
               <IonLabel>
                 <Trans>No chats yet</Trans>
               </IonLabel>
             </IonItem>
-          )}
-          {chats.map((chat) => (
-            <IonItemSliding key={chat.id}>
-              <IonItemOptions
-                side="start"
-                onIonSwipe={(e) => {
-                  const slidingItem = (e.target as HTMLElement).closest('ion-item-sliding');
-                  handleToggleRead(chat, slidingItem as HTMLIonItemSlidingElement | null);
-                }}
-              >
-                <IonItemOption
-                  color="primary"
-                  expandable
-                  onClick={(e) => {
-                    const slidingItem = (e.target as HTMLElement).closest('ion-item-sliding');
-                    handleToggleRead(chat, slidingItem as HTMLIonItemSlidingElement | null);
-                  }}
-                >
-                  <IonIcon slot="top" icon={chat.unreadCount > 0 ? checkmarkDone : mailUnreadOutline} />
-                  {chat.unreadCount > 0 ? <Trans>Read</Trans> : <Trans>Unread</Trans>}
-                </IonItemOption>
-              </IonItemOptions>
-              <IonItem
-                id={chat.id}
-                button
-                detail={false}
-                className={`${styles.chatListItem} ${activeChatId === chat.id ? styles.active : ''}`}
-                onClick={() =>
-                  onChatSelect(
-                    chat.id,
-                    buildChatThreadRouteState({
-                      unreadCount: chat.unreadCount,
-                      lastReadMessageId: chat.lastReadMessageId,
-                    }),
-                  )
-                }
-              >
-                <span slot="start">
-                  <UserAvatar
-                    name={getChatDisplayName(chat.id, chat.name)}
-                    avatarUrl={chat.avatar}
-                    size={48}
-                    className={styles.chatsListAvatar}
-                  />
-                </span>
-                <IonLabel className={styles.chatsListLabel}>
-                  <h2 className={styles.chatsListTitle}>
-                    <span className={styles.chatsListTitleText}>{getChatDisplayName(chat.id, chat.name)}</span>
-                    {isChatMuted(chat) ? (
-                      <IonIcon
-                        aria-hidden="true"
-                        icon={notificationsOffOutline}
-                        className={styles.chatsListMutedIcon}
-                      />
-                    ) : null}
-                  </h2>
-                  <p className={styles.chatsListPreview}>{getMessagePreview(chat.lastMessage, locale)}</p>
-                </IonLabel>
-                <div slot="end" className={styles.chatsListEndSlot}>
-                  <div className={styles.chatsListTime}>{formatLastActivity(chat.lastMessageAt, locale)}</div>
-                  <div className={styles.chatsListBadge}>
-                    {chat.unreadCount > 0 && (
-                      <IonBadge mode="ios" color={isChatMuted(chat) ? 'medium' : 'primary'}>
-                        {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
-                      </IonBadge>
-                    )}
-                  </div>
-                </div>
-              </IonItem>
-            </IonItemSliding>
-          ))}
+          </IonList>
+        );
+      }
+      return <IonList>{chats.map(renderChatItem)}</IonList>;
+    }
+
+    // "all" tab — interleaved groups + threads
+    if (mergedItems.length === 0) {
+      return (
+        <IonList>
+          <IonItem>
+            <IonLabel>
+              <Trans>No chats yet</Trans>
+            </IonLabel>
+          </IonItem>
         </IonList>
-      )}
+      );
+    }
+
+    return (
+      <IonList>
+        {mergedItems.map((item) => {
+          if (item.type === 'group') {
+            return renderChatItem(item.chat);
+          }
+          return (
+            <ThreadListRow
+              key={`thread-${item.thread.threadRootMessage.id}`}
+              thread={item.thread}
+              locale={locale}
+              isActive={activeThreadId === item.thread.threadRootMessage.id}
+              onSelect={handleThreadSelect}
+            />
+          );
+        })}
+      </IonList>
+    );
+  };
+
+  return (
+    <IonContent fullscreen>
+      <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
+        <IonRefresherContent />
+      </IonRefresher>
+      <ChatListSegment
+        value={activeTab}
+        onChange={setActiveTab}
+        allUnreadCount={unreadChatCount + unreadThreadCount}
+        groupsUnreadCount={unreadChatCount}
+        threadsUnreadCount={unreadThreadCount}
+      />
+      {renderContent()}
     </IonContent>
   );
 }
