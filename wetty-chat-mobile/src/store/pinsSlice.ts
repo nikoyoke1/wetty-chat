@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import { messagePatched } from './messageEvents';
 import type { RootState } from './index';
 import type { PinResponse } from '@/api/pins';
 
@@ -56,6 +57,32 @@ const pinsSlice = createSlice({
     dismissBanner(state, action: PayloadAction<{ chatId: string; pinId: string }>) {
       state.dismissedPinId[action.payload.chatId] = action.payload.pinId;
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(messagePatched, (state, action) => {
+      const { chatId, messageId, message } = action.payload;
+      const entry = state.byChatId[chatId];
+      if (!entry) return;
+      for (let i = 0; i < entry.pins.length; i++) {
+        if (entry.pins[i].message.id === messageId) {
+          if (message.isDeleted) {
+            entry.pins[i].message = { ...entry.pins[i].message, isDeleted: true, message: null };
+          } else {
+            entry.pins[i].message = {
+              ...entry.pins[i].message,
+              message: message.message,
+              messageType: message.messageType,
+              isEdited: message.isEdited,
+              attachments: message.attachments,
+              hasAttachments: message.hasAttachments,
+              mentions: message.mentions,
+              sticker: message.sticker,
+            };
+          }
+          break;
+        }
+      }
+    });
   },
 });
 

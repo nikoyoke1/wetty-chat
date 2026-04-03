@@ -66,7 +66,7 @@ pub struct MentionInfo {
 }
 
 /// Extract `@[uid:<N>]` tokens from a message string.
-fn extract_mention_uids(text: &str) -> Vec<i32> {
+pub fn extract_mention_uids(text: &str) -> Vec<i32> {
     let mut uids = Vec::new();
 
     let bytes = text.as_bytes();
@@ -372,7 +372,7 @@ fn build_sender(
     }
 }
 
-fn build_mention_info(
+pub fn build_mention_info(
     uid: i32,
     user_avatars: &std::collections::HashMap<i32, Option<String>>,
     user_profiles: &std::collections::HashMap<i32, UserProfile>,

@@ -143,7 +143,13 @@ function patchMessageInWindows(
             (message.replyToMessage === undefined && current.replyToMessage !== undefined
               ? current.replyToMessage
               : undefined);
-          win.messages[i] = { ...message, replyToMessage: preservedReplyTo };
+          win.messages[i] = {
+            ...current,
+            ...message,
+            replyToMessage: preservedReplyTo,
+            reactions: message.reactions ?? current.reactions,
+            threadInfo: message.threadInfo ?? current.threadInfo,
+          };
         } else if (current.replyToMessage?.id === messageId) {
           current.replyToMessage.message = message.message;
           current.replyToMessage.messageType = message.messageType;
@@ -151,6 +157,7 @@ function patchMessageInWindows(
           current.replyToMessage.isDeleted = message.isDeleted;
           current.replyToMessage.attachments = message.attachments;
           current.replyToMessage.firstAttachmentKind = message.attachments?.[0]?.kind;
+          current.replyToMessage.mentions = message.mentions;
         }
       }
     }
@@ -219,6 +226,7 @@ const messagesSlice = createSlice({
       if (!win) return;
       const unique = dedup(win.messages, messages);
       win.messages = [...unique, ...win.messages];
+      win.messages.sort(compareMessageOrder);
       if (action.payload.nextCursor !== undefined) {
         win.nextCursor = action.payload.nextCursor;
       }
@@ -242,6 +250,7 @@ const messagesSlice = createSlice({
         const nextWin = chat.windows[chat.activeWindowIndex + 1];
         const merged = dedup(win.messages, nextWin.messages);
         win.messages = [...win.messages, ...merged];
+        win.messages.sort(compareMessageOrder);
         win.prevCursor = nextWin.prevCursor;
         chat.windows.splice(chat.activeWindowIndex + 1, 1);
       }

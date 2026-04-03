@@ -37,6 +37,7 @@ function formatReplyPreview(reply: ThreadReplyPreview, locale: string): string {
       sticker: reply.stickerEmoji ? { emoji: reply.stickerEmoji } : undefined,
       firstAttachmentKind: reply.firstAttachmentKind ?? undefined,
       isDeleted: reply.isDeleted,
+      mentions: reply.mentions ?? undefined,
     },
     getNotificationPreviewLabels(locale),
   );

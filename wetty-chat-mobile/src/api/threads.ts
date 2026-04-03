@@ -1,5 +1,5 @@
 import type { AxiosResponse } from 'axios';
-import type { MessageResponse } from './messages';
+import type { MentionInfo, MessageResponse } from './messages';
 import apiClient from './client';
 
 export interface ThreadParticipant {
@@ -15,6 +15,7 @@ export interface ThreadReplyPreview {
   stickerEmoji?: string | null;
   firstAttachmentKind?: string | null;
   isDeleted: boolean;
+  mentions?: MentionInfo[] | null;
 }
 
 export interface ThreadListItem {

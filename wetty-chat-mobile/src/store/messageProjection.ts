@@ -35,6 +35,17 @@ export function compareMessageOrder(
   const bTs = b.createdAt ? new Date(b.createdAt).getTime() : 0;
   if (aTs > bTs) return 1;
   if (aTs < bTs) return -1;
+  // Tie-break by ID for stable ordering
+  try {
+    const aId = BigInt(a.id);
+    const bId = BigInt(b.id);
+    if (aId > bId) return 1;
+    if (aId < bId) return -1;
+  } catch {
+    // Non-numeric IDs (e.g., optimistic "cg_" prefix) — compare as strings
+    if (a.id > b.id) return 1;
+    if (a.id < b.id) return -1;
+  }
   return 0;
 }
 

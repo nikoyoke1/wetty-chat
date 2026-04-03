@@ -2,7 +2,13 @@ import { configureStore, createListenerMiddleware } from '@reduxjs/toolkit';
 import connectionReducer from './connectionSlice';
 import messagesReducer from './messagesSlice';
 import settingsReducer, { type SettingsState } from './settingsSlice';
-import threadsReducer, { incrementThreadUnread, updateThreadLastReply } from './threadsSlice';
+import threadsReducer, {
+  incrementThreadUnread,
+  updateThreadLastReply,
+  removeThread,
+  patchThreadLastReply,
+  patchThreadRootMessage,
+} from './threadsSlice';
 import chatsReducer, {
   projectChatMessageAdded,
   projectChatMessageConfirmed,
@@ -116,6 +122,51 @@ listenerMiddleware.startListening({
           : null,
       }),
     );
+
+    // Handle thread root deletion — remove the thread entirely
+    if (action.payload.message.isDeleted && !action.payload.message.replyRootId) {
+      const thread = state.threads.items.find(
+        (t) => t.threadRootMessage.id === action.payload.messageId,
+      );
+      if (thread) {
+        api.dispatch(removeThread({ threadRootId: action.payload.messageId }));
+      }
+    }
+
+    // Handle thread root edit (not delete) — update the root message preview
+    if (!action.payload.message.isDeleted && !action.payload.message.replyRootId) {
+      const thread = state.threads.items.find(
+        (t) => t.threadRootMessage.id === action.payload.messageId,
+      );
+      if (thread) {
+        api.dispatch(
+          patchThreadRootMessage({
+            threadRootId: action.payload.messageId,
+            message: {
+              message: action.payload.message.message,
+              isDeleted: action.payload.message.isDeleted,
+            },
+          }),
+        );
+      }
+    }
+
+    // Handle thread reply edit/delete — update lastReply preview
+    if (action.payload.message.replyRootId) {
+      const threadRootId = action.payload.message.replyRootId;
+      const thread = state.threads.items.find((t) => t.threadRootMessage.id === threadRootId);
+      if (thread?.lastReply) {
+        api.dispatch(
+          patchThreadLastReply({
+            threadRootId,
+            patch: {
+              message: action.payload.message.message,
+              isDeleted: action.payload.message.isDeleted,
+            },
+          }),
+        );
+      }
+    }
   },
 });
 

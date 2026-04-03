@@ -39,6 +39,7 @@ const threadsSlice = createSlice({
       const newThreads = action.payload.threads.filter((t) => !existingIds.has(t.threadRootMessage.id));
       state.items.push(...newThreads);
       state.nextCursor = action.payload.nextCursor;
+      state.totalUnreadCount = state.items.reduce((sum, t) => sum + (t.unreadCount ?? 0), 0);
     },
     updateThreadFromWs(state, action: PayloadAction<ThreadUpdatePayload>) {
       const { threadRootId, lastReplyAt, replyCount } = action.payload;
@@ -83,6 +84,24 @@ const threadsSlice = createSlice({
       state.items = state.items.filter((t) => t.threadRootMessage.id !== action.payload.threadRootId);
       state.totalUnreadCount = state.items.reduce((sum, t) => sum + (t.unreadCount ?? 0), 0);
     },
+    patchThreadLastReply(
+      state,
+      action: PayloadAction<{ threadRootId: string; patch: Partial<ThreadReplyPreview> }>,
+    ) {
+      const thread = state.items.find((t) => t.threadRootMessage.id === action.payload.threadRootId);
+      if (thread && thread.lastReply) {
+        Object.assign(thread.lastReply, action.payload.patch);
+      }
+    },
+    patchThreadRootMessage(
+      state,
+      action: PayloadAction<{ threadRootId: string; message: Partial<{ message: string | null; isDeleted: boolean }> }>,
+    ) {
+      const thread = state.items.find((t) => t.threadRootMessage.id === action.payload.threadRootId);
+      if (thread) {
+        Object.assign(thread.threadRootMessage, action.payload.message);
+      }
+    },
     clearThreads(state) {
       state.items = [];
       state.nextCursor = null;
@@ -99,6 +118,8 @@ export const {
   incrementThreadUnread,
   markThreadRead,
   removeThread,
+  patchThreadLastReply,
+  patchThreadRootMessage,
   clearThreads,
 } = threadsSlice.actions;
 

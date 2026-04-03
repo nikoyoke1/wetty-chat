@@ -231,6 +231,9 @@ const chatsSlice = createSlice({
       entry.liveProjection.lastMessage = {
         ...currentLatest,
         ...message,
+        mentions: message.mentions ?? currentLatest.mentions,
+        reactions: message.reactions ?? currentLatest.reactions,
+        threadInfo: message.threadInfo ?? currentLatest.threadInfo,
       };
       entry.liveProjection.lastMessageAt = message.createdAt;
     },

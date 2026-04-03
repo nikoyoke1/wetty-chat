@@ -6,7 +6,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use tracing::warn;
 
-use crate::handlers::chats::MessageResponse;
+use crate::handlers::chats::{build_mention_info, extract_mention_uids, MentionInfo, MessageResponse};
 use crate::models::{Attachment, MessageType};
 use crate::schema::{attachments, stickers, thread_subscriptions};
 use crate::services::chat::MAX_UNREAD_COUNT;
@@ -242,6 +242,8 @@ pub struct ThreadReplyPreview {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub first_attachment_kind: Option<String>,
     pub is_deleted: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub mentions: Vec<MentionInfo>,
 }
 
 #[derive(Serialize)]
@@ -358,8 +360,27 @@ pub fn enrich_thread_list(
     all_uids.sort_unstable();
     all_uids.dedup();
 
-    let user_profiles = lookup_user_profiles(conn, &all_uids).unwrap_or_default();
-    let user_avatars = lookup_user_avatars(state, &all_uids);
+    let mut user_profiles = lookup_user_profiles(conn, &all_uids).unwrap_or_default();
+    let mut user_avatars = lookup_user_avatars(state, &all_uids);
+
+    // Also collect mentioned UIDs from reply messages so we can resolve them
+    let mut mention_uids_per_reply: HashMap<i64, Vec<i32>> = HashMap::new();
+    let mut extra_mention_uids: Vec<i32> = Vec::new();
+    for row in &latest_reply_rows {
+        if let Some(ref text) = row.message {
+            let uids = extract_mention_uids(text);
+            for &uid in &uids {
+                if !user_profiles.contains_key(&uid) && !extra_mention_uids.contains(&uid) {
+                    extra_mention_uids.push(uid);
+                }
+            }
+            mention_uids_per_reply.insert(row.reply_root_id, uids);
+        }
+    }
+    if !extra_mention_uids.is_empty() {
+        user_profiles.extend(lookup_user_profiles(conn, &extra_mention_uids).unwrap_or_default());
+        user_avatars.extend(lookup_user_avatars(state, &extra_mention_uids));
+    }
 
     let make_participant = |uid: i32| -> ThreadParticipant {
         let profile = user_profiles.get(&uid);
@@ -435,6 +456,14 @@ pub fn enrich_thread_list(
                     None
                 },
                 is_deleted: false,
+                mentions: mention_uids_per_reply
+                    .get(&row.reply_root_id)
+                    .map(|uids| {
+                        uids.iter()
+                            .map(|&uid| build_mention_info(uid, &user_avatars, &user_profiles))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
             },
         );
     }
