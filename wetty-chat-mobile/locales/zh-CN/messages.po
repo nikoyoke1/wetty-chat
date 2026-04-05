@@ -134,6 +134,7 @@ msgid "Avatar uploaded"
 msgstr "头像已上传"
 
 #: src/components/chat/settings/ShareInviteModal.tsx
+#: src/pages/settings/stickers.tsx
 msgid "Back"
 msgstr "返回"
 
@@ -299,9 +300,17 @@ msgctxt "sticker pack"
 msgid "Delete"
 msgstr "删除"
 
+#: src/pages/chat-thread/chat-members.tsx
+msgid "Delete all messages"
+msgstr "删除所有消息"
+
 #: src/pages/chat-thread/chat-thread.tsx
 msgid "Delete Message"
 msgstr "撤回消息"
+
+#: src/pages/chat-thread/chat-members.tsx
+msgid "Delete messages from last 24 hours"
+msgstr "删除最近 24 小时的消息"
 
 #: src/pages/settings/sticker-pack-detail.tsx
 msgid "Delete pack"
@@ -722,6 +731,10 @@ msgstr "通过邀请码加入"
 msgid "Joining…"
 msgstr "正在加入…"
 
+#: src/pages/chat-thread/chat-members.tsx
+msgid "Keep messages"
+msgstr "保留消息"
+
 #: src/pages/settings/general.tsx
 #: src/pages/settings/language.tsx
 msgid "Language"
@@ -788,6 +801,14 @@ msgstr "成员已升级"
 #: src/pages/chat-thread/chat-members.tsx
 msgid "Member removed"
 msgstr "成员已移除"
+
+#: src/pages/chat-thread/chat-members.tsx
+msgid "Member removed, deleting all messages..."
+msgstr "成员已移除，正在删除所有消息..."
+
+#: src/pages/chat-thread/chat-members.tsx
+msgid "Member removed, deleting recent messages..."
+msgstr "成员已移除，正在删除最近的消息..."
 
 #: src/components/chat/settings/ShareInviteModal.tsx
 #: src/pages/chat-thread/manage-invites.tsx
@@ -898,10 +919,6 @@ msgstr "未找到成员。"
 #: src/components/chat/ChatVirtualScroll.tsx
 msgid "No messages yet"
 msgstr "暂无消息"
-
-#: src/components/chat/ChatList.tsx
-#~ msgid "No new replies"
-#~ msgstr "没有新回复"
 
 #: src/components/chat/PinListModal.tsx
 msgid "No pinned messages"
@@ -1258,7 +1275,7 @@ msgstr "分享邀请"
 
 #: src/pages/settings/general.tsx
 msgid "Show \"All\" Tab in Chats"
-msgstr "在聊天中显示"全部"标签"
+msgstr "在聊天中显示\"全部\"标签"
 
 #: src/pages/settings/general.tsx
 msgid "Small"
