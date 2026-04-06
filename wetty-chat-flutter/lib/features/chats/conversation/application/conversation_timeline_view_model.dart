@@ -76,6 +76,8 @@ class ConversationTimelineState {
     required this.windowMode,
     required this.canLoadOlder,
     required this.canLoadNewer,
+    required this.anchorEntryIndex,
+    required this.anchorAlignment,
     this.isLoadingOlder = false,
     this.isLoadingNewer = false,
     this.pendingLiveCount = 0,
@@ -92,6 +94,13 @@ class ConversationTimelineState {
   final ConversationWindowMode windowMode;
   final bool canLoadOlder;
   final bool canLoadNewer;
+
+  /// Index into [entries] for the scroll anchor.
+  final int anchorEntryIndex;
+
+  /// Viewport fraction where the anchor sits: 0.0 = top, 1.0 = bottom.
+  final double anchorAlignment;
+
   final bool isLoadingOlder;
   final bool isLoadingNewer;
   final int pendingLiveCount;
@@ -108,6 +117,8 @@ class ConversationTimelineState {
     ConversationWindowMode? windowMode,
     bool? canLoadOlder,
     bool? canLoadNewer,
+    int? anchorEntryIndex,
+    double? anchorAlignment,
     bool? isLoadingOlder,
     bool? isLoadingNewer,
     int? pendingLiveCount,
@@ -124,6 +135,8 @@ class ConversationTimelineState {
       windowMode: windowMode ?? this.windowMode,
       canLoadOlder: canLoadOlder ?? this.canLoadOlder,
       canLoadNewer: canLoadNewer ?? this.canLoadNewer,
+      anchorEntryIndex: anchorEntryIndex ?? this.anchorEntryIndex,
+      anchorAlignment: anchorAlignment ?? this.anchorAlignment,
       isLoadingOlder: isLoadingOlder ?? this.isLoadingOlder,
       isLoadingNewer: isLoadingNewer ?? this.isLoadingNewer,
       pendingLiveCount: pendingLiveCount ?? this.pendingLiveCount,
@@ -149,7 +162,7 @@ class ConversationTimelineState {
 
 class ConversationTimelineViewModel
     extends
-        FamilyAsyncNotifier<
+        AutoDisposeFamilyAsyncNotifier<
           ConversationTimelineState,
           ConversationTimelineArgs
         > {
@@ -249,20 +262,36 @@ class ConversationTimelineViewModel
     bool shouldRefreshChats = false,
     int pendingLiveCount = 0,
     ConversationLocatePlan? locatePlan,
+    double? anchorAlignmentOverride,
   }) {
     final trimmed = _repository.trimWindowAroundAnchor(
       windowStableKeys,
       anchorMessageId: anchorMessageId,
     );
+    final entries = _buildEntries(
+      _repository.messagesForWindow(trimmed),
+      unreadMarkerMessageId: unreadMarkerMessageId,
+    );
+
+    // Compute anchor entry index and alignment for the view layer.
+    final anchorEntryIndex = _resolveAnchorEntryIndex(entries, anchorMessageId);
+    final double anchorAlignment;
+    if (anchorAlignmentOverride != null) {
+      anchorAlignment = anchorAlignmentOverride;
+    } else if (locatePlan?.placement == ConversationLocatePlacement.topPreferred) {
+      anchorAlignment = 0.0;
+    } else {
+      anchorAlignment = 1.0;
+    }
+
     return ConversationTimelineState(
-      entries: _buildEntries(
-        _repository.messagesForWindow(trimmed),
-        unreadMarkerMessageId: unreadMarkerMessageId,
-      ),
+      entries: entries,
       windowStableKeys: trimmed,
       windowMode: windowMode,
       canLoadOlder: _repository.hasOlderOutsideWindow(trimmed),
       canLoadNewer: _repository.hasNewerOutsideWindow(trimmed),
+      anchorEntryIndex: anchorEntryIndex,
+      anchorAlignment: anchorAlignment,
       pendingLiveCount: pendingLiveCount,
       highlightedMessageId: highlightedMessageId,
       anchorMessageId: anchorMessageId,
@@ -300,6 +329,26 @@ class ConversationTimelineViewModel
     return entries;
   }
 
+  /// Find the entry index for [anchorMessageId]. Falls back to last entry
+  /// (liveEdge default) when no anchor is specified or not found.
+  int _resolveAnchorEntryIndex(
+    List<TimelineEntry> entries,
+    int? anchorMessageId,
+  ) {
+    if (entries.isEmpty) return 0;
+    if (anchorMessageId != null) {
+      for (var i = 0; i < entries.length; i++) {
+        final entry = entries[i];
+        if (entry is TimelineMessageEntry &&
+            entry.message.serverMessageId == anchorMessageId) {
+          return i;
+        }
+      }
+    }
+    // Default: anchor at the last entry (bottom / live edge).
+    return entries.length - 1;
+  }
+
   void _handleRealtimeEvent(ApiWsEvent event) {
     if (!_repository.applyRealtimeEvent(event) || !state.hasValue) {
       return;
@@ -335,6 +384,7 @@ class ConversationTimelineViewModel
           highlightedMessageId: current.highlightedMessageId,
           shouldRefreshChats: true,
           pendingLiveCount: current.pendingLiveCount + 1,
+          anchorAlignmentOverride: current.anchorAlignment,
         ),
       ),
     );
@@ -373,6 +423,7 @@ class ConversationTimelineViewModel
             highlightedMessageId: current.highlightedMessageId,
             pendingLiveCount: current.pendingLiveCount,
             shouldRefreshChats: current.shouldRefreshChats,
+            anchorAlignmentOverride: current.anchorAlignment,
           ),
         ),
       );
@@ -419,6 +470,7 @@ class ConversationTimelineViewModel
             highlightedMessageId: current.highlightedMessageId,
             pendingLiveCount: reachedLiveEdge ? 0 : current.pendingLiveCount,
             shouldRefreshChats: current.shouldRefreshChats,
+            anchorAlignmentOverride: current.anchorAlignment,
           ),
         ),
       );
@@ -625,7 +677,7 @@ class ConversationTimelineViewModel
 const _sentinel = Object();
 
 final conversationTimelineViewModelProvider =
-    AsyncNotifierProvider.family<
+    AsyncNotifierProvider.autoDispose.family<
       ConversationTimelineViewModel,
       ConversationTimelineState,
       ConversationTimelineArgs

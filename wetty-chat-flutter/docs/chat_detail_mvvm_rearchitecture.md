@@ -296,4 +296,4 @@ Add tests for:
 - `LaunchRequest.unread(...)` always requires a concrete unread anchor message ID.
 - `unread(...)` and `message(...)` remain separate public intents but must use one internal anchored-load implementation.
 - Reactions, pins, and `threadUpdate` are not required for the first rewrite, but the repository delta pipeline should remain extensible enough to support them later.
-- Keep using `scrollable_positioned_list` initially. The replacement seam is the reusable timeline widget, not the entire architecture.
+- Uses `CustomScrollView` with the `center` key pattern instead of `scrollable_positioned_list`. The anchor entry is positioned at a viewport fraction (0.0 = top, 1.0 = bottom) and content grows outward in both directions. Scroll extent is computed from actual content, preventing programmatic overscroll.
