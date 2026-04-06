@@ -3,7 +3,6 @@ import { t } from '@lingui/core/macro';
 import type { MemberResponse } from '@/api/group';
 import { UserAvatar } from '@/components/UserAvatar';
 import styles from './ChatMemberRow.module.scss';
-import { FeatureGate } from '../FeatureGate';
 
 interface ChatMemberRowProps {
   member: MemberResponse;
@@ -18,11 +17,9 @@ export function ChatMemberRow({ member, isAdmin, isCurrentUser, onSelect }: Chat
     <IonItem className={styles.row} button={isAdmin && !isCurrentUser} detail={false} onClick={() => onSelect(member)}>
       <UserAvatar name={displayName} avatarUrl={member.avatarUrl} size={40} className={styles.avatar} />
       <IonLabel>{displayName}</IonLabel>
-      <FeatureGate>
-        <IonChip className={styles.roleChip} color={member.role === 'admin' ? 'primary' : 'medium'} slot="end">
-          {member.role}
-        </IonChip>
-      </FeatureGate>
+      <IonChip className={styles.roleChip} color={member.role === 'admin' ? 'primary' : 'medium'} slot="end">
+        {member.role}
+      </IonChip>
     </IonItem>
   );
 }
