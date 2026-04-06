@@ -5,7 +5,6 @@ import { useDispatch } from 'react-redux';
 import { useEffect, useRef } from 'react';
 import type { AppDispatch } from '@/store/index';
 import { fetchCurrentUser, setUser } from '@/store/userSlice';
-import { fetchRemoteSettings } from '@/store/settingsSlice';
 
 import './app.scss';
 import { getCurrentUserId } from './js/current-user';
@@ -100,7 +99,6 @@ function AppShell() {
       dispatch(setUser({ uid: getCurrentUserId(), username: 'Development User', avatarUrl: null }));
     }
     dispatch(fetchCurrentUser());
-    dispatch(fetchRemoteSettings());
   }, [dispatch]);
 
   if (missingProdToken) {
