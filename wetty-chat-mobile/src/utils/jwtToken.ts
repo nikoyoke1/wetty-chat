@@ -92,11 +92,20 @@ export function syncJwtTokenFromLanding(search: string): string {
 
 // for iOS16 compat
 async function SetTokenCacheStorage(token: string): Promise<void> {
-  const cache = await caches.open('jwt_token');
-  return cache.put('jwt_token', new Response(token));
+  try {
+    const cache = await caches.open('jwt_token');
+    await cache.put('jwt_token', new Response(token));
+  } catch (e) {
+    console.error('Error inserting into cache', e);
+  }
 }
 async function GetTokenCacheStorage(): Promise<string | undefined> {
-  const cache = await caches.open('jwt_token');
-  const response = await cache.match('jwt_token');
-  return response?.text();
+  try {
+    const cache = await caches.open('jwt_token');
+    const response = await cache.match('jwt_token');
+    return response?.text();
+  } catch {
+    console.warn('Failed fetching JWT from cache');
+    return undefined;
+  }
 }
