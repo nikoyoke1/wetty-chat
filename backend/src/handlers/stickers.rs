@@ -423,6 +423,7 @@ async fn post_pack(
         .into_iter()
         .next()
         .unwrap();
+    add_to_sticker_pack_order(conn, uid, pack_id, &state)?;
     Ok(AxumJson(summary))
 }
 
@@ -489,6 +490,7 @@ async fn patch_pack(
 )]
 async fn delete_pack(
     CurrentUid(uid): CurrentUid,
+    State(state): State<crate::AppState>,
     Path(pack_id): Path<i64>,
     mut conn: DbConn,
 ) -> Result<StatusCode, AppError> {
@@ -496,6 +498,7 @@ async fn delete_pack(
     let _pack = require_pack_owner(conn, pack_id, uid)?;
 
     diesel::delete(sticker_packs::table.filter(sticker_packs::id.eq(pack_id))).execute(conn)?;
+    remove_from_sticker_pack_order(conn, uid, pack_id, &state)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -603,11 +606,12 @@ async fn get_my_owned_packs(
 )]
 async fn put_subscription(
     CurrentUid(uid): CurrentUid,
+    State(state): State<crate::AppState>,
     Path(pack_id): Path<i64>,
     mut conn: DbConn,
 ) -> Result<StatusCode, AppError> {
     let conn = &mut *conn;
-    let _pack: StickerPack = sticker_packs::table
+    let pack: StickerPack = sticker_packs::table
         .filter(sticker_packs::id.eq(pack_id))
         .select(StickerPack::as_select())
         .first(conn)
@@ -622,6 +626,9 @@ async fn put_subscription(
         })
         .on_conflict_do_nothing()
         .execute(conn)?;
+
+    // Also update order
+    add_to_sticker_pack_order(conn, uid, pack.id, &state)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -640,6 +647,7 @@ async fn put_subscription(
 )]
 async fn delete_subscription(
     CurrentUid(uid): CurrentUid,
+    State(state): State<crate::AppState>,
     Path(pack_id): Path<i64>,
     mut conn: DbConn,
 ) -> Result<StatusCode, AppError> {
@@ -661,6 +669,7 @@ async fn delete_subscription(
             .filter(user_sticker_pack_subscriptions::pack_id.eq(pack_id)),
     )
     .execute(conn)?;
+    remove_from_sticker_pack_order(conn, uid, pack_id, &state)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -1102,4 +1111,97 @@ pub fn router() -> OpenApiRouter<crate::AppState> {
         .layer(axum::extract::DefaultBodyLimit::max(
             MAX_STICKER_UPLOAD_BYTES,
         ))
+}
+
+fn remove_from_sticker_pack_order(
+    conn: &mut PgConnection,
+    uid: i32,
+    pack_id: i64,
+    state: &crate::AppState,
+) -> Result<(), AppError> {
+    use crate::models::UserExtra;
+    use crate::schema::user_extra;
+
+    if let Ok(Some(extra)) = user_extra::table
+        .filter(user_extra::uid.eq(uid))
+        .first::<UserExtra>(conn)
+        .optional()
+    {
+        if let Ok(mut order) = serde_json::from_value::<
+            Vec<crate::handlers::users::StickerPackOrderItem>,
+        >(extra.sticker_pack_order.clone())
+        {
+            let pack_id_str = pack_id.to_string();
+            let original_len = order.len();
+            order.retain(|item| item.sticker_pack_id != pack_id_str);
+            if order.len() < original_len {
+                let order_json = serde_json::to_value(&order).unwrap_or(serde_json::json!([]));
+                diesel::update(user_extra::table.filter(user_extra::uid.eq(uid)))
+                    .set(user_extra::sticker_pack_order.eq(&order_json))
+                    .execute(conn)?;
+
+                let msg = std::sync::Arc::new(
+                    crate::handlers::ws::messages::ServerWsMessage::StickerPackOrderUpdated(
+                        crate::handlers::ws::messages::StickerPackOrderUpdatePayload { order },
+                    ),
+                );
+                state.ws_registry.broadcast_to_uids(&[uid], msg);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn add_to_sticker_pack_order(
+    conn: &mut PgConnection,
+    uid: i32,
+    pack_id: i64,
+    state: &crate::AppState,
+) -> Result<(), AppError> {
+    use crate::models::UserExtra;
+    use crate::schema::user_extra;
+
+    if let Ok(Some(extra)) = user_extra::table
+        .filter(user_extra::uid.eq(uid))
+        .first::<UserExtra>(conn)
+        .optional()
+    {
+        if let Ok(mut order) = serde_json::from_value::<
+            Vec<crate::handlers::users::StickerPackOrderItem>,
+        >(extra.sticker_pack_order.clone())
+        {
+            let pack_id_str = pack_id.to_string();
+            let mut changed = false;
+
+            let now = chrono::Utc::now().timestamp_millis();
+
+            if let Some(existing) = order.iter_mut().find(|i| i.sticker_pack_id == pack_id_str) {
+                if existing.last_used_on != now {
+                    existing.last_used_on = now;
+                    changed = true;
+                }
+            } else {
+                order.push(crate::handlers::users::StickerPackOrderItem {
+                    sticker_pack_id: pack_id_str,
+                    last_used_on: now,
+                });
+                changed = true;
+            }
+
+            if changed {
+                let order_json = serde_json::to_value(&order).unwrap_or(serde_json::json!([]));
+                diesel::update(user_extra::table.filter(user_extra::uid.eq(uid)))
+                    .set(user_extra::sticker_pack_order.eq(&order_json))
+                    .execute(conn)?;
+
+                let msg = std::sync::Arc::new(
+                    crate::handlers::ws::messages::ServerWsMessage::StickerPackOrderUpdated(
+                        crate::handlers::ws::messages::StickerPackOrderUpdatePayload { order },
+                    ),
+                );
+                state.ws_registry.broadcast_to_uids(&[uid], msg);
+            }
+        }
+    }
+    Ok(())
 }

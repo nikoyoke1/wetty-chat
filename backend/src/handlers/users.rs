@@ -47,14 +47,39 @@ async fn put_stickerpack_order(
     Json(req): Json<UpdateStickerPackOrderRequest>,
 ) -> Result<Json<()>, AppError> {
     let conn = &mut *conn;
-    let order_json = serde_json::to_value(&req.order).unwrap_or(serde_json::json!([]));
+
+    let extra = user_extra::table
+        .filter(user_extra::uid.eq(uid))
+        .first::<UserExtra>(conn)
+        .optional()?;
+
+    let mut current_order = extra
+        .and_then(|e| {
+            serde_json::from_value::<Vec<StickerPackOrderItem>>(e.sticker_pack_order).ok()
+        })
+        .unwrap_or_default();
+
+    for inc in req.order {
+        if let Some(existing) = current_order
+            .iter_mut()
+            .find(|o| o.sticker_pack_id == inc.sticker_pack_id)
+        {
+            existing.last_used_on = inc.last_used_on;
+        } else {
+            current_order.push(inc);
+        }
+    }
+
+    let order_json = serde_json::to_value(&current_order).unwrap_or(serde_json::json!([]));
 
     diesel::update(user_extra::table.filter(user_extra::uid.eq(uid)))
         .set(user_extra::sticker_pack_order.eq(&order_json))
         .execute(conn)?;
 
     let msg = Arc::new(ServerWsMessage::StickerPackOrderUpdated(
-        StickerPackOrderUpdatePayload { order: req.order },
+        StickerPackOrderUpdatePayload {
+            order: current_order,
+        },
     ));
     state.ws_registry.broadcast_to_uids(&[uid], msg);
 

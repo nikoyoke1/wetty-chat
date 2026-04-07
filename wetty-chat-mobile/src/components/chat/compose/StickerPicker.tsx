@@ -45,7 +45,7 @@ export function StickerPicker({ isOpen, onStickerSelect, overlayActiveRef }: Sti
   const [packDetails, setPackDetails] = useState<Record<string, StickerPackDetailResponse>>({});
   const [selectedPackId, setSelectedPackId] = useState('favorites');
   const [isLibraryLoading, setIsLibraryLoading] = useState(false);
-  const [packOrder, setPackOrder] = useState<string[]>([]);
+  const [packOrder, setPackOrder] = useState<{ stickerPackId: string; lastUsedOn: number }[]>([]);
   const hasLoaded = useRef(false);
   const [loadingPackIds, setLoadingPackIds] = useState<Record<string, boolean>>({});
   const [popover, setPopover] = useState<{ sticker: StickerSummary; rect: DOMRect } | null>(null);
@@ -104,7 +104,7 @@ export function StickerPicker({ isOpen, onStickerSelect, overlayActiveRef }: Sti
           if (order.length > 0 && typeof order[0] === 'string') {
             order = order.map((id) => ({ stickerPackId: id, lastUsedOn: 0 }));
           }
-          setPackOrder(order.map((o: any) => o.stickerPackId || o));
+          setPackOrder(order);
         } else {
           setPackOrder([]);
         }
@@ -143,12 +143,11 @@ export function StickerPicker({ isOpen, onStickerSelect, overlayActiveRef }: Sti
       allPacks.sort((a, b) => {
         if (a.id === 'favorites') return -1;
         if (b.id === 'favorites') return 1;
-        const indexA = packOrder.indexOf(a.id);
-        const indexB = packOrder.indexOf(b.id);
-        if (indexA === -1 && indexB === -1) return 0;
-        if (indexA === -1) return 1;
-        if (indexB === -1) return -1;
-        return indexA - indexB;
+        const itemA = packOrder.find((o) => o.stickerPackId === a.id);
+        const itemB = packOrder.find((o) => o.stickerPackId === b.id);
+        const timeA = itemA ? itemA.lastUsedOn : 0;
+        const timeB = itemB ? itemB.lastUsedOn : 0;
+        return timeB - timeA;
       });
     }
 
@@ -185,16 +184,19 @@ export function StickerPicker({ isOpen, onStickerSelect, overlayActiveRef }: Sti
                 rawOrder = rawOrder.map((id) => ({ stickerPackId: id, lastUsedOn: 0 }));
               }
               const newOrder: { stickerPackId: string; lastUsedOn: number }[] = rawOrder;
-              if (newOrder.length > 0 && newOrder[0].stickerPackId !== activePack.id) {
-                const targetObj = newOrder.find((o) => o.stickerPackId === activePack.id) || {
-                  stickerPackId: activePack.id,
-                  lastUsedOn: 0,
-                };
+              const targetObj = newOrder.find((o) => o.stickerPackId === activePack.id) || {
+                stickerPackId: activePack.id,
+                lastUsedOn: 0,
+              };
+
+              const now = Date.now();
+              if (targetObj.lastUsedOn !== now) {
+                targetObj.lastUsedOn = now;
                 const filtered = newOrder.filter((o) => o.stickerPackId !== activePack.id);
-                targetObj.lastUsedOn = Date.now();
                 filtered.unshift(targetObj);
+
                 await kvSet('stickerPackOrder', filtered);
-                void usersApi.updateStickerPackOrder(filtered).catch(console.error);
+                void usersApi.updateStickerPackOrder([targetObj]).catch(console.error);
                 window.dispatchEvent(new Event('stickerPackOrderChanged'));
               }
             }
