@@ -234,15 +234,20 @@ class _ConversationComposerBarState
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  onPressed: canAttach ? _pickAttachment : null,
-                  child: Icon(
-                    CupertinoIcons.add_circled,
-                    color: canAttach
-                        ? CupertinoColors.activeBlue.resolveFrom(context)
-                        : CupertinoColors.systemGrey2.resolveFrom(context),
-                    size: 28,
+                SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(36, 36),
+                    onPressed: canAttach ? _pickAttachment : null,
+                    child: Icon(
+                      CupertinoIcons.add_circled,
+                      color: canAttach
+                          ? CupertinoColors.activeBlue.resolveFrom(context)
+                          : CupertinoColors.systemGrey2.resolveFrom(context),
+                      size: 28,
+                    ),
                   ),
                 ),
                 if (_isUploadingAttachment)
@@ -300,23 +305,31 @@ class _ConversationComposerBarState
                   ),
                 ),
                 const SizedBox(width: 4),
-                CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(36, 36),
-                  onPressed: canSend ? _sendMessage : null,
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: canSend
-                          ? CupertinoColors.activeBlue.resolveFrom(context)
-                          : CupertinoColors.systemGrey3.resolveFrom(context),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      CupertinoIcons.paperplane_fill,
-                      size: 20,
-                      color: CupertinoColors.white,
+                SizedBox(
+                  width: 48,
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(36, 36),
+                      onPressed: canSend ? _sendMessage : null,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: canSend
+                              ? CupertinoColors.activeBlue.resolveFrom(context)
+                              : CupertinoColors.systemGrey3.resolveFrom(
+                                  context,
+                                ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          CupertinoIcons.paperplane_fill,
+                          size: 20,
+                          color: CupertinoColors.white,
+                        ),
+                      ),
                     ),
                   ),
                 ),

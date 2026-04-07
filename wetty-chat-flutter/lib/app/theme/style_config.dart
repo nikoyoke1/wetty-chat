@@ -130,7 +130,7 @@ class AppColors {
     separator: Color(0xFF3A3A3C),
     accentPrimary: Color(0xFF2B7FFF),
     inactive: Color(0xFF8E8E93),
-    chatBackground: .from(alpha: 1.0, red: 0.921, green: 0.898, blue: 0.871),
+    chatBackground: Color(0xFF000000),
     chatSentBubble: Color(0xFF2B7FFF),
     chatReceivedBubble: Color(0xFF2C2C2E),
     chatSentMeta: Color(0xBEFFFFFF),

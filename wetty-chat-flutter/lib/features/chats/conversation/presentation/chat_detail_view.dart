@@ -421,6 +421,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage>
           trailing: _buildNavigationBarTrailing(),
         ),
         child: SafeArea(
+          bottom: false,
           child: GestureDetector(
             onTap: () => FocusScope.of(context).unfocus(),
             child: Column(
@@ -505,9 +506,15 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage>
                     ),
                   ),
                 ),
-                ConversationComposerBar(
-                  scope: scope,
-                  onMessageSent: _scrollToLatest,
+                ColoredBox(
+                  color: colors.backgroundSecondary,
+                  child: SafeArea(
+                    top: false,
+                    child: ConversationComposerBar(
+                      scope: scope,
+                      onMessageSent: _scrollToLatest,
+                    ),
+                  ),
                 ),
               ],
             ),
