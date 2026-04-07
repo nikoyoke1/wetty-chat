@@ -44,7 +44,7 @@ export function EmojiInput({
   );
 
   const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLIonInputElement>) => {
-    if (event.nativeEvent.isComposing || event.key.length > 1) {
+    if (event.nativeEvent.isComposing || event.key.length > 1 || event.ctrlKey || event.metaKey) {
       return;
     }
     if (!isEmojiSequence(event.key)) {
