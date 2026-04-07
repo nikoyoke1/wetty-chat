@@ -961,6 +961,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
                 sender: replyingTo.sender,
                 isDeleted: replyingTo.isDeleted,
                 attachments: replyingTo.attachments,
+                mentions: replyingTo.mentions,
               }
             : undefined,
           clientGeneratedId,
@@ -1073,6 +1074,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
                 sender: replyingTo.sender,
                 isDeleted: replyingTo.isDeleted,
                 attachments: replyingTo.attachments,
+                mentions: replyingTo.mentions,
               }
             : undefined,
           clientGeneratedId,
@@ -1185,6 +1187,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
               sender: replyingTo.sender,
               isDeleted: replyingTo.isDeleted,
               attachments: replyingTo.attachments,
+              mentions: replyingTo.mentions,
             }
           : undefined,
         clientGeneratedId,
