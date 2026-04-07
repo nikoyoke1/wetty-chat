@@ -1321,6 +1321,9 @@ msgstr "表情"
 msgid "Subscribe"
 msgstr "訂閱"
 
+msgid "Manage"
+msgstr "管理"
+
 #: src/pages/settings.tsx
 msgid "Subscribed"
 msgstr "已訂閱"

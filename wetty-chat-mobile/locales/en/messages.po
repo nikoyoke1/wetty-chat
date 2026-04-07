@@ -1378,6 +1378,9 @@ msgstr "Stickers"
 msgid "Subscribe"
 msgstr "Subscribe"
 
+msgid "Manage"
+msgstr "Manage"
+
 #: src/pages/settings.tsx
 msgid "Subscribed"
 msgstr "Subscribed"

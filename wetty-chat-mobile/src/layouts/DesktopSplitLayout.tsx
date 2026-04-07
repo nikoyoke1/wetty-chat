@@ -352,14 +352,21 @@ export function DesktopSplitLayout() {
           ) : currentRoute.stickerPackSettings ? (
             <StickerPackDetailCore
               packId={currentRoute.stickerPackSettings.packId}
-              backAction={{
-                type: 'callback',
-                onBack: () =>
-                  history.push({
-                    pathname: '/settings/stickers',
-                    state: { backgroundPath },
-                  }),
-              }}
+              backAction={
+                (location.state as any)?.fromChat
+                  ? {
+                      type: 'callback',
+                      onBack: closeGlobalSettings,
+                    }
+                  : {
+                      type: 'callback',
+                      onBack: () =>
+                        history.push({
+                          pathname: '/settings/stickers',
+                          state: { backgroundPath },
+                        }),
+                    }
+              }
             />
           ) : currentRoute.stickerSettings ? (
             <StickerSettingsCore

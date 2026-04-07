@@ -255,6 +255,7 @@ export function StickerPackDetailCore({ packId, backAction }: StickerPackDetailC
 }
 
 export default function StickerPackDetailPage() {
-  const { packId } = useParams<{ packId: string }>();
-  return <StickerPackDetailCore packId={packId} backAction={{ type: 'back', defaultHref: '/settings/stickers' }} />;
+  const { packId, id: chatId } = useParams<{ packId: string; id?: string }>();
+  const defaultHref = chatId ? `/chats/chat/${chatId}` : '/settings/stickers';
+  return <StickerPackDetailCore packId={packId} backAction={{ type: 'back', defaultHref }} />;
 }

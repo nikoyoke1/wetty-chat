@@ -77,6 +77,7 @@ const MobileLayout: React.FC = () => {
         <Route path="/chats/chat/:id/settings" exact component={ChatSettingsPage} />
         <Route path="/chats/chat/:id/invites" exact component={ChatInvitesPage} />
         <Route path="/chats/chat/:id/members" exact component={ChatMembersPage} />
+        <Route path="/chats/chat/:id/stickers/:packId" exact component={StickerPackDetailPage} />
         <Route path="/demo" exact component={ComponentDemoPage} />
         <Route path="/settings/general" exact component={GeneralSettingsPage} />
         <Route path="/settings/language" exact component={LanguagePage} />

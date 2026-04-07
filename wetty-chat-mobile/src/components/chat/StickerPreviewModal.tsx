@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { IonContent, IonIcon, IonModal } from '@ionic/react';
-import { close, addCircleOutline, removeCircleOutline } from 'ionicons/icons';
+import { close, addCircleOutline, removeCircleOutline, settingsOutline } from 'ionicons/icons';
+import { useHistory, useLocation } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store';
 import { t } from '@lingui/core/macro';
 import { StickerImage } from '@/components/shared/StickerImage';
 import { Trans } from '@lingui/react/macro';
@@ -38,6 +41,9 @@ export function StickerPreviewModal({ stickerId, onDismiss }: StickerPreviewModa
 }
 
 function StickerPreviewModalContent({ stickerId, isDesktop, onDismiss }: StickerPreviewModalContentProps) {
+  const history = useHistory();
+  const location = useLocation();
+  const currentUserId = useSelector((state: RootState) => state.user.uid);
   const [detail, setDetail] = useState<{ id: string; data: StickerDetailResponse } | null>(null);
   const [packDetail, setPackDetail] = useState<{ id: string; data: StickerPackDetailResponse } | null>(null);
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -142,6 +148,33 @@ function StickerPreviewModalContent({ stickerId, isDesktop, onDismiss }: Sticker
 
   function renderActionButton() {
     if (loading || !pack) return null;
+
+    if (pack.ownerUid === currentUserId) {
+      return (
+        <button
+          type="button"
+          className={`${styles.floatingAction} ${styles.subscribeBtn}`}
+          onClick={() => {
+            onDismiss();
+
+            const chatMatch = location.pathname.match(/^\/chats\/chat\/([^/]+)/);
+            if (!isDesktop && chatMatch) {
+              const chatId = chatMatch[1];
+              history.push(`/chats/chat/${chatId}/stickers/${pack.id}`);
+            } else {
+              history.push({
+                pathname: `/settings/stickers/${pack.id}`,
+                state: { backgroundPath: location.pathname, fromChat: true },
+              });
+            }
+          }}
+        >
+          <IonIcon icon={settingsOutline} />
+          <Trans>Manage</Trans>
+        </button>
+      );
+    }
+
     return (
       <button
         type="button"

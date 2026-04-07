@@ -424,7 +424,7 @@ export function ChatVirtualScroll({
 
   const updateAtBottom = useCallback(() => {
     const container = containerRef.current;
-    if (!container) return;
+    if (!container || container.clientHeight === 0) return;
     if (phaseRef.current !== 'READY') return;
 
     const visualBottom =
@@ -438,7 +438,7 @@ export function ChatVirtualScroll({
 
   const updateLastFullyVisibleMessage = useCallback(() => {
     const container = containerRef.current;
-    if (!container || phaseRef.current !== 'READY') {
+    if (!container || container.clientHeight === 0 || phaseRef.current !== 'READY') {
       if (lastFullyVisibleMessageIdRef.current !== null) {
         lastFullyVisibleMessageIdRef.current = null;
         onLastFullyVisibleMessageChange?.(null);
