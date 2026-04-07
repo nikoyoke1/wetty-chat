@@ -23,7 +23,7 @@ export function useAppLifecycle(): void {
 
       if (state === 'active') {
         syncApp();
-        ensureWebSocketConnected(true);
+        ensureWebSocketConnected();
       }
     };
 

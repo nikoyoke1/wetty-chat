@@ -47,9 +47,12 @@ interface AppStateMessage {
   state: WebSocketAppState;
 }
 
+const STABLE_CONNECTION_MS = 5_000;
+
 let ws: WebSocket | null = null;
 let pingIntervalId: ReturnType<typeof setInterval> | null = null;
 let reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
+let stableResetTimeoutId: ReturnType<typeof setTimeout> | null = null;
 let retryAttempt = 0;
 let isInitialized = false;
 let isConnecting = false;
@@ -94,10 +97,15 @@ function clearReconnectTimeout(): void {
   }
 }
 
-function getReconnectDelayMs(): number {
-  if (retryAttempt === 0) return 0;
+function clearStableResetTimeout(): void {
+  if (stableResetTimeoutId != null) {
+    clearTimeout(stableResetTimeoutId);
+    stableResetTimeoutId = null;
+  }
+}
 
-  const exponential = Math.min(RETRY_BASE_DELAY_MS * 2 ** (retryAttempt - 1), MAX_RECONNECT_DELAY_MS);
+function getReconnectDelayMs(): number {
+  const exponential = Math.min(RETRY_BASE_DELAY_MS * 2 ** retryAttempt, MAX_RECONNECT_DELAY_MS);
   const jitter = Math.round(exponential * RETRY_JITTER_RATIO * Math.random());
   return Math.min(exponential + jitter, MAX_RECONNECT_DELAY_MS);
 }
@@ -248,6 +256,7 @@ function markDisconnected(socket: WebSocket, shouldReconnect: boolean): void {
   }
 
   clearPingInterval();
+  clearStableResetTimeout();
   isConnecting = false;
   store.dispatch(setWsConnected(false));
 
@@ -303,7 +312,11 @@ async function connectWebSocket(): Promise<void> {
       }
 
       isConnecting = false;
-      retryAttempt = 0;
+      clearStableResetTimeout();
+      stableResetTimeoutId = setTimeout(() => {
+        stableResetTimeoutId = null;
+        retryAttempt = 0;
+      }, STABLE_CONNECTION_MS);
       store.dispatch(setWsConnected(true));
 
       sendJson({ type: 'auth', ticket });
@@ -440,6 +453,7 @@ function reconnectNow(resetBackoff: boolean): void {
   }
 
   clearReconnectTimeout();
+  clearStableResetTimeout();
   if (resetBackoff) {
     retryAttempt = 0;
   }
