@@ -1,3 +1,5 @@
 .tab-bar-hidden ion-tab-bar {
-  display: none;
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
 }

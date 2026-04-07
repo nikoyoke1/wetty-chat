@@ -266,6 +266,7 @@
 
 .chat-thread-footer {
   padding-bottom: env(safe-area-inset-bottom);
+  background: var(--ion-background-color, #fff);
 
   &.keyboard-open {
     padding-bottom: 0;
