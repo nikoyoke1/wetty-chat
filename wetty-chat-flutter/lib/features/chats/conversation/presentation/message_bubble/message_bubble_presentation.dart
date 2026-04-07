@@ -4,6 +4,9 @@ import '../../../chat_timestamp_formatter.dart';
 import 'package:flutter/cupertino.dart';
 
 class MessageBubblePresentation {
+  static const double statusIconSize = 14;
+  static const double statusIconGap = 4;
+
   const MessageBubblePresentation({
     required this.senderName,
     required this.timeStr,
@@ -35,7 +38,8 @@ class MessageBubblePresentation {
       textColor: isMe ? colors.textOnAccent : colors.textPrimary,
       metaColor: isMe ? colors.chatSentMeta : colors.chatReceivedMeta,
       linkColor: isMe ? colors.chatLinkOnSent : colors.chatLinkOnReceived,
-      timeSpacerWidth: _measureMetaWidth(context, message, timeStr) + 8,
+      timeSpacerWidth:
+          _measureMetaWidth(context, message, timeStr, isMe: isMe) + 8,
       minBubbleContentHeight: chatMessageFontSize * 1.28,
     );
   }
@@ -55,8 +59,9 @@ class MessageBubblePresentation {
   static double _measureMetaWidth(
     BuildContext context,
     ConversationMessage message,
-    String timeStr,
-  ) {
+    String timeStr, {
+    required bool isMe,
+  }) {
     final metaText = message.isEdited ? 'edited $timeStr' : timeStr;
     final metaPainter = TextPainter(
       text: TextSpan(
@@ -70,6 +75,15 @@ class MessageBubblePresentation {
       textDirection: TextDirection.ltr,
     )..layout(maxWidth: double.infinity);
 
+    if (_showsDeliveryStatus(message, isMe: isMe)) {
+      return metaPainter.width + statusIconGap + statusIconSize;
+    }
+
     return metaPainter.width;
   }
+
+  static bool _showsDeliveryStatus(
+    ConversationMessage message, {
+    required bool isMe,
+  }) => isMe && !message.isFailed;
 }

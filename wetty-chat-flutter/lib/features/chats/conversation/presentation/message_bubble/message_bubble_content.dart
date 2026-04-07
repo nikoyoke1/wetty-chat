@@ -200,8 +200,12 @@ class MessageBubbleContent extends StatelessWidget {
 
   // Meta widget contains is message edited label and time label
   Widget _buildMetaWidget(BuildContext context) {
+    final showDeliveryStatus = isMe && !message.isFailed;
+    final isConfirmed = message.serverMessageId != null;
+
     return Row(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         if (message.isEdited)
           Padding(
@@ -225,6 +229,16 @@ class MessageBubbleContent extends StatelessWidget {
             fontWeight: _bubbleFontWeight,
           ),
         ),
+        if (showDeliveryStatus) ...[
+          const SizedBox(width: MessageBubblePresentation.statusIconGap),
+          Icon(
+            isConfirmed
+                ? CupertinoIcons.checkmark_alt_circle_fill
+                : CupertinoIcons.checkmark_alt_circle,
+            size: MessageBubblePresentation.statusIconSize,
+            color: presentation.metaColor,
+          ),
+        ],
       ],
     );
   }
