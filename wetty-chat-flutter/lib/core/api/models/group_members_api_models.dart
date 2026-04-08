@@ -10,6 +10,7 @@ class GroupMemberDto {
   const GroupMemberDto({
     required this.uid,
     this.username,
+    this.avatarUrl,
     this.role = 'member',
     this.joinedAt,
   });
@@ -17,6 +18,7 @@ class GroupMemberDto {
   @FlexibleIntConverter()
   final int uid;
   final String? username;
+  final String? avatarUrl;
   @JsonKey(defaultValue: 'member')
   final String role;
   @NullableDateTimeConverter()

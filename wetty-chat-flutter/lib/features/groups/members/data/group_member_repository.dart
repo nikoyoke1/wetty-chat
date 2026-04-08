@@ -9,9 +9,41 @@ class GroupMemberRepository {
 
   final GroupMemberApiService _apiService;
 
-  Future<List<GroupMember>> fetchMembers(String chatId) async {
-    final response = await _apiService.fetchMembers(chatId);
-    return response.members.map((member) => member.toDomain()).toList();
+  Future<GroupMembersPage> fetchMembers(
+    String chatId, {
+    int limit = 50,
+    int? after,
+    String? query,
+    GroupMemberSearchMode? searchMode,
+  }) async {
+    final response = await _apiService.fetchMembers(
+      chatId,
+      limit: limit,
+      after: after,
+      query: query,
+      searchMode: searchMode?.wireValue,
+    );
+    return GroupMembersPage(
+      members: response.members.map((member) => member.toDomain()).toList(),
+      canManageMembers: response.canManageMembers,
+      nextCursor: response.nextCursor,
+    );
+  }
+
+  Future<void> addMember(String chatId, {required int userId}) async {
+    await _apiService.addMember(chatId, userId: userId);
+  }
+
+  Future<void> removeMember(String chatId, {required int userId}) async {
+    await _apiService.removeMember(chatId, userId: userId);
+  }
+
+  Future<void> updateMemberRole(
+    String chatId, {
+    required int userId,
+    required String role,
+  }) async {
+    await _apiService.updateMemberRole(chatId, userId: userId, role: role);
   }
 }
 
