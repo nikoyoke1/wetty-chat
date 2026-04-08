@@ -1461,7 +1461,11 @@ export function ChatVirtualScroll({
       mountedRef.current = null;
       setPhaseState(containerHeight > 0 ? 'BOOTSTRAP' : 'WAITING_VIEWPORT');
       triggerRender();
-    } else if (mutation === 'append' && isAtBottomRef.current && !intent?.scrollToKey) {
+    } else if (
+      mutation === 'append' &&
+      (isAtBottomRef.current || pendingScrollToBottomRef.current) &&
+      !intent?.scrollToKey
+    ) {
       logVirtualScroll('append-bottom-lock', {
         pendingScrollToBottom: pendingScrollToBottomRef.current,
         pendingScrollToBottomBehavior: pendingScrollToBottomBehaviorRef.current,
@@ -1469,9 +1473,11 @@ export function ChatVirtualScroll({
         visualBottomDistance: container.scrollHeight - (container.scrollTop + container.clientHeight),
         mounted: mountedRef.current,
       });
-      pendingScrollToBottomRef.current = true;
-      pendingScrollToBottomBehaviorRef.current = 'smooth';
-      pendingScrollToBottomSourceRef.current = 'append-detected';
+      if (!pendingScrollToBottomRef.current) {
+        pendingScrollToBottomRef.current = true;
+        pendingScrollToBottomBehaviorRef.current = 'smooth';
+        pendingScrollToBottomSourceRef.current = 'append-detected';
+      }
       ensureBottomMeasured();
     } else if (mutation === 'append') {
       logVirtualScroll('append-preserve-natural-position', {
@@ -2192,7 +2198,7 @@ export function ChatVirtualScroll({
         // case where ensureBottomMeasured bails due to a pending staging batch,
         // leaving the new rows unmounted and invisible until the batch completes.
         const mounted = mountedRef.current;
-        if (mounted && isAtBottomRef.current) {
+        if (mounted && (isAtBottomRef.current || pendingScrollToBottomRef.current)) {
           const cappedEnd = Math.min(rowKeys.length - 1, mounted.end + WINDOW_CAP);
           if (cappedEnd > mounted.end) {
             mountedRef.current = { start: mounted.start, end: cappedEnd };
