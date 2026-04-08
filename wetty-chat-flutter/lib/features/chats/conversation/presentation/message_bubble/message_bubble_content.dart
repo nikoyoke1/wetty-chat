@@ -56,6 +56,7 @@ class MessageBubbleContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasAttachments = message.attachments.isNotEmpty;
     final contentChildren = <Widget>[
       if (!isMe && showSenderName) _buildSenderHeader(context),
       if (message.replyToMessage != null)
@@ -86,15 +87,20 @@ class MessageBubbleContent extends StatelessWidget {
       );
     }
 
-    contentChildren.add(_buildMessageBody(context));
-
-    if (message.attachments.isNotEmpty) {
+    if (hasAttachments) {
       if (contentChildren.isNotEmpty) {
         contentChildren.add(const SizedBox(height: 8));
       }
       contentChildren.add(
         _buildAttachmentSection(context, message.attachments),
       );
+    }
+
+    if (hasAttachments || (message.message?.isNotEmpty ?? false)) {
+      if (contentChildren.isNotEmpty) {
+        contentChildren.add(const SizedBox(height: 4));
+      }
+      contentChildren.add(_buildMessageBody(context));
     }
 
     final threadInfo = message.threadInfo;
@@ -169,38 +175,30 @@ class MessageBubbleContent extends StatelessWidget {
     final metaWidget = _buildMetaWidget(context);
 
     if (messageText.isEmpty) {
-      return SizedBox(
+      return Align(alignment: Alignment.centerRight, child: metaWidget);
+    }
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: SizedBox(
         width: double.infinity,
         child: Stack(
           children: [
-            SizedBox(
-              width: presentation.timeSpacerWidth,
-              height: presentation.minBubbleContentHeight,
+            LinkifiedMessageText(
+              text: messageText,
+              textStyle: _bubbleStyle(
+                context,
+                color: presentation.textColor,
+                fontSize: chatMessageFontSize,
+                height: 1.28,
+                fontWeight: _bubbleFontWeight,
+              ),
+              linkColor: presentation.linkColor,
+              trailingSpacerWidth: presentation.timeSpacerWidth,
             ),
             Positioned(right: 0, bottom: 0, child: metaWidget),
           ],
         ),
-      );
-    }
-
-    return SizedBox(
-      width: double.infinity,
-      child: Stack(
-        children: [
-          LinkifiedMessageText(
-            text: messageText,
-            textStyle: _bubbleStyle(
-              context,
-              color: presentation.textColor,
-              fontSize: chatMessageFontSize,
-              height: 1.28,
-              fontWeight: _bubbleFontWeight,
-            ),
-            linkColor: presentation.linkColor,
-            trailingSpacerWidth: presentation.timeSpacerWidth,
-          ),
-          Positioned(right: 0, bottom: 0, child: metaWidget),
-        ],
       ),
     );
   }
@@ -288,28 +286,49 @@ class MessageBubbleContent extends StatelessWidget {
     BuildContext context,
     List<AttachmentItem> attachments,
   ) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: attachments.map((attachment) {
-        if (attachment.isVideo && attachment.url.isNotEmpty) {
-          return VideoAttachmentPreview(
-            attachment: attachment,
-            onTap: () => onOpenAttachment?.call(attachment),
-          );
-        }
-        if (attachment.isImage && attachment.url.isNotEmpty) {
-          return MessageImageAttachmentPreview(
-            attachment: attachment,
-            onTap: () => onOpenAttachment?.call(attachment),
-            fallback: _buildFileAttachmentTile(context, attachment),
-          );
-        }
-        return GestureDetector(
-          onTap: () => onOpenAttachment?.call(attachment),
-          child: _buildFileAttachmentTile(context, attachment),
-        );
-      }).toList(),
+    final maxAttachmentWidth = presentation.maxBubbleWidth - 24;
+
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var index = 0; index < attachments.length; index++) ...[
+            if (index > 0) const SizedBox(height: 8),
+            _buildAttachmentPreview(
+              context,
+              attachments[index],
+              maxAttachmentWidth: maxAttachmentWidth,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttachmentPreview(
+    BuildContext context,
+    AttachmentItem attachment, {
+    required double maxAttachmentWidth,
+  }) {
+    if (attachment.isVideo && attachment.url.isNotEmpty) {
+      return VideoAttachmentPreview(
+        attachment: attachment,
+        onTap: () => onOpenAttachment?.call(attachment),
+      );
+    }
+    if (attachment.isImage && attachment.url.isNotEmpty) {
+      return MessageImageAttachmentPreview(
+        attachment: attachment,
+        onTap: () => onOpenAttachment?.call(attachment),
+        fallback: _buildFileAttachmentTile(context, attachment),
+        maxWidth: maxAttachmentWidth,
+      );
+    }
+    return GestureDetector(
+      onTap: () => onOpenAttachment?.call(attachment),
+      child: _buildFileAttachmentTile(context, attachment),
     );
   }
 
