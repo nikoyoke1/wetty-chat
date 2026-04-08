@@ -1,9 +1,16 @@
+import 'dart:math' as math;
+
+import 'package:flutter/cupertino.dart';
+
 import '../../domain/conversation_message.dart';
 import '../../../../../app/theme/style_config.dart';
 import '../../../chat_timestamp_formatter.dart';
-import 'package:flutter/cupertino.dart';
 
 class MessageBubblePresentation {
+  static const double maxRowWidthFactor = 0.80;
+  static const double rowHorizontalPadding = 24;
+  static const double avatarSlotWidth = 36;
+  static const double avatarGap = 8;
   static const double statusIconSize = 14;
   static const double statusIconGap = 4;
 
@@ -24,6 +31,7 @@ class MessageBubblePresentation {
     required ConversationMessage message,
     required bool isMe,
     required double chatMessageFontSize,
+    double? maxBubbleWidth,
   }) {
     final colors = context.appColors;
     final senderName = message.sender.name ?? 'User ${message.sender.uid}';
@@ -33,7 +41,15 @@ class MessageBubblePresentation {
     return MessageBubblePresentation(
       senderName: senderName,
       timeStr: timeStr,
-      maxBubbleWidth: screenWidth * 0.75,
+      maxBubbleWidth:
+          maxBubbleWidth ??
+          math.max(
+            0,
+            (screenWidth * maxRowWidthFactor) -
+                rowHorizontalPadding -
+                avatarSlotWidth -
+                avatarGap,
+          ),
       bubbleColor: isMe ? colors.chatSentBubble : colors.chatReceivedBubble,
       textColor: isMe ? colors.textOnAccent : colors.textPrimary,
       metaColor: isMe ? colors.chatSentMeta : colors.chatReceivedMeta,

@@ -59,6 +59,8 @@ class MessageRow extends StatefulWidget {
 class _MessageRowState extends State<MessageRow>
     with SingleTickerProviderStateMixin {
   static const double _replyThreshold = 60;
+  static const double _rowHorizontalPadding =
+      MessageBubblePresentation.rowHorizontalPadding / 2;
   static const Set<String> _replyableMessageTypes = <String>{
     'text',
     'audio',
@@ -244,7 +246,10 @@ class _MessageRowState extends State<MessageRow>
         borderRadius: BorderRadius.circular(12),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        padding: const EdgeInsets.symmetric(
+          horizontal: _rowHorizontalPadding,
+          vertical: 4,
+        ),
         child: Align(
           alignment: _isMe ? Alignment.centerRight : Alignment.centerLeft,
           child: Row(
@@ -254,17 +259,25 @@ class _MessageRowState extends State<MessageRow>
                 ? [
                     bubble,
                     if (widget.showAvatar) ...[
-                      const SizedBox(width: 8),
+                      const SizedBox(
+                        width: MessageBubblePresentation.avatarGap,
+                      ),
                       avatar,
                     ] else
-                      const SizedBox(width: 36),
+                      const SizedBox(
+                        width: MessageBubblePresentation.avatarSlotWidth,
+                      ),
                   ]
                 : [
                     if (widget.showAvatar) ...[
                       avatar,
-                      const SizedBox(width: 8),
+                      const SizedBox(
+                        width: MessageBubblePresentation.avatarGap,
+                      ),
                     ] else
-                      const SizedBox(width: 36),
+                      const SizedBox(
+                        width: MessageBubblePresentation.avatarSlotWidth,
+                      ),
                     bubble,
                   ],
           ),

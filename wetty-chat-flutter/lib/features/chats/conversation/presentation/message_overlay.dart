@@ -203,6 +203,7 @@ class MessageOverlay extends StatelessWidget {
       message: message,
       isMe: details.isMe,
       chatMessageFontSize: chatMessageFontSize,
+      maxBubbleWidth: width,
     );
 
     return SizedBox(
