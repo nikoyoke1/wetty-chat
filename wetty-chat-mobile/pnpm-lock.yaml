@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@chenglou/pretext':
+        specifier: ^0.0.5
+        version: 0.0.5
       '@ionic/react':
         specifier: ^8.7.18
         version: 8.8.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -26,6 +29,15 @@ importers:
       axios:
         specifier: ^1.13.6
         version: 1.13.6
+      emoji-picker-react:
+        specifier: ^4.18.0
+        version: 4.18.0(react@19.2.4)
+      emoji-regex-xs:
+        specifier: ^2.0.1
+        version: 2.0.1
+      idb:
+        specifier: ^8.0.3
+        version: 8.0.3
       ionicons:
         specifier: ^8.0.13
         version: 8.0.13
@@ -50,6 +62,9 @@ importers:
       react-virtuoso:
         specifier: ^4.18.3
         version: 4.18.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      react-voicemail-player:
+        specifier: ^0.0.10
+        version: 0.0.10(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       uuid:
         specifier: ^13.0.0
         version: 13.0.0
@@ -647,6 +662,9 @@ packages:
 
   '@canvas/image-data@1.1.0':
     resolution: {integrity: sha512-QdObRRjRbcXGmM1tmJ+MrHcaz1MftF2+W7YI+MsphnsCrmtyfS0d5qJbk0MeSbUeyM/jCb0hmnkXPsy026L7dA==}
+
+  '@chenglou/pretext@0.0.5':
+    resolution: {integrity: sha512-A8GZN10REdFGsyuiUgLV8jjPDDFMg5GmgxGWV0I3igxBOnzj+jgz2VMmVD7g+SFyoctfeqHFxbNatKSzVRWtRg==}
 
   '@emnapi/runtime@1.9.1':
     resolution: {integrity: sha512-VYi5+ZVLhpgK4hQ0TAjiQiZ6ol0oe4mBx7mVv7IflsiEp0OWoVsp/+f9Vc1hOhE0TtkORVrI1GvzyreqpgWtkA==}
@@ -2125,6 +2143,16 @@ packages:
   electron-to-chromium@1.5.322:
     resolution: {integrity: sha512-vFU34OcrvMcH66T+dYC3G4nURmgfDVewMIu6Q2urXpumAPSMmzvcn04KVVV8Opikq8Vs5nUbO/8laNhNRqSzYw==}
 
+  emoji-picker-react@4.18.0:
+    resolution: {integrity: sha512-vLTrLfApXAIciguGE57pXPWs9lPLBspbEpPMiUq03TIli2dHZBiB+aZ0R9/Wat0xmTfcd4AuEzQgSYxEZ8C88Q==}
+    engines: {node: '>=10'}
+    peerDependencies:
+      react: '>=16'
+
+  emoji-regex-xs@2.0.1:
+    resolution: {integrity: sha512-1QFuh8l7LqUcKe24LsPUNzjrzJQ7pgRwp1QMcZ5MX6mFplk2zQ08NVCM84++1cveaUUYtcCYHmeFEuNg16sU4g==}
+    engines: {node: '>=10.0.0'}
+
   error-ex@1.3.4:
     resolution: {integrity: sha512-sqQamAnR14VgCr1A618A3sGrygcpK+HEbenA/HiEAkkUwcZIIB/tgWqHFxWgOyDh4nB4JCRimh79dR5Ywc9MDQ==}
 
@@ -2272,6 +2300,9 @@ packages:
   find-up@5.0.0:
     resolution: {integrity: sha512-78/PXT1wlLLDgTzDs7sjq9hzz0vXD+zn+7wypEe4fXQxCmdmqfGsEPQxmiCSQI3ajFV91bVSsvNtrJRiW6nGng==}
     engines: {node: '>=10'}
+
+  flairup@1.0.0:
+    resolution: {integrity: sha512-IKlE+pNvL2R+kVL1kEhUYqRxVqeFnjiIvHWDMLFXNaqyUdFXQM2wte44EfMYJNHkW16X991t2Zg8apKkhv7OBA==}
 
   flat-cache@4.0.1:
     resolution: {integrity: sha512-f7ccFPK3SXFHpx15UIGyRJ/FJQctuKZ0zVuN3frBo4HnK3cay9VEW0R6yPYFHC0AgqhukPzKjq22t5DmAyqGyw==}
@@ -2432,6 +2463,9 @@ packages:
 
   idb@7.1.1:
     resolution: {integrity: sha512-gchesWBzyvGHRO9W8tzUWFDycow5gwjvFKfyV9FF32Y7F50yZMp7mP+T2mJIWFx49zicqyC4uefHM17o6xKIVQ==}
+
+  idb@8.0.3:
+    resolution: {integrity: sha512-LtwtVyVYO5BqRvcsKuB2iUMnHwPVByPCXFXOpuU96IZPPoPN6xjOGxZQ74pgSVVLQWtUOYgyeL4GE98BY5D3wg==}
 
   ieee754@1.2.1:
     resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
@@ -3011,6 +3045,13 @@ packages:
     peerDependencies:
       react: '>=16 || >=17 || >= 18 || >= 19'
       react-dom: '>=16 || >=17 || >= 18 || >=19'
+
+  react-voicemail-player@0.0.10:
+    resolution: {integrity: sha512-OZbDVQQcEJK1PhzaUMscGYILsdVkcqgORHE0MgbwDUluHUdKx/ndni8hTo9sjm/XL2XXQ9Wag+72U6PPrGBAnw==}
+    engines: {node: '>= 14'}
+    peerDependencies:
+      react: '>= 18.0.0'
+      react-dom: '>= 18.0.0'
 
   react@19.2.4:
     resolution: {integrity: sha512-9nfp2hYpCwOjAN+8TZFGhtWEwgvWHXqESH8qT89AT/lWklpLON22Lc8pEtnpsZz7VmawabSU0gCjnj8aC0euHQ==}
@@ -4252,6 +4293,8 @@ snapshots:
       '@babel/helper-validator-identifier': 7.28.5
 
   '@canvas/image-data@1.1.0': {}
+
+  '@chenglou/pretext@0.0.5': {}
 
   '@emnapi/runtime@1.9.1':
     dependencies:
@@ -5527,6 +5570,13 @@ snapshots:
 
   electron-to-chromium@1.5.322: {}
 
+  emoji-picker-react@4.18.0(react@19.2.4):
+    dependencies:
+      flairup: 1.0.0
+      react: 19.2.4
+
+  emoji-regex-xs@2.0.1: {}
+
   error-ex@1.3.4:
     dependencies:
       is-arrayish: 0.2.1
@@ -5792,6 +5842,8 @@ snapshots:
       locate-path: 6.0.0
       path-exists: 4.0.0
 
+  flairup@1.0.0: {}
+
   flat-cache@4.0.1:
     dependencies:
       flatted: 3.4.2
@@ -5957,6 +6009,8 @@ snapshots:
       postcss: 8.5.8
 
   idb@7.1.1: {}
+
+  idb@8.0.3: {}
 
   ieee754@1.2.1: {}
 
@@ -6483,6 +6537,11 @@ snapshots:
       tiny-warning: 1.0.3
 
   react-virtuoso@4.18.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4):
+    dependencies:
+      react: 19.2.4
+      react-dom: 19.2.4(react@19.2.4)
+
+  react-voicemail-player@0.0.10(react-dom@19.2.4(react@19.2.4))(react@19.2.4):
     dependencies:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)

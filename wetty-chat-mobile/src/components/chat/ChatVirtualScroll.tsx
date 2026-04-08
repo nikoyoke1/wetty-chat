@@ -1,5 +1,13 @@
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { t } from '@lingui/core/macro';
+import { useSelector } from 'react-redux';
+import { selectChatFontSizeStyle } from '@/store/settingsSlice';
+import {
+  parseChatBubbleContentToRichItems,
+  getMessageLayoutStats,
+  getChatBaseFont,
+  getChatBubbleMaxWidth,
+} from '@/utils/chatTextMeasure';
 import { HeightCache } from './virtualScroll/heightCache';
 import { MeasuredRow } from './virtualScroll/MeasuredRow';
 import { FenwickTree } from './virtualScroll/fenwick';
@@ -146,18 +154,33 @@ function capRange(range: MountedWindow, maxIndex: number): MountedWindow {
   return { start, end: Math.min(maxIndex, start + WINDOW_CAP - 1) };
 }
 
-function estimateRowHeight(row: ChatRow): number {
+function estimateRowHeight(row: ChatRow, chatFontSizeStyle: string): number {
   if (row.type === 'date') return 32;
 
   const { message } = row;
   if (message.isDeleted) return 48;
 
   let estimate = message.attachments?.length || message.sticker ? 220 : 76;
+
+  if (message.messageType === 'text' && !message.attachments?.length && !message.sticker && message.message) {
+    try {
+      const fontSizeNum = parseInt(chatFontSizeStyle) || 14;
+      const baseFont = getChatBaseFont(chatFontSizeStyle as string);
+      const items = parseChatBubbleContentToRichItems(message.message, message.mentions, baseFont);
+      const maxWidth = getChatBubbleMaxWidth();
+      const stats = getMessageLayoutStats(items, maxWidth);
+      const lineHeight = fontSizeNum * 1.4;
+      estimate = stats.lineCount * lineHeight + 60;
+    } catch {
+      /* ignore measure errors */
+    }
+  }
+
   if (message.replyToMessage) {
     estimate += 26;
   }
 
-  return Math.min(estimate, 320);
+  return Math.min(estimate, 3000);
 }
 
 function visiblePrefixHeight(rowTop: number, rowHeight: number, viewportTop: number): number {
@@ -182,6 +205,7 @@ export function ChatVirtualScroll({
   onLastFullyVisibleMessageChange,
   onFirstVisibleMessageChange,
 }: ChatVirtualScrollProps) {
+  const chatFontSizeStyle = useSelector(selectChatFontSizeStyle);
   const containerRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const rowRefsMap = useRef(new Map<string, HTMLDivElement>());
@@ -189,6 +213,13 @@ export function ChatVirtualScroll({
   const treeRef = useRef(new FenwickTree(0));
   const treeKeysRef = useRef<string[]>([]);
   const mountedRef = useRef<MountedWindow | null>(null);
+
+  const lastFontSizeRef = useRef(chatFontSizeStyle);
+  if (lastFontSizeRef.current !== chatFontSizeStyle) {
+    lastFontSizeRef.current = chatFontSizeStyle;
+    heightCacheRef.current.clear();
+    treeKeysRef.current = [];
+  }
 
   const layoutIntentRef = useRef<LayoutIntent | null>(null);
   const isAtBottomRef = useRef(true);
@@ -286,7 +317,7 @@ export function ChatVirtualScroll({
       const key = rowKeys[index];
       const row = rows[index];
       if (!row) continue;
-      tree.set(index, heightCacheRef.current.get(key) ?? estimateRowHeight(row));
+      tree.set(index, heightCacheRef.current.get(key) ?? estimateRowHeight(row, chatFontSizeStyle));
     }
     treeRef.current = tree;
     treeKeysRef.current = rowKeys;

@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type HTMLAttributes, type ReactNode, type Ref } from 'react';
+import { useMemo, useState, type CSSProperties, type HTMLAttributes, type ReactNode, type Ref } from 'react';
 import { IonIcon } from '@ionic/react';
 import {
   arrowUndo,
@@ -25,9 +25,17 @@ import { InviteLinkInline } from './InviteLinkInline';
 import { PermalinkInline } from './PermalinkInline';
 import { SingleMediaAttachment } from './media/SingleMediaAttachment';
 import { JustifiedMediaGallery } from './media/JustifiedMediaGallery';
+import {
+  parseChatBubbleContentToRichItems,
+  getMessageLayoutStats,
+  URL_REGEX,
+  TRAILING_PUNCT,
+  getChatBaseFont,
+  getChatBubbleMaxWidth,
+  MENTION_TEST,
+  MENTION_REGEX,
+} from '@/utils/chatTextMeasure';
 
-const URL_REGEX = /(https?:\/\/[A-Za-z0-9\-._~:/?#@!$&'()*+,;=%]+)/g;
-const TRAILING_PUNCT = /[.,);!?]+$/;
 const PERMALINK_PATH_RE = /^\/m\/([A-Za-z0-9_-]+)$/;
 
 function parsePermalinkFromUrl(url: string): { chatId: string; messageId: string; encoded: string } | null {
@@ -90,8 +98,6 @@ function renderMessageWithLinks(message: string): ReactNode[] {
   });
 }
 
-const MENTION_TEST = /@\[uid:\d+\]/;
-
 function renderMessageContent(
   message: string,
   mentions: MentionInfo[] | undefined,
@@ -109,7 +115,7 @@ function renderMessageContent(
     }
   }
 
-  const regex = /@\[uid:(\d+)\]/g;
+  const regex = new RegExp(MENTION_REGEX);
   const result: ReactNode[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -258,6 +264,20 @@ export function ChatBubbleBase({
   const hasTopContent = showName || replyTo;
   const hasBottomContent = message && message.trim() !== '';
   const isMediaOnly = imageAttachments.length > 0 && !hasBottomContent && otherAttachments.length === 0;
+
+  const baseFont = getChatBaseFont(chatFontSizeStyle as string);
+
+  const layoutStats = useMemo(() => {
+    if (messageType === 'text' && hasBottomContent) {
+      try {
+        const items = parseChatBubbleContentToRichItems(message, mentions, baseFont);
+        return getMessageLayoutStats(items, getChatBubbleMaxWidth());
+      } catch {
+        return undefined;
+      }
+    }
+    return undefined;
+  }, [messageType, hasBottomContent, message, mentions, baseFont]);
 
   const mediaContainerClasses = [
     styles.attachmentsContainer,
@@ -515,7 +535,14 @@ export function ChatBubbleBase({
         <div className={styles.attachmentsContainer}>{otherAttachments.map(renderAttachment)}</div>
       )}
       {(hasBottomContent || !isMediaOnly) && (
-        <div className={styles.messageWrapper}>
+        <div
+          className={styles.messageWrapper}
+          style={
+            layoutStats && layoutStats.lineCount > 1
+              ? { width: `min(100%, ${Math.ceil(layoutStats.maxLineWidth) + 12}px)` }
+              : undefined
+          }
+        >
           {hasBottomContent && (
             <span className={styles.messageText}>
               {renderMessageContent(message, mentions, currentUserUid, interactive ? onMentionClick : undefined)}
