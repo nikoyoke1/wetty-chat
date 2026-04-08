@@ -2,15 +2,15 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:wetty_chat_flutter/core/api/models/chats_api_models.dart';
-import 'package:wetty_chat_flutter/core/api/models/messages_api_models.dart';
-import 'package:wetty_chat_flutter/core/api/models/websocket_api_models.dart';
-import 'package:wetty_chat_flutter/core/network/websocket_service.dart';
-import 'package:wetty_chat_flutter/features/chats/conversation/application/conversation_timeline_view_model.dart';
-import 'package:wetty_chat_flutter/features/chats/conversation/data/message_api_service.dart';
-import 'package:wetty_chat_flutter/features/chats/conversation/domain/conversation_scope.dart';
-import 'package:wetty_chat_flutter/features/chats/conversation/domain/launch_request.dart';
-import 'package:wetty_chat_flutter/features/chats/conversation/domain/viewport_placement.dart';
+import 'package:chahua/core/api/models/chats_api_models.dart';
+import 'package:chahua/core/api/models/messages_api_models.dart';
+import 'package:chahua/core/api/models/websocket_api_models.dart';
+import 'package:chahua/core/network/websocket_service.dart';
+import 'package:chahua/features/chats/conversation/application/conversation_timeline_view_model.dart';
+import 'package:chahua/features/chats/conversation/data/message_api_service.dart';
+import 'package:chahua/features/chats/conversation/domain/conversation_scope.dart';
+import 'package:chahua/features/chats/conversation/domain/launch_request.dart';
+import 'package:chahua/features/chats/conversation/domain/viewport_placement.dart';
 
 void main() {
   group('ConversationTimelineViewModel locate plans', () {

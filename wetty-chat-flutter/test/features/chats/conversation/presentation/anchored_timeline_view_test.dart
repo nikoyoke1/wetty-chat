@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:wetty_chat_flutter/features/chats/conversation/presentation/anchored_timeline_view.dart';
+import 'package:chahua/features/chats/conversation/presentation/anchored_timeline_view.dart';
 
 void main() {
   group('resolveTopPreferredAnchorAlignment', () {

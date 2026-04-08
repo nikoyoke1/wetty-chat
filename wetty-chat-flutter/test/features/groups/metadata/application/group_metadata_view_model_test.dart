@@ -2,13 +2,13 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:wetty_chat_flutter/core/api/models/group_info_api_models.dart';
-import 'package:wetty_chat_flutter/core/network/websocket_service.dart';
-import 'package:wetty_chat_flutter/features/chats/models/chat_models.dart';
-import 'package:wetty_chat_flutter/features/chats/list/data/chat_repository.dart';
-import 'package:wetty_chat_flutter/features/groups/metadata/application/group_metadata_view_model.dart';
-import 'package:wetty_chat_flutter/features/groups/metadata/data/group_metadata_api_service.dart';
-import 'package:wetty_chat_flutter/features/groups/metadata/data/group_metadata_repository.dart';
+import 'package:chahua/core/api/models/group_info_api_models.dart';
+import 'package:chahua/core/network/websocket_service.dart';
+import 'package:chahua/features/chats/models/chat_models.dart';
+import 'package:chahua/features/chats/list/data/chat_repository.dart';
+import 'package:chahua/features/groups/metadata/application/group_metadata_view_model.dart';
+import 'package:chahua/features/groups/metadata/data/group_metadata_api_service.dart';
+import 'package:chahua/features/groups/metadata/data/group_metadata_repository.dart';
 
 void main() {
   test(

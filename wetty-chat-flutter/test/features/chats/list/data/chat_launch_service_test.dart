@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:wetty_chat_flutter/core/api/models/messages_api_models.dart';
-import 'package:wetty_chat_flutter/features/chats/conversation/data/message_api_service.dart';
-import 'package:wetty_chat_flutter/features/chats/conversation/domain/conversation_scope.dart';
-import 'package:wetty_chat_flutter/features/chats/conversation/domain/launch_request.dart';
-import 'package:wetty_chat_flutter/features/chats/list/data/chat_launch_service.dart';
-import 'package:wetty_chat_flutter/features/chats/models/chat_models.dart';
+import 'package:chahua/core/api/models/messages_api_models.dart';
+import 'package:chahua/features/chats/conversation/data/message_api_service.dart';
+import 'package:chahua/features/chats/conversation/domain/conversation_scope.dart';
+import 'package:chahua/features/chats/conversation/domain/launch_request.dart';
+import 'package:chahua/features/chats/list/data/chat_launch_service.dart';
+import 'package:chahua/features/chats/models/chat_models.dart';
 
 void main() {
   group('ChatLaunchService', () {

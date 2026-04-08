@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:wetty_chat_flutter/core/api/models/messages_api_models.dart';
-import 'package:wetty_chat_flutter/core/api/models/websocket_api_models.dart';
-import 'package:wetty_chat_flutter/features/chats/conversation/data/conversation_repository.dart';
-import 'package:wetty_chat_flutter/features/chats/conversation/data/message_api_service.dart';
-import 'package:wetty_chat_flutter/features/chats/conversation/domain/conversation_scope.dart';
-import 'package:wetty_chat_flutter/features/chats/models/message_models.dart';
+import 'package:chahua/core/api/models/messages_api_models.dart';
+import 'package:chahua/core/api/models/websocket_api_models.dart';
+import 'package:chahua/features/chats/conversation/data/conversation_repository.dart';
+import 'package:chahua/features/chats/conversation/data/message_api_service.dart';
+import 'package:chahua/features/chats/conversation/domain/conversation_scope.dart';
+import 'package:chahua/features/chats/models/message_models.dart';
 
 void main() {
   group('ConversationRepository reactions', () {

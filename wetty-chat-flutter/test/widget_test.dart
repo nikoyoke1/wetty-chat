@@ -5,9 +5,9 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:wetty_chat_flutter/app/app.dart';
-import 'package:wetty_chat_flutter/core/providers/http_client_provider.dart';
-import 'package:wetty_chat_flutter/core/providers/shared_preferences_provider.dart';
+import 'package:chahua/app/app.dart';
+import 'package:chahua/core/providers/http_client_provider.dart';
+import 'package:chahua/core/providers/shared_preferences_provider.dart';
 
 void main() {
   testWidgets('WettyChatApp builds a CupertinoApp.router shell', (

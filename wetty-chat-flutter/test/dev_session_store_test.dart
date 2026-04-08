@@ -3,9 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:wetty_chat_flutter/core/providers/http_client_provider.dart';
-import 'package:wetty_chat_flutter/core/providers/shared_preferences_provider.dart';
-import 'package:wetty_chat_flutter/core/session/dev_session_store.dart';
+import 'package:chahua/core/providers/http_client_provider.dart';
+import 'package:chahua/core/providers/shared_preferences_provider.dart';
+import 'package:chahua/core/session/dev_session_store.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -103,32 +103,38 @@ void main() {
     expect(session.jwtToken, isNull);
   });
 
-  test('clearJwt re-runs bootstrap and becomes unauthenticated when dev probe fails', () async {
-    SharedPreferences.setMockInitialValues({
-      'auth_session_jwt_token': 'persisted-token',
-    });
-    final prefs = await SharedPreferences.getInstance();
-    final requests = <Uri>[];
-    container = ProviderContainer(
-      overrides: [
-        sharedPreferencesProvider.overrideWithValue(prefs),
-        httpClientProvider.overrideWithValue(
-          MockClient((request) async {
-            requests.add(request.url);
-            return http.Response('unauthorized', 401);
-          }),
-        ),
-      ],
-    );
+  test(
+    'clearJwt re-runs bootstrap and becomes unauthenticated when dev probe fails',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'auth_session_jwt_token': 'persisted-token',
+      });
+      final prefs = await SharedPreferences.getInstance();
+      final requests = <Uri>[];
+      container = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          httpClientProvider.overrideWithValue(
+            MockClient((request) async {
+              requests.add(request.url);
+              return http.Response('unauthorized', 401);
+            }),
+          ),
+        ],
+      );
 
-    await container.read(authSessionProvider.notifier).clearJwt();
+      await container.read(authSessionProvider.notifier).clearJwt();
 
-    final session = container.read(authSessionProvider);
-    expect(session.status, AuthBootstrapStatus.unauthenticated);
-    expect(session.mode, AuthSessionMode.none);
-    expect(session.jwtToken, isNull);
-    expect(requests.where((uri) => uri.path.endsWith('/users/auth-token')).length, 1);
-  });
+      final session = container.read(authSessionProvider);
+      expect(session.status, AuthBootstrapStatus.unauthenticated);
+      expect(session.mode, AuthSessionMode.none);
+      expect(session.jwtToken, isNull);
+      expect(
+        requests.where((uri) => uri.path.endsWith('/users/auth-token')).length,
+        1,
+      );
+    },
+  );
 
   test('bootstrap falls back to unauthenticated when request throws', () async {
     container = ProviderContainer(
@@ -151,27 +157,30 @@ void main() {
     expect(session.mode, AuthSessionMode.none);
   });
 
-  test('bootstrap can run again after a previous bootstrap completed', () async {
-    var devProbeCount = 0;
-    final client = MockClient((request) async {
-      if (request.url.path.endsWith('/users/auth-token')) {
-        devProbeCount++;
-        return http.Response('unauthorized', 401);
-      }
-      return http.Response('not found', 404);
-    });
-    container = ProviderContainer(
-      overrides: [
-        sharedPreferencesProvider.overrideWithValue(
-          await SharedPreferences.getInstance(),
-        ),
-        httpClientProvider.overrideWithValue(client),
-      ],
-    );
+  test(
+    'bootstrap can run again after a previous bootstrap completed',
+    () async {
+      var devProbeCount = 0;
+      final client = MockClient((request) async {
+        if (request.url.path.endsWith('/users/auth-token')) {
+          devProbeCount++;
+          return http.Response('unauthorized', 401);
+        }
+        return http.Response('not found', 404);
+      });
+      container = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(
+            await SharedPreferences.getInstance(),
+          ),
+          httpClientProvider.overrideWithValue(client),
+        ],
+      );
 
-    await container.read(authSessionProvider.notifier).bootstrap();
-    await container.read(authSessionProvider.notifier).bootstrap();
+      await container.read(authSessionProvider.notifier).bootstrap();
+      await container.read(authSessionProvider.notifier).bootstrap();
 
-    expect(devProbeCount, 2);
-  });
+      expect(devProbeCount, 2);
+    },
+  );
 }

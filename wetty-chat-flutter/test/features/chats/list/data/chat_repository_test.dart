@@ -3,13 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:wetty_chat_flutter/core/api/models/chats_api_models.dart';
-import 'package:wetty_chat_flutter/core/api/models/messages_api_models.dart';
-import 'package:wetty_chat_flutter/core/api/models/websocket_api_models.dart';
-import 'package:wetty_chat_flutter/core/network/websocket_service.dart';
-import 'package:wetty_chat_flutter/core/providers/shared_preferences_provider.dart';
-import 'package:wetty_chat_flutter/features/chats/list/data/chat_api_service.dart';
-import 'package:wetty_chat_flutter/features/chats/list/data/chat_repository.dart';
+import 'package:chahua/core/api/models/chats_api_models.dart';
+import 'package:chahua/core/api/models/messages_api_models.dart';
+import 'package:chahua/core/api/models/websocket_api_models.dart';
+import 'package:chahua/core/network/websocket_service.dart';
+import 'package:chahua/core/providers/shared_preferences_provider.dart';
+import 'package:chahua/features/chats/list/data/chat_api_service.dart';
+import 'package:chahua/features/chats/list/data/chat_repository.dart';
 
 void main() {
   group('ChatListNotifier realtime', () {
