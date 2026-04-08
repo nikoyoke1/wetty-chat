@@ -140,6 +140,19 @@ pub struct ThreadListRow {
     pub unread_count: i64,
     #[diesel(sql_type = diesel::sql_types::Timestamptz)]
     pub subscribed_at: DateTime<Utc>,
+    // Latest reply fields (from second LATERAL join)
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::BigInt>)]
+    pub latest_reply_id: Option<i64>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub latest_reply_message: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<crate::schema::sql_types::MessageType>)]
+    pub latest_reply_message_type: Option<MessageType>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Integer>)]
+    pub latest_reply_sender_uid: Option<i32>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::BigInt>)]
+    pub latest_reply_sticker_id: Option<i64>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Bool>)]
+    pub latest_reply_has_attachments: Option<bool>,
 }
 
 /// List threads the user is subscribed to, ordered by most recent reply.
@@ -161,7 +174,13 @@ pub fn get_user_threads(
                 COALESCE(thread_stats.unread_count, 0),
                 $4
             )::bigint AS unread_count,
-            ts.subscribed_at
+            ts.subscribed_at,
+            latest_reply.id AS latest_reply_id,
+            latest_reply.message AS latest_reply_message,
+            latest_reply.message_type AS latest_reply_message_type,
+            latest_reply.sender_uid AS latest_reply_sender_uid,
+            latest_reply.sticker_id AS latest_reply_sticker_id,
+            latest_reply.has_attachments AS latest_reply_has_attachments
         FROM thread_subscriptions ts
         JOIN groups g ON g.id = ts.chat_id
         LEFT JOIN media avatar_media ON g.avatar_image_id = avatar_media.id AND avatar_media.deleted_at IS NULL
@@ -177,6 +196,14 @@ pub fn get_user_threads(
             WHERE m.reply_root_id = ts.thread_root_id
               AND m.deleted_at IS NULL
         ) thread_stats ON TRUE
+        LEFT JOIN LATERAL (
+            SELECT id, message, message_type, sender_uid, sticker_id, has_attachments
+            FROM messages
+            WHERE reply_root_id = ts.thread_root_id
+              AND deleted_at IS NULL
+            ORDER BY id DESC
+            LIMIT 1
+        ) latest_reply ON TRUE
         WHERE ts.uid = $1
           AND root_msg.deleted_at IS NULL
           AND ($2::timestamptz IS NULL OR COALESCE(thread_stats.last_reply_at, ts.subscribed_at) < $2)
@@ -286,24 +313,6 @@ struct ParticipantRow {
     sender_uid: i32,
 }
 
-#[derive(QueryableByName)]
-struct LatestReplyRow {
-    #[diesel(sql_type = diesel::sql_types::BigInt)]
-    reply_root_id: i64,
-    #[diesel(sql_type = diesel::sql_types::BigInt)]
-    id: i64,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
-    message: Option<String>,
-    #[diesel(sql_type = crate::schema::sql_types::MessageType)]
-    message_type: MessageType,
-    #[diesel(sql_type = diesel::sql_types::Integer)]
-    sender_uid: i32,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::BigInt>)]
-    sticker_id: Option<i64>,
-    #[diesel(sql_type = diesel::sql_types::Bool)]
-    has_attachments: bool,
-}
-
 /// Enrich a list of thread rows with participants, latest replies, user profiles,
 /// and assemble the final `ListThreadsResponse`.
 ///
@@ -346,24 +355,12 @@ pub fn enrich_thread_list(
     .load(conn)
     .unwrap_or_default();
 
-    // 2. Batch query: latest reply per thread
-    let latest_reply_rows: Vec<LatestReplyRow> = sql_query(
-        "SELECT DISTINCT ON (m.reply_root_id)
-            m.reply_root_id, m.id, m.message, m.message_type,
-            m.sender_uid, m.sticker_id, m.has_attachments
-         FROM messages m
-         WHERE m.reply_root_id = ANY($1)
-           AND m.deleted_at IS NULL
-         ORDER BY m.reply_root_id, m.id DESC",
-    )
-    .bind::<diesel::sql_types::Array<diesel::sql_types::BigInt>, _>(&root_ids)
-    .load(conn)
-    .unwrap_or_default();
-
-    // 3. Collect all UIDs that need profile/avatar lookup
+    // 2. Collect all UIDs that need profile/avatar lookup
     let mut all_uids: Vec<i32> = participant_rows.iter().map(|r| r.sender_uid).collect();
-    for row in &latest_reply_rows {
-        all_uids.push(row.sender_uid);
+    for row in &rows {
+        if let Some(uid) = row.latest_reply_sender_uid {
+            all_uids.push(uid);
+        }
     }
     all_uids.sort_unstable();
     all_uids.dedup();
@@ -374,15 +371,15 @@ pub fn enrich_thread_list(
     // Also collect mentioned UIDs from reply messages so we can resolve them
     let mut mention_uids_per_reply: HashMap<i64, Vec<i32>> = HashMap::new();
     let mut extra_mention_uids: Vec<i32> = Vec::new();
-    for row in &latest_reply_rows {
-        if let Some(ref text) = row.message {
+    for row in &rows {
+        if let Some(ref text) = row.latest_reply_message {
             let uids = extract_mention_uids(text);
             for &uid in &uids {
                 if !user_profiles.contains_key(&uid) && !extra_mention_uids.contains(&uid) {
                     extra_mention_uids.push(uid);
                 }
             }
-            mention_uids_per_reply.insert(row.reply_root_id, uids);
+            mention_uids_per_reply.insert(row.thread_root_id, uids);
         }
     }
     if !extra_mention_uids.is_empty() {
@@ -409,9 +406,9 @@ pub fn enrich_thread_list(
     }
 
     // 5. Build latest reply map, load sticker emoji and first attachment kind
-    let sticker_ids: Vec<i64> = latest_reply_rows
+    let sticker_ids: Vec<i64> = rows
         .iter()
-        .filter_map(|r| r.sticker_id)
+        .filter_map(|r| r.latest_reply_sticker_id)
         .collect();
     let sticker_emoji_map: HashMap<i64, String> = if sticker_ids.is_empty() {
         HashMap::new()
@@ -425,10 +422,10 @@ pub fn enrich_thread_list(
             .collect()
     };
 
-    let reply_msg_ids: Vec<i64> = latest_reply_rows
+    let reply_msg_ids: Vec<i64> = rows
         .iter()
-        .filter(|r| r.has_attachments)
-        .map(|r| r.id)
+        .filter(|r| r.latest_reply_has_attachments.unwrap_or(false))
+        .filter_map(|r| r.latest_reply_id)
         .collect();
     let first_attachment_map: HashMap<i64, String> = if reply_msg_ids.is_empty() {
         HashMap::new()
@@ -448,32 +445,39 @@ pub fn enrich_thread_list(
     };
 
     let mut latest_reply_map: HashMap<i64, ThreadReplyPreview> = HashMap::new();
-    for row in latest_reply_rows {
-        latest_reply_map.insert(
-            row.reply_root_id,
-            ThreadReplyPreview {
-                sender: make_participant(row.sender_uid),
-                message: row.message,
-                message_type: row.message_type,
-                sticker_emoji: row
-                    .sticker_id
-                    .and_then(|sid| sticker_emoji_map.get(&sid).cloned()),
-                first_attachment_kind: if row.has_attachments {
-                    first_attachment_map.get(&row.id).cloned()
-                } else {
-                    None
+    for row in &rows {
+        if let (Some(reply_id), Some(message_type), Some(sender_uid)) = (
+            row.latest_reply_id,
+            row.latest_reply_message_type.clone(),
+            row.latest_reply_sender_uid,
+        ) {
+            let has_attachments = row.latest_reply_has_attachments.unwrap_or(false);
+            latest_reply_map.insert(
+                row.thread_root_id,
+                ThreadReplyPreview {
+                    sender: make_participant(sender_uid),
+                    message: row.latest_reply_message.clone(),
+                    message_type,
+                    sticker_emoji: row
+                        .latest_reply_sticker_id
+                        .and_then(|sid| sticker_emoji_map.get(&sid).cloned()),
+                    first_attachment_kind: if has_attachments {
+                        first_attachment_map.get(&reply_id).cloned()
+                    } else {
+                        None
+                    },
+                    is_deleted: false,
+                    mentions: mention_uids_per_reply
+                        .get(&row.thread_root_id)
+                        .map(|uids| {
+                            uids.iter()
+                                .map(|&uid| build_mention_info(uid, &user_avatars, &user_profiles))
+                                .collect()
+                        })
+                        .unwrap_or_default(),
                 },
-                is_deleted: false,
-                mentions: mention_uids_per_reply
-                    .get(&row.reply_root_id)
-                    .map(|uids| {
-                        uids.iter()
-                            .map(|&uid| build_mention_info(uid, &user_avatars, &user_profiles))
-                            .collect()
-                    })
-                    .unwrap_or_default(),
-            },
-        );
+            );
+        }
     }
 
     // 6. Assemble final response

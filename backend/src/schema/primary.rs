@@ -144,17 +144,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    pinned_messages (id) {
-        id -> Int8,
-        chat_id -> Int8,
-        message_id -> Int8,
-        pinned_by -> Int4,
-        pinned_at -> Timestamptz,
-        expires_at -> Nullable<Timestamptz>,
-    }
-}
-
-diesel::table! {
     message_reactions (message_id, user_uid, emoji) {
         message_id -> Int8,
         user_uid -> Int4,
@@ -188,6 +177,17 @@ diesel::table! {
 }
 
 diesel::table! {
+    pinned_messages (id) {
+        id -> Int8,
+        chat_id -> Int8,
+        message_id -> Int8,
+        pinned_by -> Int4,
+        pinned_at -> Timestamptz,
+        expires_at -> Nullable<Timestamptz>,
+    }
+}
+
+diesel::table! {
     push_subscriptions (id) {
         id -> Int8,
         user_id -> Int4,
@@ -197,16 +197,6 @@ diesel::table! {
         created_at -> Timestamp,
         #[max_length = 64]
         client_id -> Nullable<Varchar>,
-    }
-}
-
-diesel::table! {
-    thread_subscriptions (chat_id, thread_root_id, uid) {
-        chat_id -> Int8,
-        thread_root_id -> Int8,
-        uid -> Int4,
-        last_read_message_id -> Nullable<Int8>,
-        subscribed_at -> Timestamptz,
     }
 }
 
@@ -240,6 +230,16 @@ diesel::table! {
         name -> Nullable<Varchar>,
         description -> Nullable<Text>,
         created_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    thread_subscriptions (chat_id, thread_root_id, uid) {
+        chat_id -> Int8,
+        thread_root_id -> Int8,
+        uid -> Int4,
+        last_read_message_id -> Nullable<Int8>,
+        subscribed_at -> Timestamptz,
     }
 }
 
@@ -282,9 +282,9 @@ diesel::joinable!(attachments -> messages (message_id));
 diesel::joinable!(group_membership -> groups (chat_id));
 diesel::joinable!(groups -> media (avatar_image_id));
 diesel::joinable!(message_reactions -> messages (message_id));
+diesel::joinable!(messages -> stickers (sticker_id));
 diesel::joinable!(pinned_messages -> groups (chat_id));
 diesel::joinable!(pinned_messages -> messages (message_id));
-diesel::joinable!(messages -> stickers (sticker_id));
 diesel::joinable!(sticker_pack_stickers -> sticker_packs (pack_id));
 diesel::joinable!(sticker_pack_stickers -> stickers (sticker_id));
 diesel::joinable!(stickers -> media (media_id));
