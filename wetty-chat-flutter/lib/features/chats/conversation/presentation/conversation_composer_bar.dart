@@ -32,6 +32,11 @@ class _ConversationComposerBarState
 
   ProviderSubscription<ConversationComposerState>? _composerSubscription;
 
+  AttachmentService get _attachmentService {
+    final session = ref.read(authSessionProvider);
+    return AttachmentService(session.authHeaders);
+  }
+
   @override
   void initState() {
     super.initState();

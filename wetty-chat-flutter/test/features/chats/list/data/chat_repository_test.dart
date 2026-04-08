@@ -59,7 +59,7 @@ void main() {
 }
 
 class _FakeChatApiService extends ChatApiService {
-  _FakeChatApiService(this._responses) : super(1);
+  _FakeChatApiService(this._responses) : super(const <String, String>{});
 
   final List<ListChatsResponseDto> _responses;
   int fetchChatsCalls = 0;

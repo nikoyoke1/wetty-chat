@@ -24,10 +24,9 @@ class WebSocketService {
   Timer? _reconnectTimer;
   bool _isConnecting = false;
 
-  /// The current user ID to use for API headers when fetching ticket.
-  int _currentUserId;
+  Map<String, String> _authHeaders;
 
-  WebSocketService(this._currentUserId);
+  WebSocketService(this._authHeaders);
 
   /// Initialize the connection.
   Future<void> init() async {
@@ -39,7 +38,7 @@ class WebSocketService {
       // Fetch auth ticket
       final ticketRes = await http.get(
         Uri.parse('$apiBaseUrl/ws/ticket'),
-        headers: apiHeadersForUser(_currentUserId),
+        headers: apiJsonHeaders(_authHeaders),
       );
       if (ticketRes.statusCode != 200) {
         throw Exception('Failed to fetch WS ticket: ${ticketRes.body}');
@@ -105,8 +104,8 @@ class WebSocketService {
     });
   }
 
-  Future<void> refreshSession(int newUserId) async {
-    _currentUserId = newUserId;
+  Future<void> refreshSession(Map<String, String> authHeaders) async {
+    _authHeaders = authHeaders;
     _pingTimer?.cancel();
     _reconnectTimer?.cancel();
     final old = _channel;
@@ -124,18 +123,22 @@ class WebSocketService {
 }
 
 final webSocketProvider = Provider<WebSocketService>((ref) {
-  final userId = ref.watch(devSessionProvider);
-  final service = WebSocketService(userId);
-  unawaited(service.init());
+  final session = ref.watch(authSessionProvider);
+  final service = WebSocketService(session.authHeaders);
+  if (session.isAuthenticated) {
+    unawaited(service.init());
+  }
 
   // When devSessionProvider changes, Riverpod will recreate this provider,
   // so we dispose the old service.
   ref.onDispose(service.dispose);
 
   // Listen for subsequent session changes to refresh the connection.
-  ref.listen<int>(devSessionProvider, (previous, next) {
-    if (previous != null && previous != next) {
-      service.refreshSession(next);
+  ref.listen<AuthSessionState>(authSessionProvider, (previous, next) {
+    if (previous != null &&
+        next.isAuthenticated &&
+        !mapEquals(previous.authHeaders, next.authHeaders)) {
+      service.refreshSession(next.authHeaders);
     }
   });
 

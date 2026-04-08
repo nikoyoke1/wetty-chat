@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/session/dev_session_store.dart';
+import '../../features/auth/presentation/auth_bootstrap_view.dart';
+import '../../features/auth/presentation/token_login_view.dart';
 import '../../features/chats/conversation/presentation/attachment_viewer_page.dart';
 import '../../features/chats/conversation/presentation/chat_detail_view.dart';
 import '../../features/chats/conversation/domain/launch_request.dart';
@@ -18,19 +20,46 @@ import '../../features/settings/presentation/notification_settings_view.dart';
 import '../../features/settings/presentation/profile_settings_view.dart';
 import '../../features/settings/presentation/settings_view.dart';
 import '../presentation/home_root_view.dart';
+import 'route_names.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
-  // Bridge devSessionProvider to a ValueNotifier for GoRouter's refreshListenable.
-  final sessionNotifier = ValueNotifier(ref.read(devSessionProvider));
-  ref.listen<int>(devSessionProvider, (_, next) {
+  final sessionNotifier = ValueNotifier(ref.read(authSessionProvider));
+  ref.listen<AuthSessionState>(authSessionProvider, (_, next) {
     sessionNotifier.value = next;
   });
   ref.onDispose(() => sessionNotifier.dispose());
 
   return GoRouter(
-    initialLocation: '/chats',
+    initialLocation: AppRoutes.bootstrap,
     refreshListenable: sessionNotifier,
+    redirect: (context, state) {
+      final session = ref.read(authSessionProvider);
+      final location = state.matchedLocation;
+      final isBootstrap = location == AppRoutes.bootstrap;
+      final isLogin = location == AppRoutes.login;
+
+      if (session.isBootstrapping) {
+        return isBootstrap ? null : AppRoutes.bootstrap;
+      }
+      if (!session.isAuthenticated) {
+        return isLogin ? null : AppRoutes.login;
+      }
+      if (isBootstrap || isLogin) {
+        return AppRoutes.chats;
+      }
+      return null;
+    },
     routes: [
+      GoRoute(
+        path: AppRoutes.bootstrap,
+        pageBuilder: (context, state) =>
+            const CupertinoPage(child: AuthBootstrapPage()),
+      ),
+      GoRoute(
+        path: AppRoutes.login,
+        pageBuilder: (context, state) =>
+            const CupertinoPage(child: TokenLoginPage()),
+      ),
       // Full-screen routes outside the shell (no bottom nav, swipe-back enabled).
       GoRoute(
         path: '/attachment-viewer',

@@ -1,4 +1,6 @@
 abstract final class AppRoutes {
+  static const bootstrap = '/bootstrap';
+  static const login = '/login';
   static const chats = '/chats';
   static const newChat = '/chats/new';
   static String chatDetail(String chatId) => '/chats/$chatId';

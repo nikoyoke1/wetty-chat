@@ -16,10 +16,13 @@ class WettyChatApp extends ConsumerWidget {
     final settings = ref.watch(appSettingsProvider);
     final locale = settings.language.toLocale();
     final router = ref.watch(appRouterProvider);
+    final session = ref.watch(authSessionProvider);
 
     // Keep ApiSession bridge in sync for deep presentation-layer code.
-    final userId = ref.watch(devSessionProvider);
-    ApiSession.updateUserId(userId);
+    ApiSession.updateSession(
+      userId: session.currentUserId,
+      authHeaders: session.authHeaders,
+    );
 
     return CupertinoApp.router(
       theme: appCupertinoTheme,

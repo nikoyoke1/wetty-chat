@@ -171,7 +171,7 @@ MessageItemDto _message({
 class _FakeMessageApiService extends MessageApiService {
   _FakeMessageApiService({required List<MessageItemDto> messages})
     : _messages = messages,
-      super(1);
+      super(const <String, String>{}, 1);
 
   final List<MessageItemDto> _messages;
   final List<String> reactionCalls = <String>[];

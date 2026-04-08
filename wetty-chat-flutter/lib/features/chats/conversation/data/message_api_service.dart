@@ -11,14 +11,15 @@ import '../../../../core/session/dev_session_store.dart';
 import '../domain/conversation_scope.dart';
 
 class MessageApiService {
-  final int _userId;
+  final Map<String, String> _authHeaders;
+  final int _currentUserId;
 
-  MessageApiService(this._userId);
+  MessageApiService(this._authHeaders, this._currentUserId);
 
-  Map<String, String> get _headers => apiHeadersForUser(_userId);
+  Map<String, String> get _headers => apiJsonHeaders(_authHeaders);
 
   String nextClientGeneratedId({String? seed}) {
-    return '${DateTime.now().microsecondsSinceEpoch}-$seed-$_userId';
+    return '${DateTime.now().microsecondsSinceEpoch}-$seed-$_currentUserId';
   }
 
   String _messagesPath(ConversationScope scope) {
@@ -240,6 +241,6 @@ class MessageApiService {
 }
 
 final messageApiServiceProvider = Provider<MessageApiService>((ref) {
-  final userId = ref.watch(devSessionProvider);
-  return MessageApiService(userId);
+  final session = ref.watch(authSessionProvider);
+  return MessageApiService(session.authHeaders, session.currentUserId);
 });

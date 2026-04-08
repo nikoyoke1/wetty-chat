@@ -21,11 +21,11 @@ Map<String, String>? attachmentRequestHeadersForUrl(String url) {
     return null;
   }
 
-  final uid = ApiSession.currentUserId;
-  return <String, String>{
-    'X-User-Id': uid.toString(),
-    'X-Client-Id': uid.toString(),
-  };
+  final authHeaders = ApiSession.authHeaders;
+  if (authHeaders.isEmpty) {
+    return null;
+  }
+  return authHeaders;
 }
 
 class MediaPreviewCache {

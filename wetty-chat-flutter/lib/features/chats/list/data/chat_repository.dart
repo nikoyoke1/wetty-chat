@@ -99,7 +99,7 @@ class ChatListNotifier extends Notifier<ChatListState> {
     final message = payload.toDomain();
     if (type == 'message') {
       final senderUid = payload.sender.uid;
-      final currentUserId = ref.read(devSessionProvider);
+      final currentUserId = ref.read(authSessionProvider).currentUserId;
       final createdAt = payload.createdAt;
       final updated = previous.copyWith(
         lastMessage: message,

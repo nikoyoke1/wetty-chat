@@ -23,9 +23,9 @@ class AttachmentService {
   static const Duration _requestTimeout = Duration(seconds: 15);
   static const Duration _uploadTimeout = Duration(seconds: 120);
 
-  final int _userId;
+  final Map<String, String> _authHeaders;
 
-  AttachmentService(this._userId);
+  AttachmentService(this._authHeaders);
 
   Future<UploadUrlResponse> requestUploadUrl({
     required String filename,
@@ -46,7 +46,7 @@ class AttachmentService {
     final response = await http
         .post(
           uri,
-          headers: apiHeadersForUser(_userId),
+          headers: apiJsonHeaders(_authHeaders),
           body: jsonEncode(payload.toJson()),
         )
         .timeout(_requestTimeout);

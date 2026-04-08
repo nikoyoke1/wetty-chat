@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/routing/route_names.dart';
 import '../../../app/theme/style_config.dart';
 import '../../../core/session/dev_session_store.dart';
 
@@ -23,7 +24,7 @@ class _DevSessionSettingsPageState
   void initState() {
     super.initState();
     _uidController = TextEditingController(
-      text: ref.read(devSessionProvider).toString(),
+      text: ref.read(authSessionProvider).developerUserId.toString(),
     );
   }
 
@@ -48,7 +49,7 @@ class _DevSessionSettingsPageState
       _errorText = null;
     });
     try {
-      await ref.read(devSessionProvider.notifier).setCurrentUserId(nextUserId);
+      await ref.read(authSessionProvider.notifier).setCurrentUserId(nextUserId);
       if (!mounted) {
         return;
       }
@@ -68,12 +69,33 @@ class _DevSessionSettingsPageState
       _errorText = null;
     });
     try {
-      await ref.read(devSessionProvider.notifier).resetToDefault();
-      _uidController.text = DevSessionNotifier.defaultUserId.toString();
+      await ref.read(authSessionProvider.notifier).resetToDefault();
+      _uidController.text = AuthSessionNotifier.defaultUserId.toString();
       if (!mounted) {
         return;
       }
-      context.pop();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _clearJwt() async {
+    setState(() {
+      _isSaving = true;
+      _errorText = null;
+    });
+    try {
+      if (mounted) {
+        context.go(AppRoutes.bootstrap);
+      }
+      await ref.read(authSessionProvider.notifier).clearJwt();
+      if (!mounted) {
+        return;
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -85,7 +107,12 @@ class _DevSessionSettingsPageState
 
   @override
   Widget build(BuildContext context) {
-    final currentUserId = ref.watch(devSessionProvider);
+    final session = ref.watch(authSessionProvider);
+    final modeLabel = switch (session.mode) {
+      AuthSessionMode.jwt => 'JWT token',
+      AuthSessionMode.devHeader => 'Developer UID header',
+      AuthSessionMode.none => 'No active session',
+    };
     return CupertinoPageScaffold(
       navigationBar: const CupertinoNavigationBar(
         middle: Text('Developer Session'),
@@ -95,8 +122,9 @@ class _DevSessionSettingsPageState
           padding: const EdgeInsets.all(16),
           children: [
             Text(
-              'The Flutter app currently uses a developer UID session. '
-              'Changes apply immediately and reconnect realtime features.',
+              'The Flutter app now supports a temporary JWT session and the '
+              'existing developer UID session. Changing the developer UID '
+              'applies immediately only while the app is using developer headers.',
               style: appSecondaryTextStyle(
                 context,
                 fontSize: AppFontSizes.body,
@@ -104,7 +132,7 @@ class _DevSessionSettingsPageState
             ),
             const SizedBox(height: 16),
             Text(
-              'Current UID',
+              'Current Session',
               style: appTextStyle(
                 context,
                 fontSize: AppFontSizes.body,
@@ -113,7 +141,40 @@ class _DevSessionSettingsPageState
             ),
             const SizedBox(height: 8),
             Text(
-              '$currentUserId',
+              modeLabel,
+              style: appTextStyle(
+                context,
+                fontSize: AppFontSizes.chatEntryTitle,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Active UID: ${session.currentUserId}',
+              style: appSecondaryTextStyle(
+                context,
+                fontSize: AppFontSizes.body,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Stored JWT: ${session.hasJwtToken ? 'Present' : 'None'}',
+              style: appSecondaryTextStyle(
+                context,
+                fontSize: AppFontSizes.body,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Developer UID',
+              style: appTextStyle(
+                context,
+                fontSize: AppFontSizes.body,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${session.developerUserId}',
               style: appTextStyle(
                 context,
                 fontSize: AppFontSizes.chatEntryTitle,
@@ -159,7 +220,12 @@ class _DevSessionSettingsPageState
             const SizedBox(height: 12),
             CupertinoButton(
               onPressed: _isSaving ? null : _resetToDefault,
-              child: Text('Reset to UID ${DevSessionNotifier.defaultUserId}'),
+              child: Text('Reset to UID ${AuthSessionNotifier.defaultUserId}'),
+            ),
+            const SizedBox(height: 12),
+            CupertinoButton(
+              onPressed: _isSaving || !session.hasJwtToken ? null : _clearJwt,
+              child: const Text('Clear Stored JWT'),
             ),
           ],
         ),

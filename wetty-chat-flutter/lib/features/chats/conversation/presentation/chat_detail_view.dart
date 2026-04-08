@@ -188,7 +188,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage>
   }
 
   List<MessageOverlayAction> _overlayActions(ConversationMessage message) {
-    final currentUserId = ref.read(devSessionProvider);
+    final currentUserId = ref.read(authSessionProvider).currentUserId;
     final isOwn = message.sender.uid == currentUserId;
     final composerNotifier = ref.read(
       conversationComposerViewModelProvider(scope).notifier,

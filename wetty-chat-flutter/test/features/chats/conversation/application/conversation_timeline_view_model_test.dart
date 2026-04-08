@@ -161,7 +161,7 @@ List<MessageItemDto> _buildMessages() {
 }
 
 class _FakeMessageApiService extends MessageApiService {
-  _FakeMessageApiService(this._messages) : super(1);
+  _FakeMessageApiService(this._messages) : super(const <String, String>{}, 1);
 
   final List<MessageItemDto> _messages;
 

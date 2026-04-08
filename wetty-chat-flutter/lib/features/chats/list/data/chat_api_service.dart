@@ -10,11 +10,11 @@ import '../../../../core/session/dev_session_store.dart';
 
 /// Raw HTTP calls for chat endpoints. No state.
 class ChatApiService {
-  final int _userId;
+  final Map<String, String> _authHeaders;
 
-  ChatApiService(this._userId);
+  ChatApiService(this._authHeaders);
 
-  Map<String, String> get _headers => apiHeadersForUser(_userId);
+  Map<String, String> get _headers => apiJsonHeaders(_authHeaders);
 
   Future<ListChatsResponseDto> fetchChats({int? limit, String? after}) async {
     final query = <String, String>{};
@@ -61,6 +61,6 @@ class ChatApiService {
 }
 
 final chatApiServiceProvider = Provider<ChatApiService>((ref) {
-  final userId = ref.watch(devSessionProvider);
-  return ChatApiService(userId);
+  final session = ref.watch(authSessionProvider);
+  return ChatApiService(session.authHeaders);
 });

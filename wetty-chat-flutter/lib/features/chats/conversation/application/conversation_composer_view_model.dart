@@ -310,7 +310,7 @@ class ConversationComposerViewModel
         .map((item) => item.toAttachmentItem())
         .toList(growable: false);
 
-    final currentUserId = ref.read(devSessionProvider);
+    final currentUserId = ref.read(authSessionProvider).currentUserId;
     final clientGeneratedId =
         '${DateTime.now().microsecondsSinceEpoch}-$currentUserId-${_scope.storageKey}';
     _repository.insertOptimisticSend(

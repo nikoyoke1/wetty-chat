@@ -15,9 +15,14 @@ class SettingsPage extends ConsumerWidget {
   List<SettingsSectionData> _sections(
     BuildContext context,
     AppLanguage language,
-    int currentUserId,
+    AuthSessionState session,
   ) {
     final l10n = AppLocalizations.of(context)!;
+    final sessionLabel = switch (session.mode) {
+      AuthSessionMode.jwt => 'JWT',
+      AuthSessionMode.devHeader => 'UID ${session.currentUserId}',
+      AuthSessionMode.none => 'No session',
+    };
     return [
       SettingsSectionData(
         title: l10n.settingsGeneral,
@@ -57,7 +62,7 @@ class SettingsPage extends ConsumerWidget {
             title: 'Developer Session',
             icon: CupertinoIcons.person_crop_square,
             iconColor: const Color(0xFF8E44AD),
-            trailingText: 'UID $currentUserId',
+            trailingText: sessionLabel,
             trailingTextSize: AppFontSizes.body,
             titleFontSize: AppFontSizes.body,
             titleFontWeight: FontWeight.w500,
@@ -85,8 +90,8 @@ class SettingsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
     final settings = ref.watch(appSettingsProvider);
-    final currentUserId = ref.watch(devSessionProvider);
-    final sections = _sections(context, settings.language, currentUserId);
+    final session = ref.watch(authSessionProvider);
+    final sections = _sections(context, settings.language, session);
     return CupertinoPageScaffold(
       backgroundColor: const Color(0xFFF2F2F7),
       navigationBar: CupertinoNavigationBar(middle: Text(l10n.tabSettings)),

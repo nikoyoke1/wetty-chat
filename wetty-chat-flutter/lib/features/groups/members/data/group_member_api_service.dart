@@ -7,11 +7,11 @@ import '../../../../core/network/api_config.dart';
 import '../../../../core/session/dev_session_store.dart';
 
 class GroupMemberApiService {
-  final int _userId;
+  final Map<String, String> _authHeaders;
 
-  GroupMemberApiService(this._userId);
+  GroupMemberApiService(this._authHeaders);
 
-  Map<String, String> get _headers => apiHeadersForUser(_userId);
+  Map<String, String> get _headers => apiJsonHeaders(_authHeaders);
 
   Future<GroupMembersResponseDto> fetchMembers(String chatId) async {
     final uri = Uri.parse('$apiBaseUrl/group/$chatId/members');
@@ -25,6 +25,6 @@ class GroupMemberApiService {
 }
 
 final groupMemberApiServiceProvider = Provider<GroupMemberApiService>((ref) {
-  final userId = ref.watch(devSessionProvider);
-  return GroupMemberApiService(userId);
+  final session = ref.watch(authSessionProvider);
+  return GroupMemberApiService(session.authHeaders);
 });
