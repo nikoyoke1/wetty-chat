@@ -73,8 +73,9 @@ export function MessageOverlay(props: MessageOverlayProps) {
   useLayoutEffect(() => {
     const content = contentRef.current;
     if (!content) return;
-    const contentRect = content.getBoundingClientRect();
-    const pad = 40;
+
+    // We get dimensions from offsetHeight/Width because getBoundingClientRect()
+    // is affected by the scale() animation currently running on the element.
     const visualViewport = window.visualViewport;
     const vh = visualViewport?.height ?? window.innerHeight;
     const vw = visualViewport?.width ?? window.innerWidth;
@@ -93,8 +94,8 @@ export function MessageOverlay(props: MessageOverlayProps) {
     const reactionBarEl = content.querySelector('[data-reaction-bar]') as HTMLElement | null;
     if (actionListEl) {
       const spaceBelow = offsetTop + vh - sourceRect.bottom;
-      // Required space: action list height + flex gap (8px) + visual margin (pad)
-      const requiredSpace = actionListEl.offsetHeight + 8 + pad;
+      // Required space: action list height + flex gap (8px) + minimum bottom padding
+      const requiredSpace = actionListEl.offsetHeight + 8 + 40;
 
       // If space below is less than the required space, swap the layout
       if (spaceBelow < requiredSpace) {
@@ -109,23 +110,37 @@ export function MessageOverlay(props: MessageOverlayProps) {
       }
     }
 
-    // For sent messages, align right edge to source right edge
-    let left = isSent ? sourceRect.right - contentRect.width : sourceRect.left;
+    const currentContentHeight = content.offsetHeight;
+    const currentContentWidth = content.offsetWidth;
 
-    // Clamp vertically: ensure the entire content (reactions + bubble + actions) fits
-    if (top + contentRect.height > offsetTop + vh - pad) {
-      top = offsetTop + vh - pad - contentRect.height;
+    // For sent messages, align right edge to source right edge
+    let left = isSent ? sourceRect.right - currentContentWidth : sourceRect.left;
+
+    const computedStyle = getComputedStyle(document.documentElement);
+    const safeBottomStr = computedStyle.getPropertyValue('--ion-safe-area-bottom');
+    const safeBottom = safeBottomStr ? parseFloat(safeBottomStr) : 0;
+
+    const safeTopStr = computedStyle.getPropertyValue('--ion-safe-area-top');
+    const safeTop = safeTopStr ? parseFloat(safeTopStr) : 0;
+
+    const bottomPad = 40 + safeBottom;
+    const topPad = Math.max(40, 12 + safeTop);
+    const sidePad = 12;
+
+    // Clamp vertically: prioritize bottom clamp over top clamp so interactive elements stay reachable
+    if (top < offsetTop + topPad) {
+      top = offsetTop + topPad;
     }
-    if (top < offsetTop + pad) {
-      top = offsetTop + pad;
+    if (top + currentContentHeight > offsetTop + vh - bottomPad) {
+      top = offsetTop + vh - bottomPad - currentContentHeight;
     }
 
     // Clamp horizontally
-    if (left + contentRect.width > offsetLeft + vw - pad) {
-      left = offsetLeft + vw - pad - contentRect.width;
+    if (left + currentContentWidth > offsetLeft + vw - sidePad) {
+      left = offsetLeft + vw - sidePad - currentContentWidth;
     }
-    if (left < offsetLeft + pad) {
-      left = offsetLeft + pad;
+    if (left < offsetLeft + sidePad) {
+      left = offsetLeft + sidePad;
     }
 
     content.style.top = `${top}px`;

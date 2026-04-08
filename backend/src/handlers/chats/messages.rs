@@ -114,10 +114,9 @@ fn validate_message_payload(
     attachment_ids: &[i64],
 ) -> Result<(), AppError> {
     if attachment_ids.len() > MAX_ATTACHMENTS_PER_MESSAGE {
-        return Err(AppError::BadRequest(format!(
-            "Too many attachments (maximum of {} allowed)",
-            MAX_ATTACHMENTS_PER_MESSAGE
-        )));
+        return Err(AppError::BadRequest(
+            "Too many attachments (maximum of 20 allowed)",
+        ));
     }
 
     if matches!(body.message_type, MessageType::Sticker) {
