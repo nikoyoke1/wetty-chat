@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/dio_client.dart';
@@ -35,6 +36,8 @@ class ComposerAttachment {
     this.errorMessage,
   });
 
+  /// Local-only key used to track draft attachments before the backend assigns
+  /// a persistent attachment id.
   final String localId;
   final PlatformFile file;
   final String name;
@@ -45,6 +48,8 @@ class ComposerAttachment {
   final int? width;
   final int? height;
   final ComposerAttachmentUploadStatus status;
+
+  /// Backend attachment id returned after requesting the upload URL.
   final String? attachmentId;
   final String? errorMessage;
 
@@ -53,9 +58,8 @@ class ComposerAttachment {
       kind == ComposerAttachmentKind.gif;
   bool get isVideo => kind == ComposerAttachmentKind.video;
   bool get isUploaded => status == ComposerAttachmentUploadStatus.uploaded;
-  bool get isUploading =>
-      status == ComposerAttachmentUploadStatus.queued ||
-      status == ComposerAttachmentUploadStatus.uploading;
+  bool get isUploading => status == ComposerAttachmentUploadStatus.uploading;
+  bool get isQueued => status == ComposerAttachmentUploadStatus.queued;
   bool get hasFailed => status == ComposerAttachmentUploadStatus.failed;
   bool get isFailed => hasFailed;
 
@@ -142,12 +146,14 @@ class ConversationComposerState {
   bool get isEditing => mode is ComposerEditing;
   bool get hasUploadingAttachments =>
       attachments.any((item) => item.isUploading);
+  bool get hasPendingAttachmentUploads =>
+      attachments.any((item) => item.isQueued || item.isUploading);
   bool get hasFailedAttachments => attachments.any((item) => item.hasFailed);
   bool get hasUploadedAttachments => attachments.any((item) => item.isUploaded);
   bool get hasAttachmentCapacity =>
       attachments.length < maxAttachmentsPerMessage;
   bool get canSend =>
-      !hasUploadingAttachments &&
+      !hasPendingAttachmentUploads &&
       !hasFailedAttachments &&
       (draft.trim().isNotEmpty || hasUploadedAttachments);
   int get remainingAttachmentSlots =>
@@ -217,7 +223,9 @@ class ConversationComposerViewModel
     state = state.copyWith(mode: const ComposerIdle());
   }
 
-  Future<String?> pickAttachments(ComposerAttachmentSource source) async {
+  Future<String?> pickAndQueueAttachments(
+    ComposerAttachmentSource source,
+  ) async {
     if (state.isEditing) {
       throw Exception('Editing messages does not support attachments');
     }
@@ -233,11 +241,12 @@ class ConversationComposerViewModel
       return null;
     }
 
-    final accepted = picked.take(remaining).map(_toComposerAttachment).toList();
+    final accepted = picked.take(remaining).map(_toDraftAttachment).toList();
     state = state.copyWith(attachments: [...state.attachments, ...accepted]);
 
     for (final attachment in accepted) {
-      unawaited(_uploadAttachment(attachment.localId));
+      debugPrint('Uploading attachment ${attachment.localId}');
+      unawaited(_uploadDraftAttachment(attachment.localId));
     }
 
     final skippedCount = picked.length - accepted.length;
@@ -268,7 +277,7 @@ class ConversationComposerViewModel
     if (attachment == null) {
       return Future<void>.value();
     }
-    return _uploadAttachment(localId, forceRestart: true);
+    return _uploadDraftAttachment(localId, forceRestart: true);
   }
 
   Future<void> send({required String text}) async {
@@ -276,7 +285,7 @@ class ConversationComposerViewModel
     final attachmentIds = state.uploadedAttachmentIds;
     final mode = state.mode;
 
-    if (state.hasUploadingAttachments) {
+    if (state.hasPendingAttachmentUploads) {
       throw Exception('Please wait for attachments to finish uploading.');
     }
     if (state.hasFailedAttachments) {
@@ -343,21 +352,32 @@ class ConversationComposerViewModel
     }
   }
 
-  Future<void> _uploadAttachment(
+  /// Draft attachments move through queued -> uploading -> uploaded/failed.
+  /// `localId` stays stable across retries until the backend returns an
+  /// `attachmentId`, which is what gets included in the final message send.
+  Future<void> _uploadDraftAttachment(
     String localId, {
     bool forceRestart = false,
   }) async {
+    debugPrint('in upload attachment: $localId');
     final attachment = _attachmentByLocalId(localId);
     if (attachment == null) {
+      debugPrint(
+        'upload skipped because draft attachment was not found: $localId',
+      );
+      return;
+    }
+    if (attachment.isUploading) {
+      debugPrint('upload skipped because draft is already uploading: $localId');
       return;
     }
     if (!forceRestart &&
-        (attachment.isUploading ||
-            attachment.status == ComposerAttachmentUploadStatus.uploaded)) {
+        attachment.status == ComposerAttachmentUploadStatus.uploaded) {
+      debugPrint('upload skipped because draft is already uploaded: $localId');
       return;
     }
 
-    _updateAttachment(
+    _updateAttachmentByLocalId(
       localId,
       (current) => current.copyWith(
         status: ComposerAttachmentUploadStatus.uploading,
@@ -368,10 +388,14 @@ class ConversationComposerViewModel
 
     final current = _attachmentByLocalId(localId);
     if (current == null) {
+      debugPrint(
+        'upload aborted because draft disappeared after status update: $localId',
+      );
       return;
     }
 
     try {
+      debugPrint('Requesting upload URL for ${current.name}');
       final uploadInfo = await _attachmentService.requestUploadUrl(
         filename: current.name,
         contentType: current.mimeType,
@@ -379,12 +403,15 @@ class ConversationComposerViewModel
         width: current.width,
         height: current.height,
       );
+      debugPrint('Received upload URL for ${current.name}');
+      debugPrint('Uploading file bytes for ${current.name}');
       await _attachmentService.uploadFileToS3(
         uploadUrl: uploadInfo.uploadUrl,
         file: current.file,
         uploadHeaders: uploadInfo.uploadHeaders,
       );
-      _updateAttachment(
+      debugPrint('Upload completed for ${current.name}');
+      _updateAttachmentByLocalId(
         localId,
         (latest) => latest.copyWith(
           status: ComposerAttachmentUploadStatus.uploaded,
@@ -392,8 +419,10 @@ class ConversationComposerViewModel
           clearErrorMessage: true,
         ),
       );
-    } catch (_) {
-      _updateAttachment(
+    } catch (error, stackTrace) {
+      debugPrint('Upload failed for $localId: $error');
+      debugPrint('$stackTrace');
+      _updateAttachmentByLocalId(
         localId,
         (latest) => latest.copyWith(
           status: ComposerAttachmentUploadStatus.failed,
@@ -413,7 +442,7 @@ class ConversationComposerViewModel
     return null;
   }
 
-  void _updateAttachment(
+  void _updateAttachmentByLocalId(
     String localId,
     ComposerAttachment Function(ComposerAttachment current) update,
   ) {
@@ -428,12 +457,15 @@ class ConversationComposerViewModel
         })
         .toList(growable: false);
     if (!found) {
+      debugPrint(
+        'update skipped because draft attachment was not found: $localId',
+      );
       return;
     }
     state = state.copyWith(attachments: next);
   }
 
-  ComposerAttachment _toComposerAttachment(PickedComposerAttachment item) {
+  ComposerAttachment _toDraftAttachment(PickedComposerAttachment item) {
     return ComposerAttachment(
       localId: item.localId,
       file: item.file,

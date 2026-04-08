@@ -90,7 +90,7 @@ class _ConversationComposerBarState
     try {
       final message = await ref
           .read(conversationComposerViewModelProvider(widget.scope).notifier)
-          .pickAttachments(source);
+          .pickAndQueueAttachments(source);
       if (!mounted || message == null) {
         return;
       }
@@ -202,7 +202,7 @@ class _ConversationComposerBarState
                     ),
                   ),
                 ),
-                if (composer.hasUploadingAttachments)
+                if (composer.hasPendingAttachmentUploads)
                   const Padding(
                     padding: EdgeInsets.only(left: 4, bottom: 2),
                     child: CupertinoActivityIndicator(radius: 8),
