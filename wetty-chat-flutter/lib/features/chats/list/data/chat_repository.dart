@@ -76,6 +76,29 @@ class ChatListNotifier extends Notifier<ChatListState> {
     return ChatListItem(id: response.id.toString(), name: response.name);
   }
 
+  void updateChatMetadata({
+    required String chatId,
+    required String name,
+    DateTime? mutedUntil,
+  }) {
+    final index = state.chats.indexWhere((chat) => chat.id == chatId);
+    if (index < 0) {
+      return;
+    }
+
+    final updated = state.chats[index].copyWith(
+      name: name,
+      mutedUntil: mutedUntil,
+    );
+    final chats = [...state.chats];
+    chats[index] = updated;
+    state = (
+      chats: chats,
+      nextCursor: state.nextCursor,
+      hasMore: state.hasMore,
+    );
+  }
+
   void _applyRealtimeEvent(ApiWsEvent event) {
     final (type, payload) = switch (event) {
       MessageCreatedWsEvent(:final payload) => ('message', payload),

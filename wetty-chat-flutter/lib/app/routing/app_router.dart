@@ -83,7 +83,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return CupertinoPage(
             child: ChatDetailPage(
               chatId: chatId,
-              chatName: extra?['chatName'] as String? ?? 'Chat $chatId',
               launchRequest:
                   extra?['launchRequest'] as LaunchRequest? ??
                   const LaunchRequest.latest(),
@@ -102,14 +101,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: 'settings',
             pageBuilder: (context, state) {
               final chatId = state.pathParameters['chatId']!;
-              final extra = state.extra as Map<String, dynamic>?;
-              final currentName = extra?['currentName'] as String? ?? '';
-              return CupertinoPage(
-                child: GroupSettingsPage(
-                  chatId: chatId,
-                  currentName: currentName,
-                ),
-              );
+              return CupertinoPage(child: GroupSettingsPage(chatId: chatId));
             },
           ),
         ],

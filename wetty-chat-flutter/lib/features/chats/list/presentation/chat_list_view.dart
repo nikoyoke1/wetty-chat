@@ -237,10 +237,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             if (!context.mounted) return;
             final shouldRefresh = await context.push<bool>(
               AppRoutes.chatDetail(chat.id),
-              extra: {
-                'chatName': chat.name ?? 'Chat ${chat.id}',
-                'launchRequest': launchRequest,
-              },
+              extra: {'launchRequest': launchRequest},
             );
             if (shouldRefresh == true) {
               await ref.read(chatListViewModelProvider.notifier).refreshChats();

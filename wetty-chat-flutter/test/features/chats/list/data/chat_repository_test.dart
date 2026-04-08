@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -59,7 +60,7 @@ void main() {
 }
 
 class _FakeChatApiService extends ChatApiService {
-  _FakeChatApiService(this._responses) : super(const <String, String>{});
+  _FakeChatApiService(this._responses) : super(Dio());
 
   final List<ListChatsResponseDto> _responses;
   int fetchChatsCalls = 0;

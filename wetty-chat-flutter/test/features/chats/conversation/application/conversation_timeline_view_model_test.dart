@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -161,7 +162,7 @@ List<MessageItemDto> _buildMessages() {
 }
 
 class _FakeMessageApiService extends MessageApiService {
-  _FakeMessageApiService(this._messages) : super(const <String, String>{}, 1);
+  _FakeMessageApiService(this._messages) : super(Dio(), 1);
 
   final List<MessageItemDto> _messages;
 

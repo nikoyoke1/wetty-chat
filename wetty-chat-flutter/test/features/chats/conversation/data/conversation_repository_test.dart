@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:wetty_chat_flutter/core/api/models/messages_api_models.dart';
@@ -171,7 +172,7 @@ MessageItemDto _message({
 class _FakeMessageApiService extends MessageApiService {
   _FakeMessageApiService({required List<MessageItemDto> messages})
     : _messages = messages,
-      super(const <String, String>{}, 1);
+      super(Dio(), 1);
 
   final List<MessageItemDto> _messages;
   final List<String> reactionCalls = <String>[];

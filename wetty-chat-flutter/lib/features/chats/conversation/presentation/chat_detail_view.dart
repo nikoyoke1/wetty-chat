@@ -7,6 +7,8 @@ import '../../../../app/routing/route_names.dart';
 import '../../../../app/theme/style_config.dart';
 import '../../../../core/session/dev_session_store.dart';
 import '../../../../core/settings/app_settings_store.dart';
+import '../../../groups/metadata/application/group_metadata_view_model.dart';
+import '../../../groups/metadata/data/group_metadata_models.dart';
 import '../../../../shared/presentation/app_divider.dart';
 import '../application/conversation_composer_view_model.dart';
 import '../application/conversation_timeline_view_model.dart';
@@ -29,12 +31,10 @@ class ChatDetailPage extends ConsumerStatefulWidget {
   const ChatDetailPage({
     super.key,
     required this.chatId,
-    required this.chatName,
     this.launchRequest = const LaunchRequest.latest(),
   });
 
   final String chatId;
-  final String chatName;
   final LaunchRequest launchRequest;
 
   @override
@@ -361,9 +361,20 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage>
     );
   }
 
-  Widget _buildNavigationBarTitle(BuildContext context) {
+  String _resolveChatTitle(AsyncValue<ChatMetadata> metadataAsync) {
+    final resolvedName = metadataAsync.valueOrNull?.name;
+    if (resolvedName != null && resolvedName.trim().isNotEmpty) {
+      return resolvedName;
+    }
+    return 'Chat ${widget.chatId}';
+  }
+
+  Widget _buildNavigationBarTitle(
+    BuildContext context,
+    AsyncValue<ChatMetadata> metadataAsync,
+  ) {
     return Text(
-      widget.chatName.isEmpty ? 'Chat ${widget.chatId}' : widget.chatName,
+      _resolveChatTitle(metadataAsync),
       style: appTitleTextStyle(context, fontSize: AppFontSizes.appTitle),
       overflow: TextOverflow.ellipsis,
     );
@@ -385,10 +396,8 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage>
           CupertinoButton(
             padding: EdgeInsets.zero,
             minimumSize: Size.zero,
-            onPressed: () => context.push(
-              AppRoutes.chatSettings(widget.chatId),
-              extra: {'currentName': widget.chatName},
-            ),
+            onPressed: () =>
+                context.push(AppRoutes.chatSettings(widget.chatId)),
             child: const Icon(
               CupertinoIcons.gear_solid,
               size: IconSizes.iconSize,
@@ -406,6 +415,9 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage>
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final metadataAsync = ref.watch(
+      groupMetadataViewModelProvider(widget.chatId),
+    );
     final timelineAsync = ref.watch(
       conversationTimelineViewModelProvider(_timelineArgs),
     );
@@ -476,7 +488,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage>
       },
       child: CupertinoPageScaffold(
         navigationBar: CupertinoNavigationBar(
-          middle: _buildNavigationBarTitle(context),
+          middle: _buildNavigationBarTitle(context, metadataAsync),
           leading: CupertinoNavigationBarBackButton(onPressed: _popWithResult),
           trailing: _buildNavigationBarTrailing(),
         ),
