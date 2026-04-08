@@ -9,6 +9,7 @@ import '../message_attachment_previews.dart';
 import '../video_popup_player.dart';
 import 'linkified_message_text.dart';
 import 'message_bubble_presentation.dart';
+import 'message_reactions.dart';
 
 class MessageBubbleContent extends StatelessWidget {
   const MessageBubbleContent({
@@ -35,6 +36,7 @@ class MessageBubbleContent extends StatelessWidget {
   final ValueChanged<String>? onToggleReaction;
 
   static const FontWeight _bubbleFontWeight = FontWeight.w400;
+  static const double _emptyBubbleMinWidth = 48;
 
   TextStyle _bubbleStyle(
     BuildContext context, {
@@ -96,7 +98,7 @@ class MessageBubbleContent extends StatelessWidget {
       );
     }
 
-    if (hasAttachments || (message.message?.isNotEmpty ?? false)) {
+    if (hasAttachments || message.messageType != 'system') {
       if (contentChildren.isNotEmpty) {
         contentChildren.add(const SizedBox(height: 4));
       }
@@ -174,8 +176,14 @@ class MessageBubbleContent extends StatelessWidget {
     final messageText = message.message ?? '';
     final metaWidget = _buildMetaWidget(context);
 
-    if (messageText.isEmpty) {
-      return Align(alignment: Alignment.centerRight, child: metaWidget);
+    if (messageText.trim().isEmpty) {
+      return ConstrainedBox(
+        constraints: BoxConstraints(
+          minWidth: _emptyBubbleMinWidth,
+          minHeight: presentation.minBubbleContentHeight,
+        ),
+        child: Align(alignment: Alignment.bottomRight, child: metaWidget),
+      );
     }
 
     return Align(
@@ -425,61 +433,12 @@ class MessageBubbleContent extends StatelessWidget {
         onToggleReaction != null &&
         message.messageType != 'sticker' &&
         !message.isDeleted;
-    final pills = message.reactions
-        .map((reaction) {
-          final pill = Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: reaction.reactedByMe == true
-                  ? CupertinoColors.activeBlue.withAlpha(isMe ? 90 : 38)
-                  : (isMe
-                        ? CupertinoColors.white.withAlpha(26)
-                        : CupertinoColors.black.withAlpha(18)),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: reaction.reactedByMe == true
-                    ? CupertinoColors.activeBlue.resolveFrom(context)
-                    : presentation.metaColor.withAlpha(64),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  reaction.emoji,
-                  style: _bubbleStyle(
-                    context,
-                    fontSize: AppFontSizes.bodySmall,
-                    fontWeight: _bubbleFontWeight,
-                  ),
-                ),
-                if (reaction.count > 1) ...[
-                  const SizedBox(width: 4),
-                  Text(
-                    '${reaction.count}',
-                    style: _bubbleStyle(
-                      context,
-                      color: presentation.textColor,
-                      fontSize: AppFontSizes.meta,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          );
-
-          if (!isInteractive) {
-            return pill;
-          }
-
-          return GestureDetector(
-            onTap: () => onToggleReaction?.call(reaction.emoji),
-            child: pill,
-          );
-        })
-        .toList(growable: false);
-
-    return Wrap(spacing: 6, runSpacing: 6, children: pills);
+    return MessageReactions(
+      reactions: message.reactions,
+      maxBubbleWidth: presentation.maxBubbleWidth,
+      isMe: isMe,
+      isInteractive: isInteractive,
+      onToggleReaction: onToggleReaction,
+    );
   }
 }

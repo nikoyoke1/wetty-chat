@@ -46,6 +46,10 @@ class AppColors {
     required this.chatAttachmentChipReceived,
     required this.chatThreadChipSent,
     required this.chatThreadChipReceived,
+    required this.chatReactionSent,
+    required this.chatReactionSentActive,
+    required this.chatReactionReceived,
+    required this.chatReactionReceivedActive,
     required this.avatarBackground,
     required this.inputSurface,
     required this.inputBorder,
@@ -76,6 +80,10 @@ class AppColors {
   final Color chatAttachmentChipReceived;
   final Color chatThreadChipSent;
   final Color chatThreadChipReceived;
+  final Color chatReactionSent;
+  final Color chatReactionSentActive;
+  final Color chatReactionReceived;
+  final Color chatReactionReceivedActive;
   final Color avatarBackground;
   final Color inputSurface;
   final Color inputBorder;
@@ -111,6 +119,10 @@ class AppColors {
     chatAttachmentChipReceived: Color(0xFFF1EAE3),
     chatThreadChipSent: Color(0xFFDCEBFF),
     chatThreadChipReceived: Color(0xFFF1EAE3),
+    chatReactionSent: Color(0xFF7BAEE5),
+    chatReactionSentActive: Color(0xFF1F69B5),
+    chatReactionReceived: Color(0xFFF3F4F6),
+    chatReactionReceivedActive: Color(0xFFCFE1F6),
     avatarBackground: Color(0xFFD1D5DB),
     inputSurface: Color(0xFFF3F4F6),
     inputBorder: Color(0xFFD1D5DB),
@@ -142,6 +154,10 @@ class AppColors {
     chatAttachmentChipReceived: Color(0xFF35363A),
     chatThreadChipSent: Color(0xFF1C4FA3),
     chatThreadChipReceived: Color(0xFF35363A),
+    chatReactionSent: Color(0xFF3E7FC9),
+    chatReactionSentActive: Color(0xFF1C4FA3),
+    chatReactionReceived: Color(0xFF2C2C2E),
+    chatReactionReceivedActive: Color(0xFF315D8F),
     avatarBackground: Color(0xFF4B5563),
     inputSurface: Color(0xFF222327),
     inputBorder: Color(0xFF3A3A3C),
