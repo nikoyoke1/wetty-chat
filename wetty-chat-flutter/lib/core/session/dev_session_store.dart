@@ -1,12 +1,9 @@
-import 'dart:convert';
-
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../network/api_config.dart';
-import '../providers/http_client_provider.dart';
 import '../providers/shared_preferences_provider.dart';
 
 enum AuthBootstrapStatus { bootstrapping, authenticated, unauthenticated }
@@ -66,13 +63,29 @@ class AuthSessionNotifier extends Notifier<AuthSessionState> {
   static const String _jwtTokenStorageKey = 'auth_session_jwt_token';
 
   late SharedPreferences _prefs;
-  late http.Client _client;
+
+  /// Plain Dio instance without auth interceptors.
+  /// The auth store is the source of auth state, so it cannot depend on the
+  /// interceptor-equipped [dioProvider] without creating a circular dependency.
+  late Dio _dio;
+
   Future<void>? _bootstrapFuture;
 
   @override
   AuthSessionState build() {
     _prefs = ref.read(sharedPreferencesProvider);
-    _client = ref.read(httpClientProvider);
+    _dio = Dio(
+      BaseOptions(
+        baseUrl: apiBaseUrl,
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 15),
+        headers: <String, String>{
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ),
+    );
+    ref.onDispose(_dio.close);
     final developerUserId = _prefs.getInt(_userIdStorageKey) ?? defaultUserId;
     final jwtToken = _prefs.getString(_jwtTokenStorageKey);
     return AuthSessionState(
@@ -143,10 +156,7 @@ class AuthSessionNotifier extends Notifier<AuthSessionState> {
       }
     } catch (error, stackTrace) {
       debugPrint('[auth:bootstrap] exception during bootstrap: $error');
-      debugPrintStack(
-        label: '[auth:bootstrap] stack',
-        stackTrace: stackTrace,
-      );
+      debugPrintStack(label: '[auth:bootstrap] stack', stackTrace: stackTrace);
       await _prefs.remove(_jwtTokenStorageKey);
     }
 
@@ -227,47 +237,35 @@ class AuthSessionNotifier extends Notifier<AuthSessionState> {
   }
 
   Future<String?> _fetchAuthToken(Map<String, String> authHeaders) async {
-    final response = await _client.get(
-      Uri.parse('$apiBaseUrl/users/auth-token'),
-      headers: apiJsonHeaders(authHeaders),
-    );
-    if (response.statusCode != 200) {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/users/auth-token',
+        options: Options(headers: authHeaders),
+      );
+      final token = response.data?['token'];
+      if (token is! String || token.trim().isEmpty) {
+        return null;
+      }
+      return token.trim();
+    } on DioException {
       return null;
     }
-
-    final payload = jsonDecode(response.body);
-    if (payload is! Map<String, dynamic>) {
-      return null;
-    }
-
-    final token = payload['token'];
-    if (token is! String || token.trim().isEmpty) {
-      return null;
-    }
-
-    return token.trim();
   }
 
   Future<_MeResponse?> _fetchMe(Map<String, String> authHeaders) async {
-    final response = await _client.get(
-      Uri.parse('$apiBaseUrl/users/me'),
-      headers: apiJsonHeaders(authHeaders),
-    );
-    if (response.statusCode != 200) {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/users/me',
+        options: Options(headers: authHeaders),
+      );
+      final uid = response.data?['uid'];
+      if (uid is! int || uid <= 0) {
+        return null;
+      }
+      return _MeResponse(uid);
+    } on DioException {
       return null;
     }
-
-    final payload = jsonDecode(response.body);
-    if (payload is! Map<String, dynamic>) {
-      return null;
-    }
-
-    final uid = payload['uid'];
-    if (uid is! int || uid <= 0) {
-      return null;
-    }
-
-    return _MeResponse(uid);
   }
 }
 

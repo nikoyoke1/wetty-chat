@@ -1,15 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../api/client/api_json.dart';
 import '../api/models/websocket_api_models.dart';
 import '../session/dev_session_store.dart';
 import 'api_config.dart';
+import 'dio_client.dart';
 
 /// Manages the WebSocket connection.
 /// Handles ticket-based auth, keep-alive (pings), and broadcasts events.
@@ -24,9 +25,9 @@ class WebSocketService {
   Timer? _reconnectTimer;
   bool _isConnecting = false;
 
-  Map<String, String> _authHeaders;
+  final Dio _dio;
 
-  WebSocketService(this._authHeaders);
+  WebSocketService(this._dio);
 
   /// Initialize the connection.
   Future<void> init() async {
@@ -36,16 +37,8 @@ class WebSocketService {
 
     try {
       // Fetch auth ticket
-      final ticketRes = await http.get(
-        Uri.parse('$apiBaseUrl/ws/ticket'),
-        headers: apiJsonHeaders(_authHeaders),
-      );
-      if (ticketRes.statusCode != 200) {
-        throw Exception('Failed to fetch WS ticket: ${ticketRes.body}');
-      }
-      final ticket = WsTicketResponseDto.fromJson(
-        decodeJsonObject(ticketRes.body),
-      ).ticket;
+      final ticketRes = await _dio.get<Map<String, dynamic>>('/ws/ticket');
+      final ticket = WsTicketResponseDto.fromJson(ticketRes.data!).ticket;
 
       // create a WebSocketChannel
       final wsUrl = '${apiBaseUrl.replaceAll('http', 'ws')}/ws';
@@ -104,8 +97,7 @@ class WebSocketService {
     });
   }
 
-  Future<void> refreshSession(Map<String, String> authHeaders) async {
-    _authHeaders = authHeaders;
+  Future<void> refreshSession() async {
     _pingTimer?.cancel();
     _reconnectTimer?.cancel();
     final old = _channel;
@@ -124,7 +116,7 @@ class WebSocketService {
 
 final webSocketProvider = Provider<WebSocketService>((ref) {
   final session = ref.watch(authSessionProvider);
-  final service = WebSocketService(session.authHeaders);
+  final service = WebSocketService(ref.watch(dioProvider));
   if (session.isAuthenticated) {
     unawaited(service.init());
   }
@@ -138,7 +130,7 @@ final webSocketProvider = Provider<WebSocketService>((ref) {
     if (previous != null &&
         next.isAuthenticated &&
         !mapEquals(previous.authHeaders, next.authHeaders)) {
-      service.refreshSession(next.authHeaders);
+      service.refreshSession();
     }
   });
 

@@ -1,22 +1,17 @@
-import 'dart:convert';
-
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
 
-import '../../../../core/api/client/api_json.dart';
 import '../../../../core/api/models/chats_api_models.dart';
 import '../../../../core/api/models/messages_api_models.dart';
-import '../../../../core/network/api_config.dart';
+import '../../../../core/network/dio_client.dart';
 import '../../../../core/session/dev_session_store.dart';
 import '../domain/conversation_scope.dart';
 
 class MessageApiService {
-  final Map<String, String> _authHeaders;
+  final Dio _dio;
   final int _currentUserId;
 
-  MessageApiService(this._authHeaders, this._currentUserId);
-
-  Map<String, String> get _headers => apiJsonHeaders(_authHeaders);
+  MessageApiService(this._dio, this._currentUserId);
 
   String nextClientGeneratedId({String? seed}) {
     return '${DateTime.now().microsecondsSinceEpoch}-$seed-$_currentUserId';
@@ -24,9 +19,9 @@ class MessageApiService {
 
   String _messagesPath(ConversationScope scope) {
     if (scope.threadRootId == null) {
-      return '$apiBaseUrl/chats/${scope.chatId}/messages';
+      return '/chats/${scope.chatId}/messages';
     }
-    return '$apiBaseUrl/chats/${scope.chatId}/threads/${scope.threadRootId}/messages';
+    return '/chats/${scope.chatId}/threads/${scope.threadRootId}/messages';
   }
 
   Future<ListMessagesResponseDto> fetchMessages(
@@ -46,17 +41,11 @@ class MessageApiService {
       query['threadId'] = threadId;
     }
 
-    final uri = Uri.parse(
-      '$apiBaseUrl/chats/$chatId/messages',
-    ).replace(queryParameters: query.isEmpty ? null : query);
-    final response = await http.get(uri, headers: _headers);
-    if (response.statusCode != 200) {
-      throw Exception(
-        'Failed to load messages: ${response.statusCode} ${response.body}',
-      );
-    }
-
-    return ListMessagesResponseDto.fromJson(decodeJsonObject(response.body));
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/chats/$chatId/messages',
+      queryParameters: query.isEmpty ? null : query,
+    );
+    return ListMessagesResponseDto.fromJson(response.data!);
   }
 
   Future<List<MessageItemDto>> fetchAround(String chatId, int messageId) async {
@@ -77,16 +66,11 @@ class MessageApiService {
     if (after != null) query['after'] = after.toString();
     if (around != null) query['around'] = around.toString();
 
-    final uri = Uri.parse(
+    final response = await _dio.get<Map<String, dynamic>>(
       _messagesPath(scope),
-    ).replace(queryParameters: query.isEmpty ? null : query);
-    final response = await http.get(uri, headers: _headers);
-    if (response.statusCode != 200) {
-      throw Exception(
-        'Failed to load messages: ${response.statusCode} ${response.body}',
-      );
-    }
-    return ListMessagesResponseDto.fromJson(decodeJsonObject(response.body));
+      queryParameters: query.isEmpty ? null : query,
+    );
+    return ListMessagesResponseDto.fromJson(response.data!);
   }
 
   Future<MessageItemDto> sendMessage(
@@ -98,9 +82,8 @@ class MessageApiService {
     String? clientGeneratedId,
   }) async {
     final path = threadId == null
-        ? '$apiBaseUrl/chats/$chatId/messages'
-        : '$apiBaseUrl/chats/$chatId/threads/$threadId/messages';
-    final uri = Uri.parse(path);
+        ? '/chats/$chatId/messages'
+        : '/chats/$chatId/threads/$threadId/messages';
     final body = SendMessageRequestDto(
       message: text,
       messageType: 'text',
@@ -109,18 +92,11 @@ class MessageApiService {
       replyToId: replyToId,
     );
 
-    final response = await http.post(
-      uri,
-      headers: _headers,
-      body: jsonEncode(body.toJson()),
+    final response = await _dio.post<Map<String, dynamic>>(
+      path,
+      data: body.toJson(),
     );
-    if (response.statusCode != 201) {
-      throw Exception(
-        'Failed to send message: ${response.statusCode} ${response.body}',
-      );
-    }
-
-    return MessageItemDto.fromJson(decodeJsonObject(response.body));
+    return MessageItemDto.fromJson(response.data!);
   }
 
   Future<MessageItemDto> sendConversationMessage(
@@ -130,7 +106,6 @@ class MessageApiService {
     List<String> attachmentIds = const <String>[],
     required String clientGeneratedId,
   }) async {
-    final uri = Uri.parse(_messagesPath(scope));
     final body = SendMessageRequestDto(
       message: text,
       messageType: 'text',
@@ -138,17 +113,11 @@ class MessageApiService {
       attachmentIds: attachmentIds,
       replyToId: replyToId,
     );
-    final response = await http.post(
-      uri,
-      headers: _headers,
-      body: jsonEncode(body.toJson()),
+    final response = await _dio.post<Map<String, dynamic>>(
+      _messagesPath(scope),
+      data: body.toJson(),
     );
-    if (response.statusCode != 201) {
-      throw Exception(
-        'Failed to send message: ${response.statusCode} ${response.body}',
-      );
-    }
-    return MessageItemDto.fromJson(decodeJsonObject(response.body));
+    return MessageItemDto.fromJson(response.data!);
   }
 
   Future<MessageItemDto> editMessage(
@@ -157,34 +126,18 @@ class MessageApiService {
     String newText, {
     List<String> attachmentIds = const <String>[],
   }) async {
-    final uri = Uri.parse('$apiBaseUrl/chats/$chatId/messages/$messageId');
-    final response = await http.patch(
-      uri,
-      headers: _headers,
-      body: jsonEncode(
-        EditMessageRequestDto(
-          message: newText,
-          attachmentIds: attachmentIds,
-        ).toJson(),
-      ),
+    final response = await _dio.patch<Map<String, dynamic>>(
+      '/chats/$chatId/messages/$messageId',
+      data: EditMessageRequestDto(
+        message: newText,
+        attachmentIds: attachmentIds,
+      ).toJson(),
     );
-    if (response.statusCode != 200) {
-      throw Exception(
-        'Failed to edit message: ${response.statusCode} ${response.body}',
-      );
-    }
-
-    return MessageItemDto.fromJson(decodeJsonObject(response.body));
+    return MessageItemDto.fromJson(response.data!);
   }
 
   Future<void> deleteMessage(String chatId, int messageId) async {
-    final uri = Uri.parse('$apiBaseUrl/chats/$chatId/messages/$messageId');
-    final response = await http.delete(uri, headers: _headers);
-    if (response.statusCode != 204) {
-      throw Exception(
-        'Failed to delete message: ${response.statusCode} ${response.body}',
-      );
-    }
+    await _dio.delete<void>('/chats/$chatId/messages/$messageId');
   }
 
   Future<void> putReaction(
@@ -192,15 +145,9 @@ class MessageApiService {
     int messageId,
     String emoji,
   ) async {
-    final uri = Uri.parse(
-      '$apiBaseUrl/chats/${scope.chatId}/messages/$messageId/reactions/${Uri.encodeComponent(emoji)}',
+    await _dio.put<void>(
+      '/chats/${scope.chatId}/messages/$messageId/reactions/${Uri.encodeComponent(emoji)}',
     );
-    final response = await http.put(uri, headers: _headers);
-    if (response.statusCode != 204) {
-      throw Exception(
-        'Failed to add reaction: ${response.statusCode} ${response.body}',
-      );
-    }
   }
 
   Future<void> deleteReaction(
@@ -208,39 +155,24 @@ class MessageApiService {
     int messageId,
     String emoji,
   ) async {
-    final uri = Uri.parse(
-      '$apiBaseUrl/chats/${scope.chatId}/messages/$messageId/reactions/${Uri.encodeComponent(emoji)}',
+    await _dio.delete<void>(
+      '/chats/${scope.chatId}/messages/$messageId/reactions/${Uri.encodeComponent(emoji)}',
     );
-    final response = await http.delete(uri, headers: _headers);
-    if (response.statusCode != 204) {
-      throw Exception(
-        'Failed to remove reaction: ${response.statusCode} ${response.body}',
-      );
-    }
   }
 
   Future<MarkChatReadStateResponseDto> markMessagesAsRead(
     String chatId,
     int messageId,
   ) async {
-    final uri = Uri.parse('$apiBaseUrl/chats/$chatId/read');
-    final response = await http.post(
-      uri,
-      headers: _headers,
-      body: jsonEncode(MarkReadRequestDto(messageId: messageId).toJson()),
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/chats/$chatId/read',
+      data: MarkReadRequestDto(messageId: messageId).toJson(),
     );
-    if (response.statusCode != 200) {
-      throw Exception(
-        'Failed to mark as read: ${response.statusCode} ${response.body}',
-      );
-    }
-    return MarkChatReadStateResponseDto.fromJson(
-      decodeJsonObject(response.body),
-    );
+    return MarkChatReadStateResponseDto.fromJson(response.data!);
   }
 }
 
 final messageApiServiceProvider = Provider<MessageApiService>((ref) {
   final session = ref.watch(authSessionProvider);
-  return MessageApiService(session.authHeaders, session.currentUserId);
+  return MessageApiService(ref.watch(dioProvider), session.currentUserId);
 });

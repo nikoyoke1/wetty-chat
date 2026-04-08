@@ -1,66 +1,40 @@
-import 'dart:convert';
-
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
 
-import '../../../../core/api/client/api_json.dart';
 import '../../../../core/api/models/chats_api_models.dart';
-import '../../../../core/network/api_config.dart';
-import '../../../../core/session/dev_session_store.dart';
+import '../../../../core/network/dio_client.dart';
 
 /// Raw HTTP calls for chat endpoints. No state.
 class ChatApiService {
-  final Map<String, String> _authHeaders;
+  final Dio _dio;
 
-  ChatApiService(this._authHeaders);
-
-  Map<String, String> get _headers => apiJsonHeaders(_authHeaders);
+  ChatApiService(this._dio);
 
   Future<ListChatsResponseDto> fetchChats({int? limit, String? after}) async {
     final query = <String, String>{};
     if (limit != null) query['limit'] = limit.toString();
     if (after != null && after.isNotEmpty) query['after'] = after;
-    final uri = Uri.parse(
-      '$apiBaseUrl/chats',
-    ).replace(queryParameters: query.isEmpty ? null : query);
-    final response = await http.get(uri, headers: _headers);
-    if (response.statusCode != 200) {
-      throw Exception(
-        'Failed to load chats: ${response.statusCode} ${response.body}',
-      );
-    }
-    return ListChatsResponseDto.fromJson(decodeJsonObject(response.body));
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/chats',
+      queryParameters: query.isEmpty ? null : query,
+    );
+    return ListChatsResponseDto.fromJson(response.data!);
   }
 
   Future<CreateChatResponseDto> createChat({String? name}) async {
-    final url = Uri.parse('$apiBaseUrl/group');
-    final response = await http.post(
-      url,
-      headers: _headers,
-      body: jsonEncode(CreateChatRequestDto(name: name).toJson()),
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/group',
+      data: CreateChatRequestDto(name: name).toJson(),
     );
-    if (response.statusCode != 201) {
-      throw Exception(
-        'Failed to create chat: ${response.statusCode} ${response.body}',
-      );
-    }
-    return CreateChatResponseDto.fromJson(decodeJsonObject(response.body));
+    return CreateChatResponseDto.fromJson(response.data!);
   }
 
   Future<UnreadCountResponseDto> fetchUnreadCount() async {
-    final uri = Uri.parse('$apiBaseUrl/chats/unread');
-    final response = await http.get(uri, headers: _headers);
-    if (response.statusCode != 200) {
-      throw Exception(
-        'Failed to load unread count: ${response.statusCode} ${response.body}',
-      );
-    }
-
-    return UnreadCountResponseDto.fromJson(decodeJsonObject(response.body));
+    final response = await _dio.get<Map<String, dynamic>>('/chats/unread');
+    return UnreadCountResponseDto.fromJson(response.data!);
   }
 }
 
 final chatApiServiceProvider = Provider<ChatApiService>((ref) {
-  final session = ref.watch(authSessionProvider);
-  return ChatApiService(session.authHeaders);
+  return ChatApiService(ref.watch(dioProvider));
 });

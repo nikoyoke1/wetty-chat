@@ -1,11 +1,7 @@
-import 'dart:convert';
-
+import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:http/http.dart' as http;
 
-import '../../../../core/api/client/api_json.dart';
 import '../../../../core/api/models/attachments_api_models.dart';
-import '../../../../core/network/api_config.dart';
 
 class UploadUrlResponse {
   final String attachmentId;
@@ -23,9 +19,9 @@ class AttachmentService {
   static const Duration _requestTimeout = Duration(seconds: 15);
   static const Duration _uploadTimeout = Duration(seconds: 120);
 
-  final Map<String, String> _authHeaders;
+  final Dio _dio;
 
-  AttachmentService(this._authHeaders);
+  AttachmentService(this._dio);
 
   Future<UploadUrlResponse> requestUploadUrl({
     required String filename,
@@ -34,7 +30,6 @@ class AttachmentService {
     int? width,
     int? height,
   }) async {
-    final uri = Uri.parse('$apiBaseUrl/attachments/upload-url');
     final payload = UploadUrlRequestDto(
       filename: filename,
       contentType: contentType,
@@ -43,19 +38,12 @@ class AttachmentService {
       height: height,
     );
 
-    final response = await http
-        .post(
-          uri,
-          headers: apiJsonHeaders(_authHeaders),
-          body: jsonEncode(payload.toJson()),
-        )
-        .timeout(_requestTimeout);
-    if (response.statusCode != 201) {
-      throw Exception(
-        'Failed to get upload URL: ${response.statusCode} ${response.body}',
-      );
-    }
-    final dto = UploadUrlResponseDto.fromJson(decodeJsonObject(response.body));
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/attachments/upload-url',
+      data: payload.toJson(),
+      options: Options(sendTimeout: _requestTimeout),
+    );
+    final dto = UploadUrlResponseDto.fromJson(response.data!);
     return UploadUrlResponse(
       attachmentId: dto.attachmentId,
       uploadUrl: dto.uploadUrl,
@@ -63,24 +51,29 @@ class AttachmentService {
     );
   }
 
+  /// Uploads a file directly to S3 using the pre-signed URL.
+  ///
+  /// Uses a separate [Dio] instance without auth interceptors since
+  /// the upload target is an external S3 endpoint with its own headers.
   Future<void> uploadFileToS3({
     required String uploadUrl,
     required PlatformFile file,
     required Map<String, String> uploadHeaders,
   }) async {
-    await Future<void>(() async {
-      final request = http.StreamedRequest('PUT', Uri.parse(uploadUrl));
-      request.headers.addAll(uploadHeaders);
-      request.contentLength = file.size;
-
+    final s3Dio = Dio(
+      BaseOptions(sendTimeout: _uploadTimeout, receiveTimeout: _uploadTimeout),
+    );
+    try {
       final stream = file.readStream ?? file.xFile.openRead();
-      await stream.pipe(request.sink);
-
-      final response = await request.send().timeout(_uploadTimeout);
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        final body = await response.stream.bytesToString();
-        throw Exception('Failed to upload file: ${response.statusCode} $body');
-      }
-    }).timeout(_uploadTimeout);
+      await s3Dio.put<void>(
+        uploadUrl,
+        data: stream,
+        options: Options(
+          headers: {...uploadHeaders, Headers.contentLengthHeader: file.size},
+        ),
+      );
+    } finally {
+      s3Dio.close();
+    }
   }
 }

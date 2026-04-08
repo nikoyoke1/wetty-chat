@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/network/dio_client.dart';
 import '../../../../core/session/dev_session_store.dart';
 import '../../models/message_models.dart';
 import '../data/attachment_picker_service.dart';
@@ -472,8 +473,7 @@ class ConversationComposerViewModel
 }
 
 final attachmentServiceProvider = Provider<AttachmentService>((ref) {
-  final userId = ref.watch(devSessionProvider);
-  return AttachmentService(userId);
+  return AttachmentService(ref.watch(dioProvider));
 });
 
 final attachmentPickerServiceProvider = Provider<AttachmentPickerService>((
