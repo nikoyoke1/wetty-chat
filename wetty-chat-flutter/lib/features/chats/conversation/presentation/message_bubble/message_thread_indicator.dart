@@ -35,8 +35,9 @@ class MessageThreadIndicator extends StatelessWidget {
         child: Opacity(
           opacity: 0.8,
           child: Row(
-            mainAxisAlignment:
-                isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+            mainAxisAlignment: isMe
+                ? MainAxisAlignment.end
+                : MainAxisAlignment.start,
             children: [
               Icon(
                 CupertinoIcons.chat_bubble_2,

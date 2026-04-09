@@ -16,6 +16,8 @@ import '../domain/conversation_scope.dart';
 import '../domain/launch_request.dart';
 import '../domain/timeline_entry.dart';
 import '../domain/viewport_placement.dart';
+import '../../threads/data/thread_api_service.dart';
+import '../../threads/data/thread_subscription_provider.dart';
 import 'anchored_timeline_view.dart';
 import 'chat_detail_view.dart' show shouldShowJumpToLatestFab;
 import 'conversation_composer_bar.dart';
@@ -41,6 +43,7 @@ class _ThreadDetailPageState extends ConsumerState<ThreadDetailPage>
   static const double _liveEdgeScrollThreshold = 50;
   static const double _timelineEndPadding = 12;
   static const Duration _overlayAnimationDuration = Duration(milliseconds: 150);
+  static const Duration _markReadCooldown = Duration(milliseconds: 500);
 
   final ScrollController _timelineScrollController = ScrollController();
 
@@ -50,6 +53,9 @@ class _ThreadDetailPageState extends ConsumerState<ThreadDetailPage>
   Key _timelineViewportKey = const ValueKey<int>(0);
   _ActiveMessageOverlay? _activeOverlay;
   Timer? _overlayDismissTimer;
+
+  int? _maxSeenMessageId;
+  Timer? _markReadTimer;
 
   static const List<String> _quickReactionEmojis = <String>[
     '👍',
@@ -85,6 +91,10 @@ class _ThreadDetailPageState extends ConsumerState<ThreadDetailPage>
       'dispose: identity=${identityHashCode(this)}',
       name: 'ThreadDetailView',
     );
+    _markReadTimer?.cancel();
+    try {
+      unawaited(_flushMarkAsRead());
+    } catch (_) {}
     WidgetsBinding.instance.removeObserver(this);
     _timelineScrollController.removeListener(_onTimelineScroll);
     _timelineScrollController.dispose();
@@ -105,6 +115,7 @@ class _ThreadDetailPageState extends ConsumerState<ThreadDetailPage>
               )
               .flushReadStatus(),
         );
+        unawaited(_flushMarkAsRead());
       } catch (_) {}
     }
   }
@@ -277,8 +288,31 @@ class _ThreadDetailPageState extends ConsumerState<ThreadDetailPage>
     for (final entry in viewState.entries) {
       if (entry is TimelineMessageEntry) {
         notifier.onMessageVisible(entry.message);
+
+        // Track max seen message for thread read status
+        final id = entry.message.serverMessageId;
+        if (id != null &&
+            (_maxSeenMessageId == null || id > _maxSeenMessageId!)) {
+          _maxSeenMessageId = id;
+        }
       }
     }
+    _scheduleMarkAsRead();
+  }
+
+  void _scheduleMarkAsRead() {
+    _markReadTimer?.cancel();
+    _markReadTimer = Timer(_markReadCooldown, _flushMarkAsRead);
+  }
+
+  Future<void> _flushMarkAsRead() async {
+    final messageId = _maxSeenMessageId;
+    if (messageId == null) return;
+    try {
+      await ref
+          .read(threadApiServiceProvider)
+          .markThreadAsRead(int.parse(widget.threadRootId), messageId);
+    } catch (_) {}
   }
 
   Future<void> _scrollToLatest() async {
@@ -309,6 +343,31 @@ class _ThreadDetailPageState extends ConsumerState<ThreadDetailPage>
             child: const Text('OK'),
           ),
         ],
+      ),
+    );
+  }
+
+  ThreadSubscriptionArgs get _subscriptionArgs =>
+      (chatId: widget.chatId, threadRootId: int.parse(widget.threadRootId));
+
+  Widget _buildSubscriptionButton() {
+    final subscriptionAsync = ref.watch(
+      threadSubscriptionProvider(_subscriptionArgs),
+    );
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      onPressed: subscriptionAsync.isLoading
+          ? null
+          : () {
+              ref
+                  .read(threadSubscriptionProvider(_subscriptionArgs).notifier)
+                  .toggle();
+            },
+      child: subscriptionAsync.when(
+        loading: () => const CupertinoActivityIndicator(),
+        error: (_, _) => const Icon(CupertinoIcons.bell),
+        data: (subscribed) =>
+            Icon(subscribed ? CupertinoIcons.bell_fill : CupertinoIcons.bell),
       ),
     );
   }
@@ -366,6 +425,7 @@ class _ThreadDetailPageState extends ConsumerState<ThreadDetailPage>
                 )
                 .flushReadStatus(),
           );
+          unawaited(_flushMarkAsRead());
         }
       },
       child: CupertinoPageScaffold(
@@ -389,6 +449,7 @@ class _ThreadDetailPageState extends ConsumerState<ThreadDetailPage>
               ),
             ],
           ),
+          trailing: _buildSubscriptionButton(),
         ),
         child: SafeArea(
           bottom: false,

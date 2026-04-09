@@ -18,10 +18,12 @@ class SettingsItemData {
     required this.onTap,
     this.trailingText,
     this.trailingTextSize,
+    this.trailingWidget,
     this.titleColor,
     this.titleFontSize,
     this.titleFontWeight,
     this.isDestructive = false,
+    this.showChevron,
   });
 
   final String title;
@@ -30,10 +32,14 @@ class SettingsItemData {
   final VoidCallback onTap;
   final String? trailingText;
   final double? trailingTextSize;
+  final Widget? trailingWidget;
   final Color? titleColor;
   final double? titleFontSize;
   final FontWeight? titleFontWeight;
   final bool isDestructive;
+
+  /// Whether to show the trailing chevron. Defaults to `!isDestructive`.
+  final bool? showChevron;
 }
 
 class SettingsSectionCard extends StatelessWidget {
@@ -124,7 +130,8 @@ class SettingsActionRow extends StatelessWidget {
             ),
             const SizedBox(width: 8),
           ],
-          if (!item.isDestructive)
+          if (item.trailingWidget != null) item.trailingWidget!,
+          if (item.showChevron ?? !item.isDestructive)
             Icon(
               CupertinoIcons.chevron_right,
               size: IconSizes.iconSize,

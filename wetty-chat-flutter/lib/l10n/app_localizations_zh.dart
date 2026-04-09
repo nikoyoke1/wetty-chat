@@ -120,6 +120,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsTextSize => '字体大小';
 
   @override
+  String get settingsChat => '聊天';
+
+  @override
+  String get settingsShowAllTab => '显示「全部」标签';
+
+  @override
   String get settingsGeneral => '通用';
 
   @override
@@ -284,6 +290,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsTextSize => '字体大小';
 
   @override
+  String get settingsChat => '聊天';
+
+  @override
+  String get settingsShowAllTab => '显示「全部」标签';
+
+  @override
   String get settingsGeneral => '通用';
 
   @override
@@ -446,6 +458,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsTextSize => '字型大小';
+
+  @override
+  String get settingsChat => '聊天';
+
+  @override
+  String get settingsShowAllTab => '顯示「全部」分頁';
 
   @override
   String get settingsGeneral => '一般';

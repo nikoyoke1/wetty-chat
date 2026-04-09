@@ -42,6 +42,8 @@
   "languageChineseCN": "简体中文",
   "languageChineseTW": "繁體中文",
   "settingsTextSize": "字型大小",
+  "settingsChat": "聊天",
+  "settingsShowAllTab": "顯示「全部」分頁",
   "settingsGeneral": "一般",
   "settingsUser": "使用者",
   "settingsProfile": "個人資料",

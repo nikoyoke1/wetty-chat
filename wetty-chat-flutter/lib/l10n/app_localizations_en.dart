@@ -120,6 +120,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsTextSize => 'Text Size';
 
   @override
+  String get settingsChat => 'Chat';
+
+  @override
+  String get settingsShowAllTab => 'Show \'All\' Tab';
+
+  @override
   String get settingsGeneral => 'General';
 
   @override

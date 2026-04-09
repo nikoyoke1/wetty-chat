@@ -112,6 +112,12 @@
   "settingsTextSize": "Text Size",
   "@settingsTextSize": { "description": "Text size setting label" },
 
+  "settingsChat": "Chat",
+  "@settingsChat": { "description": "Chat settings section header" },
+
+  "settingsShowAllTab": "Show 'All' Tab",
+  "@settingsShowAllTab": { "description": "Toggle to show or hide the All tab in chat list" },
+
   "settingsGeneral": "General",
   "@settingsGeneral": { "description": "General settings section header" },
 

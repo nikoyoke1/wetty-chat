@@ -322,6 +322,18 @@ abstract class AppLocalizations {
   /// **'Text Size'**
   String get settingsTextSize;
 
+  /// Chat settings section header
+  ///
+  /// In en, this message translates to:
+  /// **'Chat'**
+  String get settingsChat;
+
+  /// Toggle to show or hide the All tab in chat list
+  ///
+  /// In en, this message translates to:
+  /// **'Show \'All\' Tab'**
+  String get settingsShowAllTab;
+
   /// General settings section header
   ///
   /// In en, this message translates to:

@@ -5,14 +5,47 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/routing/route_names.dart';
 import '../../../../app/theme/style_config.dart';
+import '../../../../core/settings/app_settings_store.dart';
 import '../../chat_timestamp_formatter.dart';
 import '../../conversation/application/conversation_draft_store.dart';
 import '../../conversation/domain/conversation_scope.dart';
 import '../../conversation/domain/launch_request.dart';
 import '../../models/chat_models.dart';
 import '../../models/message_models.dart';
+import '../../threads/application/thread_list_view_model.dart';
+import '../../threads/models/thread_models.dart';
+import '../../threads/presentation/thread_list_row.dart';
+import '../../threads/presentation/thread_list_view.dart';
 import '../application/chat_list_view_model.dart';
 import '../data/chat_launch_service.dart';
+import 'chat_list_segment.dart';
+
+// ---------------------------------------------------------------------------
+// Merged list items for the "All" tab
+// ---------------------------------------------------------------------------
+
+/// Union type for items in the merged "All" tab list.
+sealed class MergedListItem {
+  DateTime? get sortTime;
+}
+
+/// Wraps a [ChatListItem] for the merged list.
+class MergedChatItem extends MergedListItem {
+  MergedChatItem(this.chat);
+  final ChatListItem chat;
+
+  @override
+  DateTime? get sortTime => chat.lastMessageAt;
+}
+
+/// Wraps a [ThreadListItem] for the merged list.
+class MergedThreadItem extends MergedListItem {
+  MergedThreadItem(this.thread);
+  final ThreadListItem thread;
+
+  @override
+  DateTime? get sortTime => thread.lastReplyAt;
+}
 
 class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key});
@@ -23,6 +56,7 @@ class ChatPage extends ConsumerStatefulWidget {
 
 class _ChatPageState extends ConsumerState<ChatPage> {
   late final ScrollController _scrollController;
+  ChatListTab? _activeTab;
 
   bool get _supportsPullToRefresh {
     if (kIsWeb) return false;
@@ -49,6 +83,57 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// Resolves the effective active tab based on current settings.
+  ChatListTab _effectiveTab(bool showAllTab) {
+    final tab = _activeTab;
+    if (tab == null) {
+      // First build: pick default based on setting.
+      return showAllTab ? ChatListTab.all : ChatListTab.groups;
+    }
+    // If the "All" tab was removed while we were on it, fall back.
+    if (!showAllTab && tab == ChatListTab.all) {
+      return ChatListTab.groups;
+    }
+    return tab;
+  }
+
+  /// Computes the total unread count for groups (excluding muted chats).
+  int _groupsUnreadCount(List<ChatListItem> chats) {
+    final now = DateTime.now();
+    var total = 0;
+    for (final chat in chats) {
+      if (chat.mutedUntil != null && chat.mutedUntil!.isAfter(now)) continue;
+      total += chat.unreadCount;
+    }
+    return total;
+  }
+
+  /// Computes the total unread count for threads.
+  int _threadsUnreadCount(List<ThreadListItem> threads) {
+    var total = 0;
+    for (final thread in threads) {
+      total += thread.unreadCount;
+    }
+    return total;
+  }
+
+  /// Merges chat and thread items, sorted by most recent first.
+  List<MergedListItem> _buildMergedList(
+    List<ChatListItem> chats,
+    List<ThreadListItem> threads,
+  ) {
+    final items = <MergedListItem>[
+      for (final chat in chats) MergedChatItem(chat),
+      for (final thread in threads) MergedThreadItem(thread),
+    ];
+    items.sort((a, b) {
+      final aTime = a.sortTime ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bTime = b.sortTime ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bTime.compareTo(aTime);
+    });
+    return items;
   }
 
   void _onScroll() {
@@ -98,7 +183,20 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    final asyncState = ref.watch(chatListViewModelProvider);
+    final settings = ref.watch(appSettingsProvider);
+    final showAllTab = settings.showAllTab;
+    final activeTab = _effectiveTab(showAllTab);
+
+    // Watch both providers so we can compute unread badges.
+    final chatAsync = ref.watch(chatListViewModelProvider);
+    final threadAsync = ref.watch(threadListViewModelProvider);
+
+    final chatList = chatAsync.valueOrNull?.chats ?? const [];
+    final threadList = threadAsync.valueOrNull?.threads ?? const [];
+
+    final groupsUnread = _groupsUnreadCount(chatList);
+    final threadsUnread = _threadsUnreadCount(threadList);
+    final allUnread = groupsUnread + threadsUnread;
 
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
@@ -113,25 +211,148 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         ),
       ),
       child: SafeArea(
-        child: asyncState.when(
-          loading: () => const Center(child: CupertinoActivityIndicator()),
-          error: (error, _) => Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(error.toString(), textAlign: TextAlign.center),
-                  const SizedBox(height: 16),
-                  CupertinoButton.filled(
-                    onPressed: () => ref.invalidate(chatListViewModelProvider),
-                    child: const Text('Retry'),
-                  ),
-                ],
+        bottom: false,
+        child: Column(
+          children: [
+            ChatListSegment(
+              activeTab: activeTab,
+              showAllTab: showAllTab,
+              allUnreadCount: allUnread,
+              groupsUnreadCount: groupsUnread,
+              threadsUnreadCount: threadsUnread,
+              onTabChanged: (tab) => setState(() => _activeTab = tab),
+            ),
+            Expanded(
+              child: _buildTabContent(activeTab, chatAsync, threadAsync),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabContent(
+    ChatListTab tab,
+    AsyncValue<ChatListViewState> chatAsync,
+    AsyncValue<ThreadListViewState> threadAsync,
+  ) {
+    return switch (tab) {
+      ChatListTab.groups => chatAsync.when(
+        loading: () => const Center(child: CupertinoActivityIndicator()),
+        error: (error, _) => _buildErrorView(
+          error,
+          () => ref.invalidate(chatListViewModelProvider),
+        ),
+        data: (viewState) => _buildBody(viewState),
+      ),
+      ChatListTab.threads => const ThreadListView(embedded: true),
+      ChatListTab.all => _buildAllTab(chatAsync, threadAsync),
+    };
+  }
+
+  Widget _buildAllTab(
+    AsyncValue<ChatListViewState> chatAsync,
+    AsyncValue<ThreadListViewState> threadAsync,
+  ) {
+    // Show loading only when both are loading and have no data yet.
+    if (chatAsync is AsyncLoading && threadAsync is AsyncLoading) {
+      return const Center(child: CupertinoActivityIndicator());
+    }
+
+    // If the chat provider errored and has no data, show error.
+    if (chatAsync is AsyncError && chatAsync.valueOrNull == null) {
+      return _buildErrorView(
+        (chatAsync as AsyncError).error,
+        () => ref.invalidate(chatListViewModelProvider),
+      );
+    }
+
+    final chatViewState = chatAsync.valueOrNull;
+    final threadViewState = threadAsync.valueOrNull;
+
+    final chats = chatViewState?.chats ?? const [];
+    final threads = threadViewState?.threads ?? const [];
+
+    if (chats.isEmpty && threads.isEmpty) {
+      return const Center(child: Text('No chats or threads yet'));
+    }
+
+    final merged = _buildMergedList(chats, threads);
+    final isLoadingMore =
+        (chatViewState?.isLoadingMore ?? false) ||
+        (threadViewState?.isLoadingMore ?? false);
+
+    if (_supportsPullToRefresh) {
+      return CustomScrollView(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        slivers: [
+          CupertinoSliverRefreshControl(onRefresh: _refreshChats),
+          SliverList.builder(
+            itemCount: merged.length,
+            itemBuilder: (context, index) =>
+                _buildMergedItem(context, merged[index]),
+          ),
+          if (isLoadingMore)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(child: CupertinoActivityIndicator()),
               ),
             ),
-          ),
-          data: (viewState) => _buildBody(viewState),
+        ],
+      );
+    }
+
+    return ListView.builder(
+      controller: _scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
+      itemCount: merged.length + (isLoadingMore ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index >= merged.length) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(child: CupertinoActivityIndicator()),
+          );
+        }
+        return _buildMergedItem(context, merged[index]);
+      },
+    );
+  }
+
+  Widget _buildMergedItem(BuildContext context, MergedListItem item) {
+    return switch (item) {
+      MergedChatItem(:final chat) => _buildChatListItem(context, chat),
+      MergedThreadItem(:final thread) => ThreadListRow(
+        thread: thread,
+        onTap: () {
+          context.push(
+            AppRoutes.threadDetail(
+              thread.chatId,
+              thread.threadRootId.toString(),
+            ),
+          );
+        },
+      ),
+    };
+  }
+
+  Widget _buildErrorView(Object error, VoidCallback onRetry) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(error.toString(), textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            CupertinoButton.filled(
+              onPressed: onRetry,
+              child: const Text('Retry'),
+            ),
+          ],
         ),
       ),
     );

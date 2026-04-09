@@ -45,11 +45,16 @@ extension AppLanguageDisplayName on AppLanguage {
   };
 }
 
-typedef AppSettingsState = ({double fontSize, AppLanguage language});
+typedef AppSettingsState = ({
+  double fontSize,
+  AppLanguage language,
+  bool showAllTab,
+});
 
 class AppSettingsNotifier extends Notifier<AppSettingsState> {
   static const String _chatMessageFontSizeKey = 'chat_message_font_size';
   static const String _languageKey = 'app_language';
+  static const String _showAllTabKey = 'chat_list_show_all_tab';
   static const double minChatMessageFontSize = 14;
   static const double maxChatMessageFontSize = 18;
   static const int chatMessageFontSizeSteps = 5;
@@ -68,7 +73,8 @@ class AppSettingsNotifier extends Notifier<AppSettingsState> {
       ),
     );
     final language = AppLanguage.fromStorage(_prefs.getString(_languageKey));
-    return (fontSize: fontSize, language: language);
+    final showAllTab = _prefs.getBool(_showAllTabKey) ?? true;
+    return (fontSize: fontSize, language: language, showAllTab: showAllTab);
   }
 
   void setChatMessageFontSize(double value) {
@@ -76,14 +82,32 @@ class AppSettingsNotifier extends Notifier<AppSettingsState> {
       value.clamp(minChatMessageFontSize, maxChatMessageFontSize),
     );
     if (next == state.fontSize) return;
-    state = (fontSize: next, language: state.language);
+    state = (
+      fontSize: next,
+      language: state.language,
+      showAllTab: state.showAllTab,
+    );
     _prefs.setDouble(_chatMessageFontSizeKey, next);
   }
 
   void setLanguage(AppLanguage language) {
     if (language == state.language) return;
-    state = (fontSize: state.fontSize, language: language);
+    state = (
+      fontSize: state.fontSize,
+      language: language,
+      showAllTab: state.showAllTab,
+    );
     _prefs.setString(_languageKey, language.storageValue);
+  }
+
+  void setShowAllTab(bool value) {
+    if (value == state.showAllTab) return;
+    state = (
+      fontSize: state.fontSize,
+      language: state.language,
+      showAllTab: value,
+    );
+    _prefs.setBool(_showAllTabKey, value);
   }
 
   static double _snapChatMessageFontSize(double value) {

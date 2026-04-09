@@ -14,7 +14,8 @@ class SettingsPage extends ConsumerWidget {
 
   List<SettingsSectionData> _sections(
     BuildContext context,
-    AppLanguage language,
+    WidgetRef ref,
+    AppSettingsState settings,
     AuthSessionState session,
   ) {
     final l10n = AppLocalizations.of(context)!;
@@ -25,13 +26,37 @@ class SettingsPage extends ConsumerWidget {
     };
     return [
       SettingsSectionData(
+        title: l10n.settingsChat,
+        items: [
+          SettingsItemData(
+            title: l10n.settingsShowAllTab,
+            icon: CupertinoIcons.list_bullet,
+            iconColor: const Color(0xFF5856D6),
+            titleFontSize: AppFontSizes.body,
+            titleFontWeight: FontWeight.w500,
+            showChevron: false,
+            trailingWidget: CupertinoSwitch(
+              value: settings.showAllTab,
+              onChanged: (value) {
+                ref.read(appSettingsProvider.notifier).setShowAllTab(value);
+              },
+            ),
+            onTap: () {
+              ref
+                  .read(appSettingsProvider.notifier)
+                  .setShowAllTab(!settings.showAllTab);
+            },
+          ),
+        ],
+      ),
+      SettingsSectionData(
         title: l10n.settingsGeneral,
         items: [
           SettingsItemData(
             title: l10n.settingsLanguage,
             icon: CupertinoIcons.globe,
             iconColor: const Color(0xFF3A7DFF),
-            trailingText: language.displayName(l10n),
+            trailingText: settings.language.displayName(l10n),
             trailingTextSize: AppFontSizes.body,
             titleFontSize: AppFontSizes.body,
             titleFontWeight: FontWeight.w500,
@@ -91,7 +116,7 @@ class SettingsPage extends ConsumerWidget {
     final l10n = AppLocalizations.of(context)!;
     final settings = ref.watch(appSettingsProvider);
     final session = ref.watch(authSessionProvider);
-    final sections = _sections(context, settings.language, session);
+    final sections = _sections(context, ref, settings, session);
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(middle: Text(l10n.tabSettings)),
       child: SafeArea(

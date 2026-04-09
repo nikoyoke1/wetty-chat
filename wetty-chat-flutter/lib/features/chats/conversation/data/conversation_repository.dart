@@ -17,7 +17,7 @@ class ConversationRepository {
   }) : _service = service;
 
   static const int defaultWindowSize = 100;
-  static const int pageSize = 40;
+  static const int pageSize = 50;
   static const int maxRenderEntries = 350;
 
   final ConversationScope scope;
