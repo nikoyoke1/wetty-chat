@@ -1,13 +1,11 @@
-import 'dart:async';
-
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show LinearProgressIndicator;
-import 'package:media_kit/media_kit.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../app/theme/style_config.dart';
+import '../../application/voice_message_playback_controller.dart';
 import '../../../models/message_models.dart';
 
-class VoiceMessageBubble extends StatefulWidget {
+class VoiceMessageBubble extends ConsumerStatefulWidget {
   const VoiceMessageBubble({
     super.key,
     required this.attachment,
@@ -18,185 +16,220 @@ class VoiceMessageBubble extends StatefulWidget {
   final bool isMe;
 
   @override
-  State<VoiceMessageBubble> createState() => _VoiceMessageBubbleState();
+  ConsumerState<VoiceMessageBubble> createState() => _VoiceMessageBubbleState();
 }
 
-class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
-  late final Player _player;
-  StreamSubscription<Object>? _errorSubscription;
-  bool _isPreparing = false;
-  bool _hasOpened = false;
-  String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _player = Player();
-    _errorSubscription = _player.stream.error.listen((error) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _errorMessage = error.toString();
-        _isPreparing = false;
-      });
-    });
-    unawaited(_prepare());
-  }
-
-  @override
-  void dispose() {
-    _errorSubscription?.cancel();
-    unawaited(_player.dispose());
-    super.dispose();
-  }
-
-  Future<void> _prepare() async {
-    if (_hasOpened || _isPreparing || widget.attachment.url.isEmpty) {
-      return;
-    }
-    setState(() {
-      _isPreparing = true;
-      _errorMessage = null;
-    });
-    try {
-      await _player.open(Media(widget.attachment.url), play: false);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _hasOpened = true;
-        _isPreparing = false;
-      });
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _errorMessage = error.toString();
-        _isPreparing = false;
-      });
-    }
-  }
-
-  Future<void> _togglePlayback(bool isPlaying) async {
-    if (_errorMessage != null || widget.attachment.url.isEmpty) {
-      await _prepare();
-      return;
-    }
-    if (!_hasOpened) {
-      await _prepare();
-    }
-    if (isPlaying) {
-      await _player.pause();
-    } else {
-      await _player.play();
-    }
-  }
-
-  String _formatDuration(Duration value) {
-    final totalSeconds = value.inSeconds;
-    final minutes = totalSeconds ~/ 60;
-    final seconds = totalSeconds % 60;
-    return '$minutes:${seconds.toString().padLeft(2, '0')}';
-  }
+class _VoiceMessageBubbleState extends ConsumerState<VoiceMessageBubble> {
+  Duration? _dragPosition;
 
   @override
   Widget build(BuildContext context) {
+    final playbackState = ref.watch(voiceMessagePlaybackControllerProvider);
+    final controller = ref.read(
+      voiceMessagePlaybackControllerProvider.notifier,
+    );
+    final isActive = playbackState.isActive(widget.attachment.id);
+    final phase = isActive
+        ? playbackState.phase
+        : VoiceMessagePlaybackPhase.idle;
+    final duration = playbackState.durationFor(widget.attachment.id);
+    final livePosition = isActive ? playbackState.position : Duration.zero;
+    final sliderPosition = _dragPosition ?? livePosition;
+    final clampedSliderPosition = duration == null
+        ? sliderPosition
+        : _clampDuration(sliderPosition, Duration.zero, duration);
     final background = widget.isMe
         ? context.appColors.chatAttachmentChipSent
         : context.appColors.chatAttachmentChipReceived;
+    final accent = CupertinoColors.activeBlue.resolveFrom(context);
+    final secondaryText = isActive && phase == VoiceMessagePlaybackPhase.error
+        ? playbackState.errorMessage ?? 'Audio playback failed'
+        : '${_formatDuration(clampedSliderPosition)} / ${_formatDuration(duration)}';
 
     return Container(
-      width: 220,
+      width: 240,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(14),
       ),
-      child: StreamBuilder<bool>(
-        stream: _player.stream.playing,
-        initialData: false,
-        builder: (context, playingSnapshot) {
-          final isPlaying = playingSnapshot.data ?? false;
-          return StreamBuilder<Duration>(
-            stream: _player.stream.position,
-            initialData: Duration.zero,
-            builder: (context, positionSnapshot) {
-              return StreamBuilder<Duration>(
-                stream: _player.stream.duration,
-                initialData: Duration.zero,
-                builder: (context, durationSnapshot) {
-                  final position = positionSnapshot.data ?? Duration.zero;
-                  final duration = durationSnapshot.data ?? Duration.zero;
-                  final progress = duration.inMilliseconds <= 0
-                      ? 0.0
-                      : (position.inMilliseconds / duration.inMilliseconds)
-                            .clamp(0, 1)
-                            .toDouble();
-
-                  return Row(
-                    children: [
-                      CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(32, 32),
-                        onPressed: _isPreparing
-                            ? null
-                            : () => unawaited(_togglePlayback(isPlaying)),
-                        child: _isPreparing
-                            ? const CupertinoActivityIndicator(radius: 9)
-                            : Icon(
-                                isPlaying
-                                    ? CupertinoIcons.pause_solid
-                                    : CupertinoIcons.play_fill,
-                                size: 18,
-                                color: CupertinoColors.activeBlue.resolveFrom(
-                                  context,
-                                ),
-                              ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(999),
-                              child: LinearProgressIndicator(
-                                value: progress,
-                                minHeight: 4,
-                                color: CupertinoColors.activeBlue.resolveFrom(
-                                  context,
-                                ),
-                                backgroundColor: CupertinoColors.systemGrey4
-                                    .resolveFrom(context),
-                              ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: accent.withAlpha(28),
+              shape: BoxShape.circle,
+            ),
+            child: CupertinoButton(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size.square(32),
+              onPressed: () => controller.togglePlayback(widget.attachment),
+              child: _PlaybackIcon(phase: phase, iconColor: accent),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Voice message',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: appTextStyle(
+                    context,
+                    fontSize: AppFontSizes.body,
+                    fontWeight: FontWeight.w600,
+                    color: context.appColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                CupertinoSlider(
+                  value: _sliderValue(clampedSliderPosition, duration),
+                  min: 0,
+                  max: _sliderMax(duration),
+                  activeColor: accent,
+                  onChanged: duration == null || !isActive
+                      ? null
+                      : (value) {
+                          setState(() {
+                            _dragPosition = Duration(
+                              milliseconds: value.round(),
+                            );
+                          });
+                        },
+                  onChangeEnd: duration == null || !isActive
+                      ? null
+                      : (value) async {
+                          final nextPosition = Duration(
+                            milliseconds: value.round(),
+                          );
+                          setState(() {
+                            _dragPosition = null;
+                          });
+                          await controller.seekToAttachment(
+                            widget.attachment,
+                            nextPosition,
+                          );
+                        },
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        secondaryText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            appSecondaryTextStyle(
+                              context,
+                              fontSize: AppFontSizes.meta,
+                            ).copyWith(
+                              color:
+                                  isActive &&
+                                      phase == VoiceMessagePlaybackPhase.error
+                                  ? CupertinoColors.systemRed.resolveFrom(
+                                      context,
+                                    )
+                                  : context.appColors.textSecondary,
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              _errorMessage != null
-                                  ? 'Audio unavailable'
-                                  : '${_formatDuration(position)} / ${_formatDuration(duration)}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: appTextStyle(
-                                context,
-                                fontSize: AppFontSizes.meta,
-                                color: context.appColors.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
                       ),
-                    ],
-                  );
-                },
-              );
-            },
-          );
-        },
+                    ),
+                    if (isActive && phase == VoiceMessagePlaybackPhase.playing)
+                      Text(
+                        'Playing',
+                        style: appSecondaryTextStyle(
+                          context,
+                          fontSize: AppFontSizes.meta,
+                        ).copyWith(color: accent),
+                      ),
+                  ],
+                ),
+                if (isActive &&
+                    playbackState.bufferedPosition > Duration.zero &&
+                    phase != VoiceMessagePlaybackPhase.error)
+                  Text(
+                    'Buffered ${_formatDuration(playbackState.bufferedPosition)}',
+                    style: appSecondaryTextStyle(
+                      context,
+                      fontSize: AppFontSizes.meta,
+                    ).copyWith(color: context.appColors.textSecondary),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
+}
+
+class _PlaybackIcon extends StatelessWidget {
+  const _PlaybackIcon({required this.phase, required this.iconColor});
+
+  final VoiceMessagePlaybackPhase phase;
+  final Color iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    switch (phase) {
+      case VoiceMessagePlaybackPhase.loading:
+        return CupertinoActivityIndicator(color: iconColor);
+      case VoiceMessagePlaybackPhase.playing:
+        return Icon(CupertinoIcons.pause_fill, size: 18, color: iconColor);
+      case VoiceMessagePlaybackPhase.error:
+        return Icon(
+          CupertinoIcons.exclamationmark_triangle_fill,
+          size: 18,
+          color: CupertinoColors.systemRed.resolveFrom(context),
+        );
+      case VoiceMessagePlaybackPhase.idle:
+      case VoiceMessagePlaybackPhase.ready:
+      case VoiceMessagePlaybackPhase.paused:
+      case VoiceMessagePlaybackPhase.completed:
+        return Icon(CupertinoIcons.play_fill, size: 18, color: iconColor);
+    }
+  }
+}
+
+double _sliderValue(Duration position, Duration? duration) {
+  if (duration == null || duration <= Duration.zero) {
+    return 0;
+  }
+  return _clampDuration(
+    position,
+    Duration.zero,
+    duration,
+  ).inMilliseconds.toDouble();
+}
+
+double _sliderMax(Duration? duration) {
+  if (duration == null || duration <= Duration.zero) {
+    return 1;
+  }
+  return duration.inMilliseconds.toDouble();
+}
+
+String _formatDuration(Duration? duration) {
+  if (duration == null) {
+    return '--:--';
+  }
+  final totalSeconds = duration.inSeconds;
+  final minutes = totalSeconds ~/ 60;
+  final seconds = totalSeconds % 60;
+  return '$minutes:${seconds.toString().padLeft(2, '0')}';
+}
+
+Duration _clampDuration(Duration value, Duration min, Duration max) {
+  if (value < min) {
+    return min;
+  }
+  if (value > max) {
+    return max;
+  }
+  return value;
 }

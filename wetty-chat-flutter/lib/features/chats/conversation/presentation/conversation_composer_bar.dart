@@ -1062,7 +1062,7 @@ class _AudioRecordButton extends StatelessWidget {
     final active = snapPosition != _AudioRecordSnapPosition.origin;
     final icon = switch (snapPosition) {
       _AudioRecordSnapPosition.left => CupertinoIcons.delete,
-      _AudioRecordSnapPosition.top => CupertinoIcons.arrow_up_circle_fill,
+      _AudioRecordSnapPosition.top => CupertinoIcons.arrow_up,
       _AudioRecordSnapPosition.origin => CupertinoIcons.mic_fill,
     };
 
@@ -1100,7 +1100,7 @@ class _AudioRecordButton extends StatelessWidget {
                 ignoring: !isActive,
                 child: _AudioGestureTarget(
                   size: size,
-                  icon: CupertinoIcons.arrow_up_circle_fill,
+                  icon: CupertinoIcons.arrow_up,
                   active: snapPosition == _AudioRecordSnapPosition.top,
                 ),
               ),

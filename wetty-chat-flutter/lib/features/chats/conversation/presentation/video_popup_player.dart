@@ -1,10 +1,5 @@
-import 'dart:async';
-
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' as material;
-import 'package:media_kit/media_kit.dart';
-import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../../../app/theme/style_config.dart';
 import '../../models/message_models.dart';
@@ -36,7 +31,7 @@ Future<void> showVideoPlayerPopup(
   );
 }
 
-class VideoAttachmentPreview extends StatefulWidget {
+class VideoAttachmentPreview extends StatelessWidget {
   const VideoAttachmentPreview({
     super.key,
     required this.attachment,
@@ -47,28 +42,13 @@ class VideoAttachmentPreview extends StatefulWidget {
   final VoidCallback onTap;
 
   @override
-  State<VideoAttachmentPreview> createState() => _VideoAttachmentPreviewState();
-}
-
-class _VideoAttachmentPreviewState extends State<VideoAttachmentPreview> {
-  late Future<Uint8List?> _thumbnailFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _thumbnailFuture = _VideoThumbnailCache.instance.load(
-      widget.attachment.url,
-    );
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final ratio = _preferredAspectRatio(widget.attachment);
+    final ratio = _preferredAspectRatio(attachment);
     final width = ratio >= 1 ? 220.0 : 168.0;
     final height = width / ratio;
 
     return GestureDetector(
-      onTap: widget.onTap,
+      onTap: onTap,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
         child: SizedBox(
@@ -77,22 +57,7 @@ class _VideoAttachmentPreviewState extends State<VideoAttachmentPreview> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              FutureBuilder<Uint8List?>(
-                future: _thumbnailFuture,
-                builder: (context, snapshot) {
-                  final bytes = snapshot.data;
-                  if (bytes != null) {
-                    return Image.memory(
-                      bytes,
-                      fit: BoxFit.cover,
-                      gaplessPlayback: true,
-                      errorBuilder: (_, _, _) =>
-                          _VideoPlaceholder(attachment: widget.attachment),
-                    );
-                  }
-                  return _VideoPlaceholder(attachment: widget.attachment);
-                },
-              ),
+              _VideoPlaceholder(attachment: attachment),
               Container(color: CupertinoColors.black.withAlpha(36)),
               Center(
                 child: Container(
@@ -132,101 +97,6 @@ class _VideoPopupPlayerDialog extends StatefulWidget {
 }
 
 class _VideoPopupPlayerDialogState extends State<_VideoPopupPlayerDialog> {
-  late final Player _player;
-  late final VideoController _controller;
-  final List<StreamSubscription<dynamic>> _subscriptions = [];
-  Object? _error;
-  bool _isPreparing = true;
-
-  bool get _isMobilePlatform {
-    switch (defaultTargetPlatform) {
-      case TargetPlatform.android:
-      case TargetPlatform.iOS:
-        return true;
-      case TargetPlatform.windows:
-      case TargetPlatform.linux:
-      case TargetPlatform.macOS:
-      case TargetPlatform.fuchsia:
-        return false;
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _player = Player(
-      configuration: PlayerConfiguration(
-        logLevel: kDebugMode ? MPVLogLevel.debug : MPVLogLevel.error,
-      ),
-    );
-    _controller = VideoController(_player);
-    _bindDebugStreams();
-    unawaited(_open());
-  }
-
-  @override
-  void dispose() {
-    for (final subscription in _subscriptions) {
-      unawaited(subscription.cancel());
-    }
-    unawaited(_player.dispose());
-    super.dispose();
-  }
-
-  Future<void> _open() async {
-    try {
-      await _player.setVolume(100);
-      await _player.open(Media(widget.attachment.url));
-    } catch (error) {
-      _log('open failed: $error');
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _error = error;
-        _isPreparing = false;
-      });
-      return;
-    }
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _isPreparing = false;
-    });
-  }
-
-  void _bindDebugStreams() {
-    _subscriptions.addAll([
-      _player.stream.error.listen((error) {
-        _log('player error: $error');
-        if (!mounted) {
-          return;
-        }
-        setState(() {
-          _error ??= error;
-        });
-      }),
-      _player.stream.log.listen((event) {
-        _log('mpv ${event.level}/${event.prefix}: ${event.text.trim()}');
-      }),
-      _player.stream.width.listen((width) {
-        if (width != null && width > 0) {
-          _log('video width=$width');
-        }
-      }),
-      _player.stream.height.listen((height) {
-        if (height != null && height > 0) {
-          _log('video height=$height');
-        }
-      }),
-    ]);
-  }
-
-  void _log(String message) {
-    debugPrint('[VideoPlayer url=${widget.attachment.url}] $message');
-  }
-
   @override
   Widget build(BuildContext context) {
     final title = widget.attachment.fileName.isEmpty
@@ -234,94 +104,6 @@ class _VideoPopupPlayerDialogState extends State<_VideoPopupPlayerDialog> {
         : widget.attachment.fileName;
     final size = MediaQuery.sizeOf(context);
     final aspectRatio = _preferredAspectRatio(widget.attachment);
-
-    final controlsTheme = MaterialDesktopVideoControlsThemeData(
-      visibleOnMount: true,
-      topButtonBar: [
-        material.IconButton(
-          onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(material.Icons.close, size: IconSizes.iconSize),
-          color: material.Colors.white,
-          tooltip: 'Close',
-        ),
-      ],
-      seekBarPositionColor: const Color(0xFFE25B47),
-      seekBarThumbColor: const Color(0xFFE25B47),
-    );
-
-    final playerView = _error != null
-        ? _PlayerError(error: _error.toString())
-        : _isPreparing
-        ? const _PlayerLoading()
-        : MaterialDesktopVideoControlsTheme(
-            normal: controlsTheme,
-            fullscreen: controlsTheme,
-            child: Video(
-              controller: _controller,
-              controls: AdaptiveVideoControls,
-              fit: BoxFit.contain,
-            ),
-          );
-
-    if (_isMobilePlatform) {
-      return material.Material(
-        color: material.Colors.black,
-        child: SafeArea(
-          child: SizedBox.expand(
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: Center(
-                    child: AspectRatio(
-                      aspectRatio: aspectRatio,
-                      child: material.Material(
-                        color: material.Colors.black,
-                        child: playerView,
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  child: CupertinoButton(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    minimumSize: const Size(40, 40),
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          CupertinoIcons.back,
-                          color: CupertinoColors.white,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: appOnDarkTextStyle(
-                              context,
-                              fontSize: AppFontSizes.sectionTitle,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
 
     final dialogWidth = size.width * 0.82;
     final dialogHeight = size.height * 0.82;
@@ -381,7 +163,7 @@ class _VideoPopupPlayerDialogState extends State<_VideoPopupPlayerDialog> {
                   child: Center(
                     child: AspectRatio(
                       aspectRatio: aspectRatio,
-                      child: playerView,
+                      child: const _VideoPlaybackUnavailable(),
                     ),
                   ),
                 ),
@@ -432,10 +214,8 @@ class _VideoPlaceholder extends StatelessWidget {
   }
 }
 
-class _PlayerError extends StatelessWidget {
-  const _PlayerError({required this.error});
-
-  final String error;
+class _VideoPlaybackUnavailable extends StatelessWidget {
+  const _VideoPlaybackUnavailable();
 
   @override
   Widget build(BuildContext context) {
@@ -446,13 +226,14 @@ class _PlayerError extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(
-              CupertinoIcons.exclamationmark_triangle,
+              CupertinoIcons.play_rectangle,
               color: CupertinoColors.white,
-              size: 34,
+              size: 40,
             ),
             const SizedBox(height: 12),
             Text(
-              'Unable to play this video',
+              'Video playback is temporarily disabled.',
+              textAlign: TextAlign.center,
               style: appOnDarkTextStyle(
                 context,
                 fontSize: AppFontSizes.sectionTitle,
@@ -461,7 +242,7 @@ class _PlayerError extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              error,
+              'TODO: replace media_kit with a simpler video playback approach.',
               textAlign: TextAlign.center,
               style: appOnDarkTextStyle(
                 context,
@@ -473,81 +254,6 @@ class _PlayerError extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _PlayerLoading extends StatelessWidget {
-  const _PlayerLoading();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CupertinoActivityIndicator(radius: 14),
-          const SizedBox(height: 12),
-          Text(
-            'Loading video...',
-            style: appOnDarkTextStyle(
-              context,
-              fontSize: AppFontSizes.body,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _VideoThumbnailCache {
-  _VideoThumbnailCache._();
-
-  static final _VideoThumbnailCache instance = _VideoThumbnailCache._();
-
-  final Map<String, Uint8List?> _cache = <String, Uint8List?>{};
-  final Map<String, Future<Uint8List?>> _pending =
-      <String, Future<Uint8List?>>{};
-
-  Future<Uint8List?> load(String url) {
-    if (_cache.containsKey(url)) {
-      return Future<Uint8List?>.value(_cache[url]);
-    }
-    final pending = _pending[url];
-    if (pending != null) {
-      return pending;
-    }
-    final future = _generate(url);
-    _pending[url] = future;
-    return future.whenComplete(() {
-      _pending.remove(url);
-    });
-  }
-
-  Future<Uint8List?> _generate(String url) async {
-    final player = Player(
-      configuration: PlayerConfiguration(
-        logLevel: kDebugMode ? MPVLogLevel.debug : MPVLogLevel.error,
-      ),
-    );
-    try {
-      await player.setVolume(0);
-      await player.open(Media(url));
-      await Future.any<Object?>(<Future<Object?>>[
-        player.stream.width.firstWhere((value) => (value ?? 0) > 0),
-        Future<Object?>.delayed(const Duration(seconds: 2)),
-      ]);
-      await Future<void>.delayed(const Duration(milliseconds: 250));
-      final bytes = await player.screenshot(format: 'image/jpeg');
-      _cache[url] = bytes;
-      return bytes;
-    } catch (_) {
-      _cache[url] = null;
-      return null;
-    } finally {
-      await player.dispose();
-    }
   }
 }
 
