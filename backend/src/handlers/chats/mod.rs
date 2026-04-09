@@ -663,7 +663,7 @@ pub async fn attach_metadata(
         use crate::schema::attachments::dsl as a_dsl;
         let attachments: Vec<Attachment> = match attachments::table
             .filter(a_dsl::message_id.eq_any(&attachment_message_ids))
-            .order((a_dsl::order.asc(), a_dsl::id.asc()))
+            .order((a_dsl::message_id.asc(), a_dsl::order.asc(), a_dsl::id.asc()))
             .select(Attachment::as_select())
             .load(conn)
         {

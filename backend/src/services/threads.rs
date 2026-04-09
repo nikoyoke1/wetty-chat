@@ -368,6 +368,16 @@ pub struct ListThreadsResponse {
     pub next_cursor: Option<String>,
 }
 
+fn first_attachment_kind_map(atts: Vec<Attachment>) -> HashMap<i64, String> {
+    let mut map: HashMap<i64, String> = HashMap::new();
+    for att in atts {
+        if let Some(msg_id) = att.message_id {
+            map.entry(msg_id).or_insert(att.kind);
+        }
+    }
+    map
+}
+
 // Raw row types for batch queries
 #[derive(QueryableByName)]
 struct ParticipantRow {
@@ -564,16 +574,15 @@ pub fn enrich_thread_list(
     } else {
         let atts: Vec<Attachment> = attachments::table
             .filter(attachments::message_id.eq_any(&attachment_msg_ids))
+            .order((
+                attachments::message_id.asc(),
+                attachments::order.asc(),
+                attachments::id.asc(),
+            ))
             .select(Attachment::as_select())
             .load(conn)
             .unwrap_or_default();
-        let mut map: HashMap<i64, String> = HashMap::new();
-        for att in atts {
-            if let Some(msg_id) = att.message_id {
-                map.entry(msg_id).or_insert(att.kind);
-            }
-        }
-        map
+        first_attachment_kind_map(atts)
     };
 
     // 7. Build latest reply map
@@ -661,4 +670,40 @@ pub fn enrich_thread_list(
         threads,
         next_cursor,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::first_attachment_kind_map;
+    use crate::models::Attachment;
+    use chrono::Utc;
+
+    fn attachment(id: i64, message_id: i64, kind: &str, order: i16) -> Attachment {
+        Attachment {
+            id,
+            message_id: Some(message_id),
+            file_name: format!("{id}.bin"),
+            kind: kind.to_string(),
+            external_reference: format!("attachments/{id}.bin"),
+            size: 123,
+            created_at: Utc::now(),
+            deleted_at: None,
+            width: None,
+            height: None,
+            order,
+        }
+    }
+
+    #[test]
+    fn first_attachment_kind_map_uses_first_row_per_message() {
+        let map = first_attachment_kind_map(vec![
+            attachment(2, 10, "image/png", 1),
+            attachment(1, 10, "video/mp4", 0),
+            attachment(4, 20, "audio/webm", 1),
+            attachment(3, 20, "image/jpeg", 0),
+        ]);
+
+        assert_eq!(map.get(&10), Some(&"image/png".to_string()));
+        assert_eq!(map.get(&20), Some(&"audio/webm".to_string()));
+    }
 }
