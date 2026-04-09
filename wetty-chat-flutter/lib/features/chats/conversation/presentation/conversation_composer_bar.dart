@@ -34,6 +34,7 @@ class _ConversationComposerBarState
   static const double _composerActionButtonSize = 36;
   static const double _composerActionSlotWidth = 48;
   static const double _composerFieldMinHeight = 36;
+  static const double _audioGestureTargetGap = 18;
   final ScrollController _inputScrollController = ScrollController();
   final TextEditingController _textController = TextEditingController();
   final LayerLink _attachmentMenuLink = LayerLink();
@@ -45,6 +46,14 @@ class _ConversationComposerBarState
   Offset? _audioPointerOrigin;
   ComposerAudioSnapPosition _audioSnapPosition =
       ComposerAudioSnapPosition.origin;
+  Offset _audioDragOffset = Offset.zero;
+
+  void _resetAudioGestureState() {
+    _activeAudioPointerId = null;
+    _audioPointerOrigin = null;
+    _audioSnapPosition = ComposerAudioSnapPosition.origin;
+    _audioDragOffset = Offset.zero;
+  }
 
   @override
   void initState() {
@@ -272,16 +281,19 @@ class _ConversationComposerBarState
     _audioPointerOrigin = event.position;
     setState(() {
       _audioSnapPosition = ComposerAudioSnapPosition.origin;
+      _audioDragOffset = Offset.zero;
     });
     try {
       await ref
           .read(conversationComposerViewModelProvider(widget.scope).notifier)
           .startAudioRecording();
     } on ComposerAudioException catch (error) {
+      _resetAudioGestureState();
       if (mounted) {
         _showErrorDialog(_audioErrorMessage(error));
       }
     } catch (error) {
+      _resetAudioGestureState();
       if (mounted) {
         _showErrorDialog('$error');
       }
@@ -292,13 +304,26 @@ class _ConversationComposerBarState
     if (_activeAudioPointerId != event.pointer) {
       return;
     }
+    final visualOffset = _resolveAudioDragOffset(event.position);
     final next = _resolveAudioSnapPosition(event.position);
-    if (next == _audioSnapPosition) {
+    if (next == _audioSnapPosition && visualOffset == _audioDragOffset) {
       return;
     }
     setState(() {
+      _audioDragOffset = visualOffset;
       _audioSnapPosition = next;
     });
+  }
+
+  Offset _resolveAudioDragOffset(Offset currentPosition) {
+    final origin = _audioPointerOrigin;
+    if (origin == null) {
+      return Offset.zero;
+    }
+    final maxOffset = _composerActionButtonSize + _audioGestureTargetGap;
+    final dx = (currentPosition.dx - origin.dx).clamp(-maxOffset, 0.0);
+    final dy = (currentPosition.dy - origin.dy).clamp(-maxOffset, 0.0);
+    return Offset(dx, dy);
   }
 
   Future<void> _finalizeAudioGesture(ComposerAudioSnapPosition position) async {
@@ -329,14 +354,10 @@ class _ConversationComposerBarState
     } finally {
       if (mounted) {
         setState(() {
-          _activeAudioPointerId = null;
-          _audioPointerOrigin = null;
-          _audioSnapPosition = ComposerAudioSnapPosition.origin;
+          _resetAudioGestureState();
         });
       } else {
-        _activeAudioPointerId = null;
-        _audioPointerOrigin = null;
-        _audioSnapPosition = ComposerAudioSnapPosition.origin;
+        _resetAudioGestureState();
       }
     }
   }
@@ -504,6 +525,7 @@ class _ConversationComposerBarState
                   showAudioTargets: showAudioTargets,
                   isSavedDraftPhase: isSavedDraftPhase,
                   snapPosition: _audioSnapPosition,
+                  dragOffset: _audioDragOffset,
                   composer: composer,
                   buttonSize: _composerActionButtonSize,
                   slotWidth: _composerActionSlotWidth,

@@ -14,6 +14,7 @@ class ComposerAudioControls extends StatelessWidget {
     required this.showAudioTargets,
     required this.isSavedDraftPhase,
     required this.snapPosition,
+    required this.dragOffset,
     required this.composer,
     required this.buttonSize,
     required this.slotWidth,
@@ -28,6 +29,7 @@ class ComposerAudioControls extends StatelessWidget {
   final bool isSavedDraftPhase;
   final ConversationComposerState composer;
   final ComposerAudioSnapPosition snapPosition;
+  final Offset dragOffset;
   final double buttonSize;
   final double slotWidth;
   final Future<void> Function() onSendRecordedAudio;
@@ -47,6 +49,7 @@ class ComposerAudioControls extends StatelessWidget {
                 isActive: showAudioTargets,
                 size: buttonSize,
                 snapPosition: snapPosition,
+                dragOffset: dragOffset,
                 buttonChild: const Icon(
                   CupertinoIcons.mic_fill,
                   size: 20,
@@ -163,29 +166,24 @@ class VoiceDraftPanel extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: draft.isRecording
-                  ? CupertinoColors.systemRed.withAlpha(30)
-                  : colors.composerReplyPreviewSurface,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              draft.isRecording
-                  ? CupertinoIcons.mic_fill
-                  : CupertinoIcons.doc_fill,
-              size: 16,
-              color: draft.isRecording
-                  ? CupertinoColors.systemRed
-                  : CupertinoColors.activeBlue.resolveFrom(context),
-            ),
-          ),
+          draft.isRecording
+              ? const _RecordingPulseIndicator()
+              : Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: colors.composerReplyPreviewSurface,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    CupertinoIcons.doc_fill,
+                    size: 16,
+                    color: CupertinoColors.activeBlue.resolveFrom(context),
+                  ),
+                ),
           const SizedBox(width: 10),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
@@ -196,14 +194,16 @@ class VoiceDraftPanel extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  hint,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: appSecondaryTextStyle(
-                    context,
-                    fontSize: AppFontSizes.meta,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    hint,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: appSecondaryTextStyle(
+                      context,
+                      fontSize: AppFontSizes.meta,
+                    ),
                   ),
                 ),
               ],
@@ -238,11 +238,74 @@ class VoiceDraftPanel extends StatelessWidget {
   }
 }
 
+class _RecordingPulseIndicator extends StatefulWidget {
+  const _RecordingPulseIndicator();
+
+  @override
+  State<_RecordingPulseIndicator> createState() =>
+      _RecordingPulseIndicatorState();
+}
+
+class _RecordingPulseIndicatorState extends State<_RecordingPulseIndicator>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final red = CupertinoColors.systemRed.resolveFrom(context);
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final progress = _controller.value;
+        final haloScale = 1 + (progress * 0.7);
+        final haloOpacity = 0.38 * (1 - progress);
+        return SizedBox(
+          width: 28,
+          height: 28,
+          child: Center(
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Transform.scale(
+                  scale: haloScale,
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: red.withValues(alpha: haloOpacity),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(color: red, shape: BoxShape.circle),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _AudioRecordButton extends StatelessWidget {
   const _AudioRecordButton({
     required this.isActive,
     required this.size,
     required this.snapPosition,
+    required this.dragOffset,
     required this.buttonChild,
     required this.onPressed,
     required this.onPointerDown,
@@ -255,6 +318,7 @@ class _AudioRecordButton extends StatelessWidget {
   final bool isActive;
   final double size;
   final ComposerAudioSnapPosition snapPosition;
+  final Offset dragOffset;
   final Widget buttonChild;
   final VoidCallback? onPressed;
   final ValueChanged<PointerDownEvent> onPointerDown;
@@ -315,28 +379,37 @@ class _AudioRecordButton extends StatelessWidget {
             onPointerMove: onPointerMove,
             onPointerUp: onPointerFinish,
             onPointerCancel: onPointerFinish,
-            child: CupertinoButton(
-              padding: EdgeInsets.zero,
-              minimumSize: Size(size, size),
-              onPressed: onPressed,
-              child: Container(
-                width: size,
-                height: size,
-                decoration: BoxDecoration(
-                  color: CupertinoColors.activeBlue.resolveFrom(context),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: CupertinoColors.activeBlue.withAlpha(80),
-                      blurRadius: active ? 16 : 10,
-                      spreadRadius: active ? 1 : 0,
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: active
-                      ? Icon(icon, size: 20, color: CupertinoColors.white)
-                      : buttonChild,
+            child: Transform.translate(
+              offset: dragOffset,
+              child: CupertinoButton(
+                padding: EdgeInsets.zero,
+                minimumSize: Size(size, size),
+                onPressed: onPressed,
+                child: Container(
+                  width: size,
+                  height: size,
+                  decoration: BoxDecoration(
+                    color: snapPosition == ComposerAudioSnapPosition.left
+                        ? CupertinoColors.systemRed.resolveFrom(context)
+                        : CupertinoColors.activeBlue.resolveFrom(context),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color:
+                            (snapPosition == ComposerAudioSnapPosition.left
+                                    ? CupertinoColors.systemRed
+                                    : CupertinoColors.activeBlue)
+                                .withAlpha(active ? 90 : 80),
+                        blurRadius: active ? 16 : 10,
+                        spreadRadius: active ? 1 : 0,
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: active
+                        ? Icon(icon, size: 20, color: CupertinoColors.white)
+                        : buttonChild,
+                  ),
                 ),
               ),
             ),
@@ -366,7 +439,9 @@ class _AudioGestureTarget extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         color: active
-            ? CupertinoColors.activeBlue.resolveFrom(context)
+            ? icon == CupertinoIcons.delete
+                  ? CupertinoColors.systemRed.resolveFrom(context)
+                  : CupertinoColors.activeBlue.resolveFrom(context)
             : CupertinoColors.systemGrey4.resolveFrom(context),
         shape: BoxShape.circle,
       ),
