@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:chahua/features/chats/conversation/application/conversation_timeline_view_model.dart';
 import 'package:chahua/features/chats/conversation/domain/timeline_entry.dart';
 import 'package:chahua/features/chats/conversation/domain/viewport_placement.dart';
-import 'package:chahua/features/chats/conversation/presentation/chat_detail_view.dart';
+import 'package:chahua/features/chats/conversation/presentation/timeline/jump_to_latest_fab.dart';
 
 void main() {
   group('shouldShowJumpToLatestFab', () {
