@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/rendering.dart';
 
@@ -121,15 +123,27 @@ class _AnchoredTimelineViewState extends State<AnchoredTimelineView> {
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
 
+    final olderDist = position.pixels - position.minScrollExtent;
+    final newerDist = position.maxScrollExtent - position.pixels;
+
     // Near older edge: scroll offset near minScrollExtent (negative = up).
     if (widget.onNearOlderEdge != null &&
-        position.pixels - position.minScrollExtent < _edgeThresholdPixels) {
+        olderDist < _edgeThresholdPixels) {
+      developer.log(
+        '_onScroll: NEAR OLDER EDGE '
+        'pixels=${position.pixels.toStringAsFixed(1)}, '
+        'min=${position.minScrollExtent.toStringAsFixed(1)}, '
+        'max=${position.maxScrollExtent.toStringAsFixed(1)}, '
+        'olderDist=${olderDist.toStringAsFixed(1)}, '
+        'entries=${widget.entries.length}',
+        name: 'Timeline',
+      );
       widget.onNearOlderEdge!();
     }
 
     // Near newer edge: scroll offset near maxScrollExtent (positive = down).
     if (widget.onNearNewerEdge != null &&
-        position.maxScrollExtent - position.pixels < _edgeThresholdPixels) {
+        newerDist < _edgeThresholdPixels) {
       widget.onNearNewerEdge!();
     }
   }
@@ -204,6 +218,13 @@ class _AnchoredTimelineViewState extends State<AnchoredTimelineView> {
       afterCount = widget.entries.length - anchorIndex;
     }
 
+    // Build key → entry index map for findChildIndexCallback so Flutter can
+    // track items by identity (not position) across rebuilds.
+    final keyToEntryIndex = <String, int>{};
+    for (var i = 0; i < widget.entries.length; i++) {
+      keyToEntryIndex[widget.entries[i].key] = i;
+    }
+
     // Before-center slivers are laid out in reverse order growing upward:
     // the last sliver listed before center is closest to the viewport anchor.
     //
@@ -223,13 +244,24 @@ class _AnchoredTimelineViewState extends State<AnchoredTimelineView> {
           SliverPadding(padding: EdgeInsets.only(bottom: widget.topPadding)),
 
         // Older entries — grows upward from the center.
-        SliverList.builder(
-          itemCount: beforeCount,
-          itemBuilder: (context, index) {
-            final entryIndex = beforeCount - 1 - index;
-            final entry = widget.entries[entryIndex];
-            return widget.entryBuilder(context, entry, entryIndex);
-          },
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final entryIndex = beforeCount - 1 - index;
+              final entry = widget.entries[entryIndex];
+              return KeyedSubtree(
+                key: ValueKey(entry.key),
+                child: widget.entryBuilder(context, entry, entryIndex),
+              );
+            },
+            childCount: beforeCount,
+            findChildIndexCallback: (Key key) {
+              if (key is! ValueKey<String>) return null;
+              final entryIndex = keyToEntryIndex[key.value];
+              if (entryIndex == null || entryIndex >= beforeCount) return null;
+              return beforeCount - 1 - entryIndex;
+            },
+          ),
         ),
 
         // Bottom padding before center (only for bottom-anchored).
@@ -237,14 +269,25 @@ class _AnchoredTimelineViewState extends State<AnchoredTimelineView> {
           SliverPadding(padding: EdgeInsets.only(bottom: widget.bottomPadding)),
 
         // Center sliver — anchor point for the scroll view.
-        SliverList.builder(
+        SliverList(
           key: _centerKey,
-          itemCount: afterCount,
-          itemBuilder: (context, index) {
-            final entryIndex = anchorIndex + index;
-            final entry = widget.entries[entryIndex];
-            return widget.entryBuilder(context, entry, entryIndex);
-          },
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final entryIndex = anchorIndex + index;
+              final entry = widget.entries[entryIndex];
+              return KeyedSubtree(
+                key: ValueKey(entry.key),
+                child: widget.entryBuilder(context, entry, entryIndex),
+              );
+            },
+            childCount: afterCount,
+            findChildIndexCallback: (Key key) {
+              if (key is! ValueKey<String>) return null;
+              final entryIndex = keyToEntryIndex[key.value];
+              if (entryIndex == null || entryIndex < anchorIndex) return null;
+              return entryIndex - anchorIndex;
+            },
+          ),
         ),
 
         // Bottom padding after center (only for top-anchored).

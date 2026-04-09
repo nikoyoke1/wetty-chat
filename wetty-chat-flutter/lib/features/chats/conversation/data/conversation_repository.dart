@@ -18,7 +18,19 @@ class ConversationRepository {
 
   static const int defaultWindowSize = 100;
   static const int pageSize = 50;
-  static const int maxRenderEntries = 350;
+
+  /// Safety net: absolute max window size in [trimWindow]. Should never fire
+  /// in practice — if you see "trimWindow: safety cap" in logs, something is
+  /// broken upstream.
+  static const int maxRenderEntries = 5000;
+
+  /// Trigger: when the window exceeds this after a load, the view model stops
+  /// the scroll, trims to [trimTarget], and transitions to topPreferred mode.
+  static const int softWindowCap = 2500;
+
+  /// Floor: the window size after a trim. Biased 2/3 older so the user has
+  /// context ahead. Cycle: grow from trimTarget → softWindowCap, trim, repeat.
+  static const int trimTarget = 300;
 
   final ConversationScope scope;
   final MessageApiService _service;
@@ -175,62 +187,48 @@ class ConversationRepository {
   List<String> latestWindowStableKeys({int limit = defaultWindowSize}) =>
       _latestWindowStableKeys(limit);
 
-  List<String> trimWindowAroundAnchor(
+  /// Trim a window to [maxEntries] entries centered around [anchorKey],
+  /// biased toward the [olderBias] direction. Returns null if the anchor is
+  /// not found in [stableKeys].
+  List<String>? trimWindowAroundKey(
     List<String> stableKeys, {
-    required int? anchorMessageId,
-    int maxEntries = maxRenderEntries,
+    required String anchorKey,
+    int maxEntries = trimTarget,
   }) {
-    if (stableKeys.length <= maxEntries) {
-      developer.log(
-        'trimWindow: no trim needed '
-        '(${stableKeys.length} <= $maxEntries), '
-        'anchorMsgId=$anchorMessageId',
-        name: 'ConvRepo',
-      );
-      return stableKeys;
-    }
-    if (anchorMessageId == null) {
-      developer.log(
-        'trimWindow: no anchor, taking last $maxEntries '
-        'of ${stableKeys.length}',
-        name: 'ConvRepo',
-      );
-      return stableKeys.sublist(stableKeys.length - maxEntries);
-    }
-
-    final anchorKey = _stableKeyByServerId[anchorMessageId];
-    if (anchorKey == null) {
-      developer.log(
-        'trimWindow: anchorMsgId=$anchorMessageId NOT in '
-        '_stableKeyByServerId (${_stableKeyByServerId.length} entries), '
-        'taking last $maxEntries of ${stableKeys.length}',
-        name: 'ConvRepo',
-      );
-      return stableKeys.sublist(stableKeys.length - maxEntries);
-    }
-
+    if (stableKeys.length <= maxEntries) return stableKeys;
     final anchorIndex = stableKeys.indexOf(anchorKey);
-    if (anchorIndex < 0) {
-      developer.log(
-        'trimWindow: anchorKey=$anchorKey found in map but NOT '
-        'in stableKeys list (${stableKeys.length} keys), '
-        'taking last $maxEntries',
-        name: 'ConvRepo',
-      );
-      return stableKeys.sublist(stableKeys.length - maxEntries);
-    }
-
-    final before = maxEntries ~/ 2;
-    final start = (anchorIndex - before).clamp(0, stableKeys.length);
+    if (anchorIndex < 0) return null;
+    // Bias toward older side (user is scrolling up).
+    final keepBefore = (maxEntries * 2) ~/ 3;
+    final start = (anchorIndex - keepBefore).clamp(0, stableKeys.length);
     final end = (start + maxEntries).clamp(0, stableKeys.length);
     final adjustedStart = (end - maxEntries).clamp(0, stableKeys.length);
     developer.log(
-      'trimWindow: anchorMsgId=$anchorMessageId → '
-      'key=$anchorKey at index $anchorIndex, '
-      'result=[$adjustedStart..$end) of ${stableKeys.length}',
+      'trimWindowAroundKey: ${stableKeys.length} → $maxEntries, '
+      'anchor=$anchorKey at $anchorIndex, '
+      'result=[$adjustedStart..$end)',
       name: 'ConvRepo',
     );
     return stableKeys.sublist(adjustedStart, end);
+  }
+
+  /// Safety cap: if the window somehow exceeds [maxEntries], keep the newest.
+  ///
+  /// Directional trimming is handled by the callers ([prependWindowPage] /
+  /// [appendWindowPage] cap via the view-model before reaching here), so this
+  /// is only a last-resort guard.
+  List<String> trimWindow(
+    List<String> stableKeys, {
+    int maxEntries = maxRenderEntries,
+  }) {
+    if (stableKeys.length <= maxEntries) {
+      return stableKeys;
+    }
+    developer.log(
+      'trimWindow: safety cap ${stableKeys.length} → $maxEntries (newest)',
+      name: 'ConvRepo',
+    );
+    return stableKeys.sublist(stableKeys.length - maxEntries);
   }
 
   List<String> prependWindowPage(
@@ -268,6 +266,9 @@ class ConversationRepository {
     final index = windowStableKeys.indexOf(stableKey);
     return index >= 0 ? index : null;
   }
+
+  ConversationMessage? messageForStableKey(String stableKey) =>
+      _messagesByStableKey[stableKey];
 
   Future<void> markAsRead(int messageId) {
     return _service.markMessagesAsRead(scope.chatId, messageId);

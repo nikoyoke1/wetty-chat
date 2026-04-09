@@ -240,10 +240,7 @@ class ConversationTimelineViewModel
     int pendingLiveCount = 0,
     ConversationLocatePlan? locatePlan,
   }) {
-    final trimmed = _repository.trimWindowAroundAnchor(
-      windowStableKeys,
-      anchorMessageId: anchorMessageId,
-    );
+    final trimmed = _repository.trimWindow(windowStableKeys);
     final entries = _buildEntries(
       _repository.messagesForWindow(trimmed),
       unreadMarkerMessageId: unreadMarkerMessageId,
@@ -343,30 +340,38 @@ class ConversationTimelineViewModel
       final latestWindow = _repository.latestWindowStableKeys(
         limit: _windowSize,
       );
+      final nextState = _buildState(
+        windowStableKeys: latestWindow,
+        windowMode: ConversationWindowMode.liveLatest,
+        viewportPlacement: ConversationViewportPlacement.liveEdge,
+        shouldRefreshChats: true,
+      );
       _setStateIfActive(
         AsyncData(
-          _buildState(
-            windowStableKeys: latestWindow,
-            windowMode: ConversationWindowMode.liveLatest,
-            viewportPlacement: ConversationViewportPlacement.liveEdge,
-            shouldRefreshChats: true,
+          nextState.copyWith(
+            isLoadingOlder: current.isLoadingOlder,
+            isLoadingNewer: current.isLoadingNewer,
           ),
         ),
       );
       return;
     }
 
+    final nextState = _buildState(
+      windowStableKeys: current.windowStableKeys,
+      windowMode: current.windowMode,
+      viewportPlacement: current.viewportPlacement,
+      anchorMessageId: current.anchorMessageId,
+      unreadMarkerMessageId: current.unreadMarkerMessageId,
+      highlightedMessageId: current.highlightedMessageId,
+      shouldRefreshChats: true,
+      pendingLiveCount: current.pendingLiveCount + 1,
+    );
     _setStateIfActive(
       AsyncData(
-        _buildState(
-          windowStableKeys: current.windowStableKeys,
-          windowMode: current.windowMode,
-          viewportPlacement: current.viewportPlacement,
-          anchorMessageId: current.anchorMessageId,
-          unreadMarkerMessageId: current.unreadMarkerMessageId,
-          highlightedMessageId: current.highlightedMessageId,
-          shouldRefreshChats: true,
-          pendingLiveCount: current.pendingLiveCount + 1,
+        nextState.copyWith(
+          isLoadingOlder: current.isLoadingOlder,
+          isLoadingNewer: current.isLoadingNewer,
         ),
       ),
     );
@@ -375,8 +380,20 @@ class ConversationTimelineViewModel
   Future<bool> loadOlder() async {
     final current = state.valueOrNull;
     if (current == null || current.isLoadingOlder || !current.canLoadOlder) {
+      developer.log(
+        'loadOlder: SKIPPED '
+        'null=${current == null}, '
+        'loading=${current?.isLoadingOlder}, '
+        'canLoad=${current?.canLoadOlder}',
+        name: 'TimelineVM',
+      );
       return false;
     }
+    developer.log(
+      'loadOlder: START window=${current.windowStableKeys.length}, '
+      'first=${current.windowStableKeys.firstOrNull}',
+      name: 'TimelineVM',
+    );
     _setStateIfActive(AsyncData(current.copyWith(isLoadingOlder: true)));
     final oldestStableKey = current.windowStableKeys.firstOrNull;
     if (oldestStableKey == null) {
@@ -389,9 +406,50 @@ class ConversationTimelineViewModel
         anchorStableKey: oldestStableKey,
         pageSize: _pageSize,
       );
-      final nextWindow = _repository.prependWindowPage(
+      var nextWindow = _repository.prependWindowPage(
         current.windowStableKeys,
         oldestStableKey,
+      );
+
+      // If window exceeds soft cap, trim around the anchor and transition
+      // to topPreferred so older/newer content lives in separate slivers.
+      // This lets the scroll extent grow on the older side while the newer
+      // side (after-center) can be safely trimmed away.
+      if (nextWindow.length > ConversationRepository.softWindowCap) {
+        final anchorMsg =
+            _repository.messageForStableKey(oldestStableKey);
+        final anchorId = anchorMsg?.serverMessageId;
+        final trimmed = _repository.trimWindowAroundKey(
+          nextWindow,
+          anchorKey: oldestStableKey,
+        );
+        if (trimmed != null && anchorId != null) {
+          developer.log(
+            'loadOlder: TRIM+TRANSITION ${nextWindow.length} → '
+            '${trimmed.length}, anchor=$anchorId',
+            name: 'TimelineVM',
+          );
+          _setStateIfActive(
+            AsyncData(
+              _buildState(
+                windowStableKeys: trimmed,
+                windowMode: ConversationWindowMode.historyBrowsing,
+                viewportPlacement:
+                    ConversationViewportPlacement.topPreferred,
+                anchorMessageId: anchorId,
+                unreadMarkerMessageId: current.unreadMarkerMessageId,
+                locatePlan: _messageLocatePlan(anchorId),
+              ),
+            ),
+          );
+          return true;
+        }
+      }
+
+      developer.log(
+        'loadOlder: DONE window=${nextWindow.length}, '
+        'first=${nextWindow.firstOrNull}, last=${nextWindow.lastOrNull}',
+        name: 'TimelineVM',
       );
       _setStateIfActive(
         AsyncData(
@@ -410,11 +468,12 @@ class ConversationTimelineViewModel
         ),
       );
       return true;
-    } finally {
+    } catch (_) {
       final latest = state.valueOrNull;
       if (latest != null) {
         _setStateIfActive(AsyncData(latest.copyWith(isLoadingOlder: false)));
       }
+      rethrow;
     }
   }
 
@@ -435,10 +494,44 @@ class ConversationTimelineViewModel
         anchorStableKey: newestStableKey,
         pageSize: _pageSize,
       );
-      final nextWindow = _repository.appendWindowPage(
+      var nextWindow = _repository.appendWindowPage(
         current.windowStableKeys,
         newestStableKey,
       );
+
+      // Symmetric trim: if window exceeds soft cap while loading newer,
+      // trim around the anchor and transition to topPreferred.
+      if (nextWindow.length > ConversationRepository.softWindowCap) {
+        final anchorMsg =
+            _repository.messageForStableKey(newestStableKey);
+        final anchorId = anchorMsg?.serverMessageId;
+        final trimmed = _repository.trimWindowAroundKey(
+          nextWindow,
+          anchorKey: newestStableKey,
+        );
+        if (trimmed != null && anchorId != null) {
+          developer.log(
+            'loadNewer: TRIM+TRANSITION ${nextWindow.length} → '
+            '${trimmed.length}, anchor=$anchorId',
+            name: 'TimelineVM',
+          );
+          _setStateIfActive(
+            AsyncData(
+              _buildState(
+                windowStableKeys: trimmed,
+                windowMode: ConversationWindowMode.historyBrowsing,
+                viewportPlacement:
+                    ConversationViewportPlacement.topPreferred,
+                anchorMessageId: anchorId,
+                unreadMarkerMessageId: current.unreadMarkerMessageId,
+                locatePlan: _messageLocatePlan(anchorId),
+              ),
+            ),
+          );
+          return true;
+        }
+      }
+
       final reachedLiveEdge = !_repository.hasNewerOutsideWindow(nextWindow);
       _setStateIfActive(
         AsyncData(
@@ -459,11 +552,12 @@ class ConversationTimelineViewModel
         ),
       );
       return true;
-    } finally {
+    } catch (_) {
       final latest = state.valueOrNull;
       if (latest != null) {
         _setStateIfActive(AsyncData(latest.copyWith(isLoadingNewer: false)));
       }
+      rethrow;
     }
   }
 
@@ -671,19 +765,23 @@ class ConversationTimelineViewModel
     if (current == null) {
       return;
     }
+    final nextState = _buildState(
+      windowStableKeys: current.windowStableKeys,
+      windowMode: current.windowMode,
+      viewportPlacement: current.viewportPlacement,
+      anchorMessageId: current.anchorMessageId,
+      unreadMarkerMessageId: current.unreadMarkerMessageId,
+      highlightedMessageId: current.highlightedMessageId,
+      infoMessage: current.infoMessage,
+      shouldRefreshChats: current.shouldRefreshChats,
+      pendingLiveCount: current.pendingLiveCount,
+      locatePlan: current.locatePlan,
+    );
     _setStateIfActive(
       AsyncData(
-        _buildState(
-          windowStableKeys: current.windowStableKeys,
-          windowMode: current.windowMode,
-          viewportPlacement: current.viewportPlacement,
-          anchorMessageId: current.anchorMessageId,
-          unreadMarkerMessageId: current.unreadMarkerMessageId,
-          highlightedMessageId: current.highlightedMessageId,
-          infoMessage: current.infoMessage,
-          shouldRefreshChats: current.shouldRefreshChats,
-          pendingLiveCount: current.pendingLiveCount,
-          locatePlan: current.locatePlan,
+        nextState.copyWith(
+          isLoadingOlder: current.isLoadingOlder,
+          isLoadingNewer: current.isLoadingNewer,
         ),
       ),
     );
