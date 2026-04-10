@@ -40,7 +40,7 @@ void main() {
         final notifier = container.read(provider.notifier);
 
         final changed = await notifier.jumpToMessage(120);
-        final state = container.read(provider).valueOrNull;
+        final state = container.read(provider).value;
 
         expect(changed, isTrue);
         expect(state, isNotNull);
@@ -94,7 +94,7 @@ void main() {
         final notifier = container.read(provider.notifier);
 
         final changed = await notifier.jumpToMessage(10);
-        final state = container.read(provider).valueOrNull;
+        final state = container.read(provider).value;
 
         expect(changed, isTrue);
         expect(state, isNotNull);
@@ -117,7 +117,7 @@ void main() {
 
         await notifier.jumpToMessage(120);
         await notifier.jumpToLatest();
-        final state = container.read(provider).valueOrNull;
+        final state = container.read(provider).value;
 
         expect(state, isNotNull);
         expect(state!.windowMode, ConversationWindowMode.liveLatest);
@@ -139,7 +139,7 @@ void main() {
 
         await notifier.jumpToMessage(10);
         await notifier.jumpToLatest();
-        final state = container.read(provider).valueOrNull;
+        final state = container.read(provider).value;
 
         expect(state, isNotNull);
         expect(state!.windowMode, ConversationWindowMode.liveLatest);
@@ -162,7 +162,7 @@ void main() {
         final notifier = container.read(provider.notifier);
 
         await notifier.loadOlder();
-        final state = container.read(provider).valueOrNull;
+        final state = container.read(provider).value;
 
         expect(state, isNotNull);
         expect(state!.windowMode, ConversationWindowMode.historyBrowsing);
@@ -178,9 +178,9 @@ void main() {
       await container.read(provider.future);
       final notifier = container.read(provider.notifier);
 
-      expect(container.read(provider).valueOrNull?.locatePlan, isNotNull);
+      expect(container.read(provider).value?.locatePlan, isNotNull);
       notifier.consumeLocatePlan();
-      expect(container.read(provider).valueOrNull?.locatePlan, isNull);
+      expect(container.read(provider).value?.locatePlan, isNull);
     });
   });
 }

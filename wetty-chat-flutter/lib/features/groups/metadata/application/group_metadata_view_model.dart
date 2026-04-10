@@ -4,9 +4,14 @@ import '../../../chats/list/data/chat_repository.dart';
 import '../data/group_metadata_models.dart';
 import '../data/group_metadata_repository.dart';
 
-class GroupMetadataViewModel extends FamilyAsyncNotifier<ChatMetadata, String> {
+class GroupMetadataViewModel extends AsyncNotifier<ChatMetadata> {
+  final String arg;
+
+  GroupMetadataViewModel(this.arg);
+
   @override
-  Future<ChatMetadata> build(String chatId) async {
+  Future<ChatMetadata> build() async {
+    final chatId = arg;
     final repository = ref.read(groupMetadataRepositoryProvider);
     return repository.fetchMetadata(chatId);
   }
@@ -25,7 +30,7 @@ class GroupMetadataViewModel extends FamilyAsyncNotifier<ChatMetadata, String> {
     int? avatarImageId,
     String? visibility,
   }) async {
-    final previous = state.valueOrNull;
+    final previous = state.value;
     try {
       final repository = ref.read(groupMetadataRepositoryProvider);
       final updated = await repository.updateMetadata(

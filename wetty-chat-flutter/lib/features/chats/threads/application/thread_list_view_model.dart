@@ -36,7 +36,7 @@ class ThreadListViewModel extends AsyncNotifier<ThreadListViewState> {
   }
 
   void _rebuildFromRepository() {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null) return;
     final repoState = ref.read(threadListStateProvider);
     state = AsyncData((
@@ -49,7 +49,7 @@ class ThreadListViewModel extends AsyncNotifier<ThreadListViewState> {
   }
 
   Future<void> loadMoreThreads() async {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null) return;
     if (!current.hasMore || current.isLoadingMore || current.threads.isEmpty) {
       return;
@@ -67,7 +67,7 @@ class ThreadListViewModel extends AsyncNotifier<ThreadListViewState> {
       // Silently fail pagination.
     } finally {
       final repoState = ref.read(threadListStateProvider);
-      final latest = state.valueOrNull;
+      final latest = state.value;
       if (latest != null) {
         state = AsyncData((
           threads: repoState.threads,
@@ -81,7 +81,7 @@ class ThreadListViewModel extends AsyncNotifier<ThreadListViewState> {
   }
 
   Future<void> refreshThreads({bool userInitiated = false}) async {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null) return;
     if (current.isLoadingMore || current.isRefreshing) return;
 
@@ -104,7 +104,7 @@ class ThreadListViewModel extends AsyncNotifier<ThreadListViewState> {
         errorMessage: null,
       ));
     } catch (e) {
-      final latest = state.valueOrNull;
+      final latest = state.value;
       if (latest != null) {
         state = AsyncData((
           threads: latest.threads,

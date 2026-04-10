@@ -84,7 +84,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
 
     final metadata = ref
         .read(groupMetadataViewModelProvider(widget.chatId))
-        .valueOrNull;
+        .value;
     if (metadata == null) {
       return;
     }
@@ -133,7 +133,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     final metadataAsync = ref.watch(
       groupMetadataViewModelProvider(widget.chatId),
     );
-    final metadata = metadataAsync.valueOrNull;
+    final metadata = metadataAsync.value;
     if (metadata != null) {
       _hydrateInitialValues(metadata.name, metadata.description);
     }

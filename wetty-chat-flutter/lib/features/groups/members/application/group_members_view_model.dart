@@ -46,11 +46,15 @@ class GroupMembersViewState {
 const Object _sentinel = Object();
 
 class GroupMembersViewModel
-    extends FamilyAsyncNotifier<GroupMembersViewState, String> {
+    extends AsyncNotifier<GroupMembersViewState> {
+  final String arg;
+
+  GroupMembersViewModel(this.arg);
+
   static const int _pageSize = 50;
 
   @override
-  Future<GroupMembersViewState> build(String chatId) async {
+  Future<GroupMembersViewState> build() async {
     return _loadMembers();
   }
 
@@ -66,7 +70,7 @@ class GroupMembersViewModel
     GroupMemberSearchMode mode = GroupMemberSearchMode.autocomplete,
   }) async {
     final normalizedQuery = query.trim();
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current != null && current.searchQuery == normalizedQuery) {
       return;
     }
@@ -78,7 +82,7 @@ class GroupMembersViewModel
   }
 
   Future<void> loadMore() async {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null || !current.hasMore || current.isLoadingMore) {
       return;
     }
@@ -99,27 +103,27 @@ class GroupMembersViewModel
         ),
       );
     } catch (_) {
-      final latest = state.valueOrNull ?? current;
+      final latest = state.value ?? current;
       state = AsyncData(latest.copyWith(isLoadingMore: false));
     }
   }
 
   Future<void> addMember(int userId) async {
-    final current = state.valueOrNull;
+    final current = state.value;
     final repository = ref.read(groupMemberRepositoryProvider);
     await repository.addMember(arg, userId: userId);
     await _reloadKeepingState(current);
   }
 
   Future<void> removeMember(int userId) async {
-    final current = state.valueOrNull;
+    final current = state.value;
     final repository = ref.read(groupMemberRepositoryProvider);
     await repository.removeMember(arg, userId: userId);
     await _reloadKeepingState(current);
   }
 
   Future<void> updateMemberRole(int userId, {required String role}) async {
-    final current = state.valueOrNull;
+    final current = state.value;
     final repository = ref.read(groupMemberRepositoryProvider);
     await repository.updateMemberRole(arg, userId: userId, role: role);
     await _reloadKeepingState(current);

@@ -99,14 +99,14 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage>
       didSync ||
           ref
                   .read(conversationTimelineViewModelProvider(_timelineArgs))
-                  .valueOrNull
+                  .value
                   ?.shouldRefreshChats ==
               true,
     );
   }
 
   String _resolveChatTitle(AsyncValue<ChatMetadata> metadataAsync) {
-    final resolvedName = metadataAsync.valueOrNull?.name;
+    final resolvedName = metadataAsync.value?.name;
     if (resolvedName != null && resolvedName.trim().isNotEmpty) {
       return resolvedName;
     }

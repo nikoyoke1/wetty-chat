@@ -82,7 +82,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   void _onScroll() {
-    final viewState = ref.read(chatListViewModelProvider).valueOrNull;
+    final viewState = ref.read(chatListViewModelProvider).value;
     if (viewState == null) return;
     if (!viewState.hasMore || viewState.isLoadingMore) return;
 
@@ -131,8 +131,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final chatAsync = ref.watch(chatListViewModelProvider);
     final threadAsync = ref.watch(threadListViewModelProvider);
 
-    final chatList = chatAsync.valueOrNull?.chats ?? const [];
-    final threadList = threadAsync.valueOrNull?.threads ?? const [];
+    final chatList = chatAsync.value?.chats ?? const [];
+    final threadList = threadAsync.value?.threads ?? const [];
 
     final groupsUnread = _groupsUnreadCount(chatList);
     final threadsUnread = _threadsUnreadCount(threadList);

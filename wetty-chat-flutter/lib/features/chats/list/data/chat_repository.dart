@@ -25,7 +25,7 @@ class ChatListNotifier extends Notifier<ChatListState> {
   ChatListState build() {
     // Subscribe to WebSocket events for realtime updates.
     ref.listen<AsyncValue<ApiWsEvent>>(wsEventsProvider, (_, next) {
-      final event = next.valueOrNull;
+      final event = next.value;
       if (event != null) _applyRealtimeEvent(event);
     });
     return (chats: const [], nextCursor: null, hasMore: false);

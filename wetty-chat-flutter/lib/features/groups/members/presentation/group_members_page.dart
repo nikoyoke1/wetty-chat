@@ -44,7 +44,7 @@ class _GroupMembersPageState extends ConsumerState<GroupMembersPage> {
 
   void _onScroll() {
     final viewState = ref.read(groupMembersViewModelProvider(widget.chatId));
-    final members = viewState.valueOrNull;
+    final members = viewState.value;
     if (members == null || !members.hasMore || members.isLoadingMore) {
       return;
     }

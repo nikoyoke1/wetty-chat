@@ -5,16 +5,20 @@ import 'thread_api_service.dart';
 typedef ThreadSubscriptionArgs = ({String chatId, int threadRootId});
 
 class ThreadSubscriptionNotifier
-    extends AutoDisposeFamilyAsyncNotifier<bool, ThreadSubscriptionArgs> {
+    extends AsyncNotifier<bool> {
+  final ThreadSubscriptionArgs arg;
+
+  ThreadSubscriptionNotifier(this.arg);
+
   @override
-  Future<bool> build(ThreadSubscriptionArgs arg) async {
+  Future<bool> build() async {
     return ref
         .read(threadApiServiceProvider)
         .getThreadSubscriptionStatus(arg.chatId, arg.threadRootId);
   }
 
   Future<void> toggle() async {
-    final current = state.valueOrNull ?? false;
+    final current = state.value ?? false;
     final api = ref.read(threadApiServiceProvider);
     final arg = this.arg;
 
@@ -34,7 +38,8 @@ class ThreadSubscriptionNotifier
   }
 }
 
-final threadSubscriptionProvider = AsyncNotifierProvider.autoDispose
-    .family<ThreadSubscriptionNotifier, bool, ThreadSubscriptionArgs>(
-      ThreadSubscriptionNotifier.new,
-    );
+final threadSubscriptionProvider = AsyncNotifierProvider.family<
+  ThreadSubscriptionNotifier,
+  bool,
+  ThreadSubscriptionArgs
+>(ThreadSubscriptionNotifier.new, isAutoDispose: true);

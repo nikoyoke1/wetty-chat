@@ -273,7 +273,7 @@ class _ConversationTimelineState extends ConsumerState<ConversationTimeline> {
     if (!mounted || !_timelineScrollController.hasClients) return;
     final viewState = ref
         .read(conversationTimelineViewModelProvider(widget.timelineArgs))
-        .valueOrNull;
+        .value;
     if (viewState == null) return;
 
     final position = _timelineScrollController.position;
@@ -292,7 +292,7 @@ class _ConversationTimelineState extends ConsumerState<ConversationTimeline> {
   void _onNearOlderEdge() {
     final viewState = ref
         .read(conversationTimelineViewModelProvider(widget.timelineArgs))
-        .valueOrNull;
+        .value;
     if (viewState == null ||
         !viewState.canLoadOlder ||
         viewState.isLoadingOlder) {
@@ -310,7 +310,7 @@ class _ConversationTimelineState extends ConsumerState<ConversationTimeline> {
   void _onNearNewerEdge() {
     final viewState = ref
         .read(conversationTimelineViewModelProvider(widget.timelineArgs))
-        .valueOrNull;
+        .value;
     if (viewState == null ||
         !viewState.canLoadNewer ||
         viewState.isLoadingNewer) {
@@ -481,7 +481,7 @@ class _ConversationTimelineState extends ConsumerState<ConversationTimeline> {
               unawaited(_toggleReaction(overlay.details.message, emoji));
             },
           ),
-        if (timelineAsync.valueOrNull case final viewState?
+        if (timelineAsync.value case final viewState?
             when shouldShowJumpToLatestFab(
               state: viewState,
               isAtLiveEdge: _isAtLiveEdge,

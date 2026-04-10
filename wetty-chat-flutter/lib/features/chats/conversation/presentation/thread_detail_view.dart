@@ -151,7 +151,7 @@ class _ThreadDetailPageState extends ConsumerState<ThreadDetailPage>
       groupMetadataViewModelProvider(widget.chatId),
     );
 
-    final chatName = metadataAsync.valueOrNull?.name ?? 'Chat ${widget.chatId}';
+    final chatName = metadataAsync.value?.name ?? 'Chat ${widget.chatId}';
 
     return PopScope(
       onPopInvokedWithResult: (didPop, _) {

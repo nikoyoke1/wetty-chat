@@ -121,7 +121,7 @@ class JustAudioPlaybackDriver implements AudioPlaybackDriver {
   }
 }
 
-final audioPlaybackDriverProvider = Provider.autoDispose<AudioPlaybackDriver>((
+final audioPlaybackDriverProvider = Provider<AudioPlaybackDriver>((
   ref,
 ) {
   final driver = JustAudioPlaybackDriver();
@@ -129,4 +129,4 @@ final audioPlaybackDriverProvider = Provider.autoDispose<AudioPlaybackDriver>((
     unawaited(driver.dispose());
   });
   return driver;
-});
+}, isAutoDispose: true);

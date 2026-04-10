@@ -36,7 +36,7 @@ class ChatListViewModel extends AsyncNotifier<ChatListViewState> {
   }
 
   void _rebuildFromRepository() {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null) return;
     final repoState = ref.read(chatListStateProvider);
     state = AsyncData((
@@ -49,7 +49,7 @@ class ChatListViewModel extends AsyncNotifier<ChatListViewState> {
   }
 
   Future<void> loadMoreChats() async {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null) return;
     if (!current.hasMore || current.isLoadingMore || current.chats.isEmpty) {
       return;
@@ -67,7 +67,7 @@ class ChatListViewModel extends AsyncNotifier<ChatListViewState> {
       // Silently fail pagination.
     } finally {
       final repoState = ref.read(chatListStateProvider);
-      final latest = state.valueOrNull;
+      final latest = state.value;
       if (latest != null) {
         state = AsyncData((
           chats: repoState.chats,
@@ -81,7 +81,7 @@ class ChatListViewModel extends AsyncNotifier<ChatListViewState> {
   }
 
   Future<void> refreshChats({bool userInitiated = false}) async {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null) return;
     if (current.isLoadingMore || current.isRefreshing) return;
 
@@ -106,7 +106,7 @@ class ChatListViewModel extends AsyncNotifier<ChatListViewState> {
         errorMessage: null,
       ));
     } catch (e) {
-      final latest = state.valueOrNull;
+      final latest = state.value;
       if (latest != null) {
         state = AsyncData((
           chats: latest.chats,

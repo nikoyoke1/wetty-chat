@@ -45,7 +45,7 @@ void main() {
           .updateMetadata(name: 'Updated Name');
 
       expect(updated.name, 'Updated Name');
-      expect(container.read(provider).valueOrNull?.name, 'Updated Name');
+      expect(container.read(provider).value?.name, 'Updated Name');
       expect(
         container.read(chatListStateProvider).chats.first.name,
         'Updated Name',

@@ -136,11 +136,10 @@ class ConversationTimelineState {
 }
 
 class ConversationTimelineViewModel
-    extends
-        AutoDisposeFamilyAsyncNotifier<
-          ConversationTimelineState,
-          ConversationTimelineArgs
-        > {
+    extends AsyncNotifier<ConversationTimelineState> {
+  final ConversationTimelineArgs arg;
+
+  ConversationTimelineViewModel(this.arg);
   static const int _windowSize = ConversationRepository.defaultWindowSize;
   static const int _pageSize = ConversationRepository.pageSize;
 
@@ -152,7 +151,7 @@ class ConversationTimelineViewModel
   bool _isDisposed = false;
 
   @override
-  Future<ConversationTimelineState> build(ConversationTimelineArgs arg) async {
+  Future<ConversationTimelineState> build() async {
     developer.log(
       'build() called — scope=${arg.scope}, '
       'launchIntent=${arg.launchRequest.intent}, '
@@ -162,7 +161,7 @@ class ConversationTimelineViewModel
     _repository = ref.read(conversationRepositoryProvider(arg.scope));
 
     ref.listen<AsyncValue<ApiWsEvent>>(wsEventsProvider, (_, next) {
-      final event = next.valueOrNull;
+      final event = next.value;
       if (event != null) {
         _handleRealtimeEvent(event);
       }
@@ -379,7 +378,7 @@ class ConversationTimelineViewModel
   }
 
   Future<bool> loadOlder() async {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null || current.isLoadingOlder || !current.canLoadOlder) {
       developer.log(
         'loadOlder: SKIPPED '
@@ -470,7 +469,7 @@ class ConversationTimelineViewModel
       );
       return true;
     } catch (_) {
-      final latest = state.valueOrNull;
+      final latest = state.value;
       if (latest != null) {
         _setStateIfActive(AsyncData(latest.copyWith(isLoadingOlder: false)));
       }
@@ -479,7 +478,7 @@ class ConversationTimelineViewModel
   }
 
   Future<bool> loadNewer() async {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null || current.isLoadingNewer || !current.canLoadNewer) {
       return false;
     }
@@ -554,7 +553,7 @@ class ConversationTimelineViewModel
       );
       return true;
     } catch (_) {
-      final latest = state.valueOrNull;
+      final latest = state.value;
       if (latest != null) {
         _setStateIfActive(AsyncData(latest.copyWith(isLoadingNewer: false)));
       }
@@ -563,7 +562,7 @@ class ConversationTimelineViewModel
   }
 
   Future<void> jumpToLatest() async {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null) {
       return;
     }
@@ -595,7 +594,7 @@ class ConversationTimelineViewModel
   }
 
   Future<bool> jumpToMessage(int messageId, {bool highlight = true}) async {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null) {
       return false;
     }
@@ -676,7 +675,7 @@ class ConversationTimelineViewModel
   Future<void> toggleReaction(ConversationMessage message, String emoji) async {
     final messageId = message.serverMessageId;
     if (messageId == null ||
-        state.valueOrNull == null ||
+        state.value == null ||
         message.messageType == 'sticker' ||
         message.isDeleted) {
       return;
@@ -705,17 +704,17 @@ class ConversationTimelineViewModel
       return false;
     }
     _lastSyncedReadId = toSync;
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current != null) {
       _setStateIfActive(AsyncData(current.copyWith(shouldRefreshChats: true)));
     }
     return true;
   }
 
-  bool get shouldRefreshChats => state.valueOrNull?.shouldRefreshChats ?? false;
+  bool get shouldRefreshChats => state.value?.shouldRefreshChats ?? false;
 
   void clearInfoMessage() {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null || current.infoMessage == null) {
       return;
     }
@@ -725,7 +724,7 @@ class ConversationTimelineViewModel
   /// Mark the current [locatePlan] as consumed so it is not re-applied
   /// when the widget rebuilds for unrelated state changes.
   void consumeLocatePlan() {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null || current.locatePlan == null) {
       developer.log(
         'consumeLocatePlan: nothing to consume '
@@ -745,7 +744,7 @@ class ConversationTimelineViewModel
   void _scheduleHighlightClear() {
     _highlightTimer?.cancel();
     _highlightTimer = Timer(const Duration(seconds: 2), () {
-      final current = state.valueOrNull;
+      final current = state.value;
       if (current != null) {
         _setStateIfActive(
           AsyncData(current.copyWith(highlightedMessageId: null)),
@@ -762,7 +761,7 @@ class ConversationTimelineViewModel
   }
 
   void _rebuildCurrentState() {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null) {
       return;
     }
@@ -802,9 +801,8 @@ class ConversationTimelineViewModel
 
 const _sentinel = Object();
 
-final conversationTimelineViewModelProvider = AsyncNotifierProvider.autoDispose
-    .family<
-      ConversationTimelineViewModel,
-      ConversationTimelineState,
-      ConversationTimelineArgs
-    >(ConversationTimelineViewModel.new);
+final conversationTimelineViewModelProvider = AsyncNotifierProvider.family<
+  ConversationTimelineViewModel,
+  ConversationTimelineState,
+  ConversationTimelineArgs
+>(ConversationTimelineViewModel.new, isAutoDispose: true);

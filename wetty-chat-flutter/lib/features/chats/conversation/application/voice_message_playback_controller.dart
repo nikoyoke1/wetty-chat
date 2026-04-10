@@ -69,7 +69,7 @@ class VoiceMessagePlaybackState {
 }
 
 class VoiceMessagePlaybackController
-    extends AutoDisposeNotifier<VoiceMessagePlaybackState> {
+    extends Notifier<VoiceMessagePlaybackState> {
   late final AudioPlaybackDriver _driver;
   StreamSubscription<AudioPlaybackStatus>? _statusSubscription;
 
@@ -228,10 +228,10 @@ class VoiceMessagePlaybackController
 }
 
 final voiceMessagePlaybackControllerProvider =
-    NotifierProvider.autoDispose<
+    NotifierProvider<
       VoiceMessagePlaybackController,
       VoiceMessagePlaybackState
-    >(VoiceMessagePlaybackController.new);
+    >(VoiceMessagePlaybackController.new, isAutoDispose: true);
 
 Duration _clampDuration(Duration value, Duration min, Duration max) {
   if (value < min) {

@@ -148,15 +148,15 @@ class _MergedBody extends ConsumerWidget {
       return const Center(child: CupertinoActivityIndicator());
     }
 
-    if (chatAsync is AsyncError && chatAsync.valueOrNull == null) {
+    if (chatAsync is AsyncError && chatAsync.value == null) {
       return _ErrorState(
         error: (chatAsync as AsyncError).error.toString(),
         onRetry: () => ref.invalidate(chatListViewModelProvider),
       );
     }
 
-    final chatViewState = chatAsync.valueOrNull;
-    final threadViewState = threadAsync.valueOrNull;
+    final chatViewState = chatAsync.value;
+    final threadViewState = threadAsync.value;
     final chats = chatViewState?.chats ?? const [];
     final threads = threadViewState?.threads ?? const [];
 

@@ -53,7 +53,7 @@ class _ThreadListViewState extends ConsumerState<ThreadListView> {
   }
 
   void _onScroll() {
-    final viewState = ref.read(threadListViewModelProvider).valueOrNull;
+    final viewState = ref.read(threadListViewModelProvider).value;
     if (viewState == null) return;
     if (!viewState.hasMore || viewState.isLoadingMore) return;
 

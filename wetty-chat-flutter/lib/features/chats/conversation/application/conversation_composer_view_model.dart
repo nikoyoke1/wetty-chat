@@ -286,7 +286,11 @@ class ConversationComposerState {
 }
 
 class ConversationComposerViewModel
-    extends FamilyNotifier<ConversationComposerState, ConversationScope> {
+    extends Notifier<ConversationComposerState> {
+  final ConversationScope arg;
+
+  ConversationComposerViewModel(this.arg);
+
   late final ConversationRepository _repository;
   late final ConversationDraftStore _draftStore;
   late final AttachmentService _attachmentService;
@@ -298,7 +302,7 @@ class ConversationComposerViewModel
   bool _cancelPendingAudioStart = false;
 
   @override
-  ConversationComposerState build(ConversationScope arg) {
+  ConversationComposerState build() {
     _scope = arg;
     _repository = ref.read(conversationRepositoryProvider(arg));
     _draftStore = ref.read(conversationDraftProvider);
