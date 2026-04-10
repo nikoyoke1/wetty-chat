@@ -87,15 +87,17 @@ MaterialApp.router(routerConfig: _router);
 
 ## Data Handling & Serialization
 * **JSON:** Use `json_serializable` and `json_annotation`.
-* **Naming:** Use `fieldRename: FieldRename.snake` for consistency.
+* **Naming:** Backend uses camelCase JSON keys. Use default field naming (no `fieldRename`) so Dart camelCase fields map 1:1 to camelCase JSON keys.
+* **Null handling:** Use `includeIfNull: false` on request DTOs to omit null fields.
 
 ```dart
-@JsonSerializable(fieldRename: FieldRename.snake)
-class User {
-  final String firstName;
-  final String lastName;
-  User({required this.firstName, required this.lastName});
-  factory User.fromJson(Map<String, dynamic> json) => _$UserFromJson(json);
+@JsonSerializable(explicitToJson: true, includeIfNull: false)
+class UpdateUserRequestDto {
+  final String? firstName;
+  final String? lastName;
+  UpdateUserRequestDto({this.firstName, this.lastName});
+  factory UpdateUserRequestDto.fromJson(Map<String, dynamic> json) => _$UpdateUserRequestDtoFromJson(json);
+  Map<String, dynamic> toJson() => _$UpdateUserRequestDtoToJson(this);
 }
 ```
 

@@ -9,6 +9,10 @@ This repository contains three apps plus shared docs and API collections. `backe
 - The application is designed to handle 20K users, and 200k messages a year (combined across all users).
 - Expect around 5K users in a large chat group.
 
+## API Serialization
+- All API should use camel case for field naming
+- use `#[serde(rename_all="camelCase")]
+
 ## Database & Index
 
 - When making changes related to the database, be extra careful and review all queries using table / index you are changing.
