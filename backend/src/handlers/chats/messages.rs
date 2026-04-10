@@ -379,28 +379,51 @@ async fn post_message(
         .filter_map(|s| s.parse().ok())
         .collect();
     validate_message_payload(conn, uid, &body, &attachment_ids)?;
-    let send_result = send_prepared_message(
-        conn,
-        &state,
-        PreparedMessageSend {
-            chat_id,
-            sender_uid: uid,
-            message: if matches!(body.message_type, MessageType::Sticker) {
-                None
-            } else {
-                body.message
+
+    // Keep message creation and read-position advancement atomic.
+    diesel::sql_query("BEGIN").execute(conn)?;
+
+    let tx_result: Result<_, AppError> = async {
+        let send_result = send_prepared_message(
+            conn,
+            &state,
+            PreparedMessageSend {
+                chat_id,
+                sender_uid: uid,
+                message: if matches!(body.message_type, MessageType::Sticker) {
+                    None
+                } else {
+                    body.message
+                },
+                message_type: body.message_type,
+                sticker_id: body.sticker_id,
+                reply_to_id: body.reply_to_id,
+                reply_root_id: None,
+                client_generated_id: body.client_generated_id,
+                attachment_ids,
+                update_group_last_message: true,
+                push_preview_override: None,
             },
-            message_type: body.message_type,
-            sticker_id: body.sticker_id,
-            reply_to_id: body.reply_to_id,
-            reply_root_id: None,
-            client_generated_id: body.client_generated_id,
-            attachment_ids,
-            update_group_last_message: true,
-            push_preview_override: None,
-        },
-    )
-    .await?;
+        )
+        .await?;
+
+        crate::services::chat::mark_chat_as_read(conn, chat_id, uid, send_result.response.id)?;
+
+        Ok(send_result)
+    }
+    .await;
+
+    let send_result = match tx_result {
+        Ok(send_result) => {
+            diesel::sql_query("COMMIT").execute(conn)?;
+            send_result
+        }
+        Err(err) => {
+            let _ = diesel::sql_query("ROLLBACK").execute(conn);
+            return Err(err);
+        }
+    };
+
     send_result.side_effects.fire(&state);
 
     Ok((StatusCode::CREATED, Json(send_result.response)))

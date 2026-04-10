@@ -4,6 +4,8 @@ use diesel::PgConnection;
 use std::collections::HashMap;
 use tracing::warn;
 
+use crate::schema::group_membership;
+
 pub const MAX_UNREAD_COUNT: i64 = 100;
 const UNREAD_COUNT_CHUNK_SIZE: usize = 50;
 
@@ -102,4 +104,27 @@ pub fn get_chat_unread_count(
     query
         .get_result::<ChatUnreadCountRow>(conn)
         .map(|row| row.unread_count.min(MAX_UNREAD_COUNT))
+}
+
+pub fn mark_chat_as_read(
+    conn: &mut PgConnection,
+    chat_id: i64,
+    uid: i32,
+    message_id: i64,
+) -> Result<bool, diesel::result::Error> {
+    use crate::schema::group_membership::dsl as gm_dsl;
+
+    let updated = diesel::update(
+        group_membership::table.filter(
+            gm_dsl::chat_id.eq(chat_id).and(gm_dsl::uid.eq(uid)).and(
+                gm_dsl::last_read_message_id
+                    .is_null()
+                    .or(gm_dsl::last_read_message_id.lt(message_id)),
+            ),
+        ),
+    )
+    .set(gm_dsl::last_read_message_id.eq(Some(message_id)))
+    .execute(conn)?;
+
+    Ok(updated > 0)
 }

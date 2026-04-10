@@ -1257,18 +1257,7 @@ async fn mark_as_read(
 
     check_membership(conn, chat_id, uid)?;
 
-    use crate::schema::group_membership::dsl as gm_dsl;
-    diesel::update(
-        group_membership::table.filter(
-            gm_dsl::chat_id.eq(chat_id).and(gm_dsl::uid.eq(uid)).and(
-                gm_dsl::last_read_message_id
-                    .is_null()
-                    .or(gm_dsl::last_read_message_id.lt(body.message_id)),
-            ),
-        ),
-    )
-    .set(gm_dsl::last_read_message_id.eq(Some(body.message_id)))
-    .execute(conn)?;
+    crate::services::chat::mark_chat_as_read(conn, chat_id, uid, body.message_id)?;
 
     let unread_count =
         crate::services::chat::get_chat_unread_count(conn, chat_id, Some(body.message_id))?;

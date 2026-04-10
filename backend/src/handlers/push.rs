@@ -177,25 +177,31 @@ async fn post_subscribe(
     };
 
     conn.transaction::<_, diesel::result::Error, _>(|conn| {
+        let provider = new_sub.provider;
+        let endpoint = new_sub.endpoint.clone();
+        let device_token = new_sub.device_token.clone();
+        let apns_environment = new_sub.apns_environment;
+        let provider_data = new_sub.provider_data.clone();
+        let created_at = new_sub.created_at;
+        let current_client_id = new_sub.client_id.clone();
+
         let mut replace_scope = push_subscriptions::table
             .filter(push_subscriptions::dsl::user_id.eq(uid))
-            .filter(push_subscriptions::dsl::client_id.eq(Some(client_id.clone())))
-            .filter(push_subscriptions::dsl::provider.eq(new_sub.provider))
+            .filter(push_subscriptions::dsl::client_id.eq(current_client_id.clone()))
+            .filter(push_subscriptions::dsl::provider.eq(provider))
             .into_boxed();
 
-        match new_sub.provider {
+        match provider {
             PushProvider::WebPush => {
-                if let Some(endpoint) = &new_sub.endpoint {
+                if let Some(endpoint) = &endpoint {
                     replace_scope = replace_scope
                         .filter(push_subscriptions::dsl::endpoint.ne(Some(endpoint.clone())));
                 }
             }
             PushProvider::Apns => {
-                if let Some(device_token) = &new_sub.device_token {
+                if let Some(device_token) = &device_token {
                     replace_scope = replace_scope
-                        .filter(
-                            push_subscriptions::dsl::apns_environment.eq(new_sub.apns_environment),
-                        )
+                        .filter(push_subscriptions::dsl::apns_environment.eq(apns_environment))
                         .filter(
                             push_subscriptions::dsl::device_token.ne(Some(device_token.clone())),
                         );
@@ -213,36 +219,50 @@ async fn post_subscribe(
             .execute(conn)?;
         }
 
-        let existing_id = match new_sub.provider {
+        let existing_id = match provider {
             PushProvider::WebPush => push_subscriptions::table
-                .filter(push_subscriptions::dsl::user_id.eq(new_sub.user_id))
-                .filter(push_subscriptions::dsl::provider.eq(new_sub.provider))
-                .filter(push_subscriptions::dsl::endpoint.eq(new_sub.endpoint.clone()))
+                .filter(push_subscriptions::dsl::user_id.eq(uid))
+                .filter(push_subscriptions::dsl::provider.eq(provider))
+                .filter(push_subscriptions::dsl::endpoint.eq(endpoint.clone()))
                 .select(push_subscriptions::dsl::id)
                 .first::<i64>(conn)
                 .optional()?,
-            PushProvider::Apns => push_subscriptions::table
-                .filter(push_subscriptions::dsl::user_id.eq(new_sub.user_id))
-                .filter(push_subscriptions::dsl::provider.eq(new_sub.provider))
-                .filter(push_subscriptions::dsl::device_token.eq(new_sub.device_token.clone()))
-                .filter(push_subscriptions::dsl::apns_environment.eq(new_sub.apns_environment))
-                .select(push_subscriptions::dsl::id)
-                .first::<i64>(conn)
-                .optional()?,
+            PushProvider::Apns => None,
         };
 
         if let Some(existing_id) = existing_id {
             diesel::update(push_subscriptions::table.find(existing_id))
                 .set((
-                    push_subscriptions::client_id.eq(&new_sub.client_id),
-                    push_subscriptions::created_at.eq(&new_sub.created_at),
-                    push_subscriptions::provider_data.eq(&new_sub.provider_data),
+                    push_subscriptions::client_id.eq(&current_client_id),
+                    push_subscriptions::created_at.eq(created_at),
+                    push_subscriptions::provider_data.eq(&provider_data),
                 ))
                 .execute(conn)?;
         } else {
-            diesel::insert_into(push_subscriptions::table)
-                .values(&new_sub)
-                .execute(conn)?;
+            match provider {
+                PushProvider::WebPush => {
+                    diesel::insert_into(push_subscriptions::table)
+                        .values(&new_sub)
+                        .execute(conn)?;
+                }
+                PushProvider::Apns => {
+                    diesel::insert_into(push_subscriptions::table)
+                        .values(&new_sub)
+                        .on_conflict((
+                            push_subscriptions::provider,
+                            push_subscriptions::device_token,
+                            push_subscriptions::apns_environment,
+                        ))
+                        .do_update()
+                        .set((
+                            push_subscriptions::user_id.eq(uid),
+                            push_subscriptions::client_id.eq(&current_client_id),
+                            push_subscriptions::created_at.eq(created_at),
+                            push_subscriptions::provider_data.eq(&provider_data),
+                        ))
+                        .execute(conn)?;
+                }
+            }
         }
 
         Ok(())
