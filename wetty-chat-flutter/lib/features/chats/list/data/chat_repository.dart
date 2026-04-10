@@ -8,6 +8,8 @@ import '../../../../core/session/dev_session_store.dart';
 import '../../models/chat_api_mapper.dart';
 import '../../models/chat_models.dart';
 import '../../models/message_api_mapper.dart';
+import '../../models/message_models.dart';
+import '../../conversation/domain/conversation_message.dart';
 import 'chat_api_service.dart';
 
 typedef ChatListState = ({
@@ -35,7 +37,7 @@ class ChatListNotifier extends Notifier<ChatListState> {
 
   /// Load the first page of chats.
   Future<void> loadChats({int limit = 20}) async {
-    final res = await _service.fetchChats();
+    final res = await _service.fetchChats(limit: limit);
     final chats = res.chats.map((chat) => chat.toDomain()).toList();
     state = (
       chats: chats,
@@ -92,6 +94,52 @@ class ChatListNotifier extends Notifier<ChatListState> {
     );
     final chats = [...state.chats];
     chats[index] = updated;
+    state = (
+      chats: chats,
+      nextCursor: state.nextCursor,
+      hasMore: state.hasMore,
+    );
+  }
+
+  void markChatRead({required String chatId, required int messageId}) {
+    final index = state.chats.indexWhere((chat) => chat.id == chatId);
+    if (index < 0) {
+      return;
+    }
+
+    final current = state.chats[index];
+    final lastMessageId = current.lastMessage?.id;
+    final nextUnreadCount = lastMessageId != null && messageId >= lastMessageId
+        ? 0
+        : current.unreadCount;
+    final chats = [...state.chats];
+    chats[index] = current.copyWith(
+      unreadCount: nextUnreadCount,
+      lastReadMessageId: messageId.toString(),
+    );
+    state = (
+      chats: chats,
+      nextCursor: state.nextCursor,
+      hasMore: state.hasMore,
+    );
+  }
+
+  void recordOutgoingMessage(ConversationMessage message) {
+    final index = state.chats.indexWhere(
+      (chat) => chat.id == message.scope.chatId,
+    );
+    if (index < 0) {
+      return;
+    }
+
+    final previous = state.chats[index];
+    final updated = previous.copyWith(
+      lastMessage: _toMessageItem(message),
+      lastMessageAt: message.createdAt,
+    );
+    final chats = [...state.chats]
+      ..removeAt(index)
+      ..insert(0, updated);
     state = (
       chats: chats,
       nextCursor: state.nextCursor,
@@ -166,6 +214,28 @@ class ChatListNotifier extends Notifier<ChatListState> {
     } finally {
       _isRealtimeRefreshing = false;
     }
+  }
+
+  MessageItem _toMessageItem(ConversationMessage message) {
+    return MessageItem(
+      id: message.serverMessageId ?? 0,
+      message: message.message,
+      messageType: message.messageType,
+      sticker: message.sticker,
+      sender: message.sender,
+      chatId: message.scope.chatId,
+      createdAt: message.createdAt,
+      isEdited: message.isEdited,
+      isDeleted: message.isDeleted,
+      clientGeneratedId: message.clientGeneratedId,
+      replyRootId: message.replyRootId,
+      hasAttachments: message.hasAttachments,
+      replyToMessage: message.replyToMessage,
+      attachments: message.attachments,
+      reactions: message.reactions,
+      mentions: message.mentions,
+      threadInfo: message.threadInfo,
+    );
   }
 }
 

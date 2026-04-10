@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/api/models/websocket_api_models.dart';
 import '../../../../core/network/websocket_service.dart';
+import '../../list/data/chat_repository.dart';
 import '../data/conversation_repository.dart';
 import '../domain/conversation_message.dart';
 import '../domain/conversation_scope.dart';
@@ -416,8 +417,7 @@ class ConversationTimelineViewModel
       // This lets the scroll extent grow on the older side while the newer
       // side (after-center) can be safely trimmed away.
       if (nextWindow.length > ConversationRepository.softWindowCap) {
-        final anchorMsg =
-            _repository.messageForStableKey(oldestStableKey);
+        final anchorMsg = _repository.messageForStableKey(oldestStableKey);
         final anchorId = anchorMsg?.serverMessageId;
         final trimmed = _repository.trimWindowAroundKey(
           nextWindow,
@@ -434,8 +434,7 @@ class ConversationTimelineViewModel
               _buildState(
                 windowStableKeys: trimmed,
                 windowMode: ConversationWindowMode.historyBrowsing,
-                viewportPlacement:
-                    ConversationViewportPlacement.topPreferred,
+                viewportPlacement: ConversationViewportPlacement.topPreferred,
                 anchorMessageId: anchorId,
                 unreadMarkerMessageId: current.unreadMarkerMessageId,
                 locatePlan: _messageLocatePlan(anchorId),
@@ -502,8 +501,7 @@ class ConversationTimelineViewModel
       // Symmetric trim: if window exceeds soft cap while loading newer,
       // trim around the anchor and transition to topPreferred.
       if (nextWindow.length > ConversationRepository.softWindowCap) {
-        final anchorMsg =
-            _repository.messageForStableKey(newestStableKey);
+        final anchorMsg = _repository.messageForStableKey(newestStableKey);
         final anchorId = anchorMsg?.serverMessageId;
         final trimmed = _repository.trimWindowAroundKey(
           nextWindow,
@@ -520,8 +518,7 @@ class ConversationTimelineViewModel
               _buildState(
                 windowStableKeys: trimmed,
                 windowMode: ConversationWindowMode.historyBrowsing,
-                viewportPlacement:
-                    ConversationViewportPlacement.topPreferred,
+                viewportPlacement: ConversationViewportPlacement.topPreferred,
                 anchorMessageId: anchorId,
                 unreadMarkerMessageId: current.unreadMarkerMessageId,
                 locatePlan: _messageLocatePlan(anchorId),
@@ -704,6 +701,9 @@ class ConversationTimelineViewModel
       return false;
     }
     _lastSyncedReadId = toSync;
+    ref
+        .read(chatListStateProvider.notifier)
+        .markChatRead(chatId: arg.scope.chatId, messageId: toSync);
     final current = state.value;
     if (current != null) {
       _setStateIfActive(AsyncData(current.copyWith(shouldRefreshChats: true)));
@@ -801,8 +801,9 @@ class ConversationTimelineViewModel
 
 const _sentinel = Object();
 
-final conversationTimelineViewModelProvider = AsyncNotifierProvider.family<
-  ConversationTimelineViewModel,
-  ConversationTimelineState,
-  ConversationTimelineArgs
->(ConversationTimelineViewModel.new, isAutoDispose: true);
+final conversationTimelineViewModelProvider =
+    AsyncNotifierProvider.family<
+      ConversationTimelineViewModel,
+      ConversationTimelineState,
+      ConversationTimelineArgs
+    >(ConversationTimelineViewModel.new, isAutoDispose: true);

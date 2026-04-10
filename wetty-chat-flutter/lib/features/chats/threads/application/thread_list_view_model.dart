@@ -94,7 +94,10 @@ class ThreadListViewModel extends AsyncNotifier<ThreadListViewState> {
       errorMessage: current.errorMessage,
     ));
     try {
-      await ref.read(threadListStateProvider.notifier).refreshThreads();
+      final limit = current.threads.isEmpty ? 20 : current.threads.length;
+      await ref
+          .read(threadListStateProvider.notifier)
+          .refreshThreads(limit: limit);
       final repoState = ref.read(threadListStateProvider);
       state = AsyncData((
         threads: repoState.threads,
@@ -115,6 +118,12 @@ class ThreadListViewModel extends AsyncNotifier<ThreadListViewState> {
         ));
       }
     }
+  }
+
+  void markThreadRead({required int threadRootId, required int messageId}) {
+    ref
+        .read(threadListStateProvider.notifier)
+        .markThreadRead(threadRootId: threadRootId, messageId: messageId);
   }
 }
 

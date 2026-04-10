@@ -105,3 +105,37 @@ Map<String, dynamic> _$ReactionUpdatedWsEventToJson(
   'type': instance.type,
   'payload': instance.payload.toJson(),
 };
+
+ThreadUpdatePayloadDto _$ThreadUpdatePayloadDtoFromJson(
+  Map<String, dynamic> json,
+) => ThreadUpdatePayloadDto(
+  threadRootId: const FlexibleIntConverter().fromJson(json['threadRootId']),
+  chatId: const FlexibleIntConverter().fromJson(json['chatId']),
+  lastReplyAt: DateTime.parse(json['lastReplyAt'] as String),
+  replyCount: const FlexibleIntConverter().fromJson(json['replyCount']),
+);
+
+Map<String, dynamic> _$ThreadUpdatePayloadDtoToJson(
+  ThreadUpdatePayloadDto instance,
+) => <String, dynamic>{
+  'threadRootId': const FlexibleIntConverter().toJson(instance.threadRootId),
+  'chatId': const FlexibleIntConverter().toJson(instance.chatId),
+  'lastReplyAt': instance.lastReplyAt.toIso8601String(),
+  'replyCount': const FlexibleIntConverter().toJson(instance.replyCount),
+};
+
+ThreadUpdatedWsEvent _$ThreadUpdatedWsEventFromJson(
+  Map<String, dynamic> json,
+) => ThreadUpdatedWsEvent(
+  type: json['type'] as String? ?? 'threadUpdate',
+  payload: ThreadUpdatePayloadDto.fromJson(
+    json['payload'] as Map<String, dynamic>,
+  ),
+);
+
+Map<String, dynamic> _$ThreadUpdatedWsEventToJson(
+  ThreadUpdatedWsEvent instance,
+) => <String, dynamic>{
+  'type': instance.type,
+  'payload': instance.payload.toJson(),
+};

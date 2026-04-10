@@ -10,6 +10,8 @@ class ThreadParticipant {
 
 class ThreadReplyPreview {
   const ThreadReplyPreview({
+    this.messageId,
+    this.clientGeneratedId,
     required this.sender,
     this.message,
     this.messageType = 'text',
@@ -19,6 +21,8 @@ class ThreadReplyPreview {
     this.mentions = const <MentionInfo>[],
   });
 
+  final int? messageId;
+  final String? clientGeneratedId;
   final ThreadParticipant sender;
   final String? message;
   final String messageType;
@@ -26,6 +30,36 @@ class ThreadReplyPreview {
   final String? firstAttachmentKind;
   final bool isDeleted;
   final List<MentionInfo> mentions;
+
+  ThreadReplyPreview copyWith({
+    Object? messageId = _sentinel,
+    Object? clientGeneratedId = _sentinel,
+    ThreadParticipant? sender,
+    Object? message = _sentinel,
+    String? messageType,
+    Object? stickerEmoji = _sentinel,
+    Object? firstAttachmentKind = _sentinel,
+    bool? isDeleted,
+    List<MentionInfo>? mentions,
+  }) {
+    return ThreadReplyPreview(
+      messageId: messageId == _sentinel ? this.messageId : messageId as int?,
+      clientGeneratedId: clientGeneratedId == _sentinel
+          ? this.clientGeneratedId
+          : clientGeneratedId as String?,
+      sender: sender ?? this.sender,
+      message: message == _sentinel ? this.message : message as String?,
+      messageType: messageType ?? this.messageType,
+      stickerEmoji: stickerEmoji == _sentinel
+          ? this.stickerEmoji
+          : stickerEmoji as String?,
+      firstAttachmentKind: firstAttachmentKind == _sentinel
+          ? this.firstAttachmentKind
+          : firstAttachmentKind as String?,
+      isDeleted: isDeleted ?? this.isDeleted,
+      mentions: mentions ?? this.mentions,
+    );
+  }
 }
 
 class ThreadListItem {
@@ -55,4 +89,40 @@ class ThreadListItem {
 
   /// Thread root message ID used as the unique key for this thread.
   int get threadRootId => threadRootMessage.id;
+
+  ThreadListItem copyWith({
+    String? chatId,
+    String? chatName,
+    Object? chatAvatar = _sentinel,
+    MessageItem? threadRootMessage,
+    List<ThreadParticipant>? participants,
+    Object? lastReply = _sentinel,
+    int? replyCount,
+    Object? lastReplyAt = _sentinel,
+    int? unreadCount,
+    Object? subscribedAt = _sentinel,
+  }) {
+    return ThreadListItem(
+      chatId: chatId ?? this.chatId,
+      chatName: chatName ?? this.chatName,
+      chatAvatar: chatAvatar == _sentinel
+          ? this.chatAvatar
+          : chatAvatar as String?,
+      threadRootMessage: threadRootMessage ?? this.threadRootMessage,
+      participants: participants ?? this.participants,
+      lastReply: lastReply == _sentinel
+          ? this.lastReply
+          : lastReply as ThreadReplyPreview?,
+      replyCount: replyCount ?? this.replyCount,
+      lastReplyAt: lastReplyAt == _sentinel
+          ? this.lastReplyAt
+          : lastReplyAt as DateTime?,
+      unreadCount: unreadCount ?? this.unreadCount,
+      subscribedAt: subscribedAt == _sentinel
+          ? this.subscribedAt
+          : subscribedAt as DateTime?,
+    );
+  }
 }
+
+const _sentinel = Object();

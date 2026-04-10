@@ -9,6 +9,8 @@ extension ThreadParticipantDtoMapper on ThreadParticipantDto {
 
 extension ThreadReplyPreviewDtoMapper on ThreadReplyPreviewDto {
   ThreadReplyPreview toDomain() => ThreadReplyPreview(
+    messageId: id,
+    clientGeneratedId: clientGeneratedId.isEmpty ? null : clientGeneratedId,
     sender: sender.toDomain(),
     message: message,
     messageType: messageType,

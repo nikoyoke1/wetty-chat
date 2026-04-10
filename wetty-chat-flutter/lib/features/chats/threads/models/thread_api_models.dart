@@ -24,6 +24,8 @@ class ThreadParticipantDto {
 @JsonSerializable(explicitToJson: true)
 class ThreadReplyPreviewDto {
   const ThreadReplyPreviewDto({
+    this.id,
+    this.clientGeneratedId = '',
     required this.sender,
     this.message,
     this.messageType = 'text',
@@ -33,6 +35,10 @@ class ThreadReplyPreviewDto {
     this.mentions = const <MentionInfoDto>[],
   });
 
+  @NullableFlexibleIntConverter()
+  final int? id;
+  @JsonKey(defaultValue: '')
+  final String clientGeneratedId;
   final ThreadParticipantDto sender;
   final String? message;
   @JsonKey(defaultValue: 'text')

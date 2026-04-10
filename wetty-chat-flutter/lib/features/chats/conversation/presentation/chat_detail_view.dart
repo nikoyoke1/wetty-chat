@@ -9,6 +9,8 @@ import '../../../../app/routing/route_names.dart';
 import '../../../../app/theme/style_config.dart';
 import '../../../groups/metadata/application/group_metadata_view_model.dart';
 import '../../../groups/metadata/data/group_metadata_models.dart';
+import '../../list/application/chat_list_view_model.dart';
+import '../../threads/application/thread_list_view_model.dart';
 import '../application/conversation_timeline_view_model.dart';
 import '../domain/conversation_scope.dart';
 import '../domain/launch_request.dart';
@@ -103,6 +105,22 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage>
                   ?.shouldRefreshChats ==
               true,
     );
+  }
+
+  Future<void> _refreshConversationLists() async {
+    try {
+      await Future.wait([
+        ref.read(chatListViewModelProvider.notifier).refreshChats(),
+        ref.read(threadListViewModelProvider.notifier).refreshThreads(),
+      ]);
+    } catch (_) {
+      // Keep detail interaction responsive; websocket/manual refresh remains fallback.
+    }
+  }
+
+  Future<void> _handleMessageSent() async {
+    await _timelineController.scrollToLatest();
+    unawaited(_refreshConversationLists());
   }
 
   String _resolveChatTitle(AsyncValue<ChatMetadata> metadataAsync) {
@@ -206,7 +224,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage>
                     top: false,
                     child: ConversationComposerBar(
                       scope: scope,
-                      onMessageSent: _timelineController.scrollToLatest,
+                      onMessageSent: _handleMessageSent,
                     ),
                   ),
                 ),

@@ -82,13 +82,45 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   void _onScroll() {
-    final viewState = ref.read(chatListViewModelProvider).value;
-    if (viewState == null) return;
-    if (!viewState.hasMore || viewState.isLoadingMore) return;
-
     final position = _scrollController.position;
-    if (position.pixels >= position.maxScrollExtent - 200) {
+    if (position.pixels < position.maxScrollExtent - 200) {
+      return;
+    }
+
+    final settings = ref.read(appSettingsProvider);
+    final activeTab = _effectiveTab(settings.showAllTab);
+    if (activeTab == ChatListTab.groups) {
+      final viewState = ref.read(chatListViewModelProvider).value;
+      if (viewState == null || !viewState.hasMore || viewState.isLoadingMore) {
+        return;
+      }
       ref.read(chatListViewModelProvider.notifier).loadMoreChats();
+      return;
+    }
+
+    if (activeTab == ChatListTab.threads) {
+      final threadState = ref.read(threadListViewModelProvider).value;
+      if (threadState == null ||
+          !threadState.hasMore ||
+          threadState.isLoadingMore) {
+        return;
+      }
+      ref.read(threadListViewModelProvider.notifier).loadMoreThreads();
+      return;
+    }
+
+    if (activeTab == ChatListTab.all) {
+      final chatState = ref.read(chatListViewModelProvider).value;
+      if (chatState != null && chatState.hasMore && !chatState.isLoadingMore) {
+        ref.read(chatListViewModelProvider.notifier).loadMoreChats();
+      }
+
+      final threadState = ref.read(threadListViewModelProvider).value;
+      if (threadState != null &&
+          threadState.hasMore &&
+          !threadState.isLoadingMore) {
+        ref.read(threadListViewModelProvider.notifier).loadMoreThreads();
+      }
     }
   }
 
@@ -116,10 +148,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     overlay.insert(entry);
   }
 
-  Future<void> _refreshChats() {
-    return ref
-        .read(chatListViewModelProvider.notifier)
-        .refreshChats(userInitiated: true);
+  Future<void> _refreshLists() async {
+    await Future.wait([
+      ref
+          .read(chatListViewModelProvider.notifier)
+          .refreshChats(userInitiated: true),
+      ref
+          .read(threadListViewModelProvider.notifier)
+          .refreshThreads(userInitiated: true),
+    ]);
   }
 
   @override
@@ -171,7 +208,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 mergedItems: mergedItems,
                 scrollController: _scrollController,
                 supportsPullToRefresh: _supportsPullToRefresh,
-                onRefresh: _refreshChats,
+                onRefresh: _refreshLists,
               ),
             ),
           ],

@@ -25,6 +25,8 @@ Map<String, dynamic> _$ThreadParticipantDtoToJson(
 ThreadReplyPreviewDto _$ThreadReplyPreviewDtoFromJson(
   Map<String, dynamic> json,
 ) => ThreadReplyPreviewDto(
+  id: const NullableFlexibleIntConverter().fromJson(json['id']),
+  clientGeneratedId: json['clientGeneratedId'] as String? ?? '',
   sender: ThreadParticipantDto.fromJson(json['sender'] as Map<String, dynamic>),
   message: json['message'] as String?,
   messageType: json['messageType'] as String? ?? 'text',
@@ -41,6 +43,8 @@ ThreadReplyPreviewDto _$ThreadReplyPreviewDtoFromJson(
 Map<String, dynamic> _$ThreadReplyPreviewDtoToJson(
   ThreadReplyPreviewDto instance,
 ) => <String, dynamic>{
+  'id': const NullableFlexibleIntConverter().toJson(instance.id),
+  'clientGeneratedId': instance.clientGeneratedId,
   'sender': instance.sender.toJson(),
   'message': instance.message,
   'messageType': instance.messageType,

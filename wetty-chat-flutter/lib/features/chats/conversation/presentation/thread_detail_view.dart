@@ -10,6 +10,7 @@ import '../application/conversation_timeline_view_model.dart';
 import '../domain/conversation_scope.dart';
 import '../domain/launch_request.dart';
 import '../../threads/data/thread_api_service.dart';
+import '../../threads/data/thread_repository.dart';
 import '../../threads/data/thread_subscription_provider.dart';
 import 'conversation_composer_bar.dart';
 import 'timeline/conversation_timeline.dart';
@@ -112,7 +113,17 @@ class _ThreadDetailPageState extends ConsumerState<ThreadDetailPage>
       await ref
           .read(threadApiServiceProvider)
           .markThreadAsRead(int.parse(widget.threadRootId), messageId);
+      ref
+          .read(threadListStateProvider.notifier)
+          .markThreadRead(
+            threadRootId: int.parse(widget.threadRootId),
+            messageId: messageId,
+          );
     } catch (_) {}
+  }
+
+  Future<void> _handleMessageSent() async {
+    await _timelineController.scrollToLatest();
   }
 
   // ---------------------------------------------------------------------------
@@ -213,7 +224,7 @@ class _ThreadDetailPageState extends ConsumerState<ThreadDetailPage>
                     top: false,
                     child: ConversationComposerBar(
                       scope: scope,
-                      onMessageSent: _timelineController.scrollToLatest,
+                      onMessageSent: _handleMessageSent,
                     ),
                   ),
                 ),

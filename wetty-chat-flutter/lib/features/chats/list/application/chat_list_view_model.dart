@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../conversation/domain/conversation_message.dart';
 import '../../models/chat_models.dart';
 import '../data/chat_repository.dart';
 
@@ -121,6 +122,16 @@ class ChatListViewModel extends AsyncNotifier<ChatListViewState> {
 
   void insertChat(ChatListItem chat) {
     ref.read(chatListStateProvider.notifier).insertChat(chat);
+  }
+
+  void markChatRead({required String chatId, required int messageId}) {
+    ref
+        .read(chatListStateProvider.notifier)
+        .markChatRead(chatId: chatId, messageId: messageId);
+  }
+
+  void recordOutgoingMessage(ConversationMessage message) {
+    ref.read(chatListStateProvider.notifier).recordOutgoingMessage(message);
   }
 
   Future<ChatListItem?> createChat({String? name}) async {

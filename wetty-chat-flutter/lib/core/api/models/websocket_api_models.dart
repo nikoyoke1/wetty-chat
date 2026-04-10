@@ -59,6 +59,8 @@ sealed class ApiWsEvent {
         return MessageDeletedWsEvent.fromJson(json);
       case 'reactionUpdated':
         return ReactionUpdatedWsEvent.fromJson(json);
+      case 'threadUpdate':
+        return ThreadUpdatedWsEvent.fromJson(json);
       default:
         return null;
     }
@@ -149,4 +151,43 @@ class ReactionUpdatedWsEvent extends ApiWsEvent {
       _$ReactionUpdatedWsEventFromJson(json);
 
   Map<String, dynamic> toJson() => _$ReactionUpdatedWsEventToJson(this);
+}
+
+@JsonSerializable(explicitToJson: true)
+class ThreadUpdatePayloadDto {
+  const ThreadUpdatePayloadDto({
+    required this.threadRootId,
+    required this.chatId,
+    required this.lastReplyAt,
+    required this.replyCount,
+  });
+
+  @FlexibleIntConverter()
+  final int threadRootId;
+  @FlexibleIntConverter()
+  final int chatId;
+  final DateTime lastReplyAt;
+  @FlexibleIntConverter()
+  final int replyCount;
+
+  factory ThreadUpdatePayloadDto.fromJson(Map<String, dynamic> json) =>
+      _$ThreadUpdatePayloadDtoFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ThreadUpdatePayloadDtoToJson(this);
+}
+
+@JsonSerializable(explicitToJson: true)
+class ThreadUpdatedWsEvent extends ApiWsEvent {
+  const ThreadUpdatedWsEvent({
+    this.type = 'threadUpdate',
+    required this.payload,
+  });
+
+  final String type;
+  final ThreadUpdatePayloadDto payload;
+
+  factory ThreadUpdatedWsEvent.fromJson(Map<String, dynamic> json) =>
+      _$ThreadUpdatedWsEventFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ThreadUpdatedWsEventToJson(this);
 }
