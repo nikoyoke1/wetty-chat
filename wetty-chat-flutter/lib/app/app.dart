@@ -3,16 +3,59 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../l10n/app_localizations.dart';
 import '../core/network/api_config.dart';
+import '../core/notifications/apns_channel.dart';
+import '../core/notifications/notification_tap_handler.dart';
+import '../core/notifications/push_notification_provider.dart';
 import '../core/session/dev_session_store.dart';
 import '../core/settings/app_settings_store.dart';
 import 'routing/app_router.dart';
 import 'theme/style_config.dart';
 
-class WettyChatApp extends ConsumerWidget {
+class WettyChatApp extends ConsumerStatefulWidget {
   const WettyChatApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WettyChatApp> createState() => _WettyChatAppState();
+}
+
+class _WettyChatAppState extends ConsumerState<WettyChatApp>
+    with WidgetsBindingObserver {
+  NotificationTapHandler? _tapHandler;
+  bool _pushInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _tapHandler?.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Retry push subscription if a previous attempt failed.
+      ref.read(pushNotificationProvider.notifier).ensureSubscribed();
+    }
+  }
+
+  void _initPushIfNeeded() {
+    if (_pushInitialized) return;
+    _pushInitialized = true;
+
+    final apns = ref.read(apnsChannelProvider);
+    final router = ref.read(appRouterProvider);
+    _tapHandler = NotificationTapHandler(apns, router);
+    _tapHandler!.handleLaunchNotification();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final settings = ref.watch(appSettingsProvider);
     final locale = settings.language.toLocale();
     final router = ref.watch(appRouterProvider);
@@ -23,6 +66,20 @@ class WettyChatApp extends ConsumerWidget {
       userId: session.currentUserId,
       authHeaders: session.authHeaders,
     );
+
+    // Initialize push notification handling once the router is available.
+    _initPushIfNeeded();
+
+    // React to auth state changes for push subscription management.
+    ref.listen<AuthSessionState>(authSessionProvider, (prev, next) {
+      if (next.isAuthenticated && prev?.isAuthenticated != true) {
+        // User just logged in — ensure push subscription is active.
+        ref.read(pushNotificationProvider.notifier).ensureSubscribed();
+      } else if (!next.isAuthenticated && prev?.isAuthenticated == true) {
+        // User logged out — unsubscribe from push.
+        ref.read(pushNotificationProvider.notifier).unsubscribe();
+      }
+    });
 
     return CupertinoApp.router(
       theme: appCupertinoTheme,

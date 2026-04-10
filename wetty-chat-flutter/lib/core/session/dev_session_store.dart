@@ -213,6 +213,8 @@ class AuthSessionNotifier extends Notifier<AuthSessionState> {
 
   Future<void> clearJwt() async {
     debugPrint('[auth:clear-jwt] clearing stored jwt and re-running bootstrap');
+    // Push unsubscribe is handled reactively in app.dart via the auth listener,
+    // which fires when the state transitions away from authenticated.
     await _prefs.remove(_jwtTokenStorageKey);
     state = AuthSessionState(
       status: AuthBootstrapStatus.bootstrapping,
