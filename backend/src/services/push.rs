@@ -159,7 +159,7 @@ pub struct PushJob {
     pub sender_username: String,
     pub chat_name: String,
     pub message_preview: PushMessagePreview,
-    pub legacy_message_preview: Option<String>,
+    pub body_preview: Option<String>,
     pub message_id: i64,
     pub thread_root_id: Option<i64>,
     pub mentioned_uids: Vec<i32>,
@@ -719,7 +719,7 @@ async fn process_push_job(
         });
 
     // 4. Build the push payload base text.
-    let body_text = format_push_body(&job.sender_username, job.legacy_message_preview.as_deref());
+    let body_text = format_push_body(&job.sender_username, job.body_preview.as_deref());
 
     // 5. Send concurrently with bounded parallelism.
     let stale_ids: Vec<i64> = stream::iter(subs.into_iter())
@@ -975,7 +975,7 @@ mod tests {
                 first_attachment_kind: None,
                 is_deleted: false,
             },
-            legacy_message_preview: Some("[Sticker] 🙂".to_string()),
+            body_preview: Some("[Sticker] 🙂".to_string()),
             message_id: 99,
             thread_root_id: None,
             mentioned_uids: Vec::new(),
@@ -1019,7 +1019,7 @@ mod tests {
                 first_attachment_kind: None,
                 is_deleted: false,
             },
-            legacy_message_preview: Some("hello there".to_string()),
+            body_preview: Some("hello there".to_string()),
             message_id: 99,
             thread_root_id: Some(77),
             mentioned_uids: Vec::new(),
@@ -1054,7 +1054,7 @@ mod tests {
                 first_attachment_kind: None,
                 is_deleted: false,
             },
-            legacy_message_preview: None,
+            body_preview: None,
             message_id: 99,
             thread_root_id: None,
             mentioned_uids: Vec::new(),
@@ -1081,7 +1081,7 @@ mod tests {
                 first_attachment_kind: None,
                 is_deleted: false,
             },
-            legacy_message_preview: None,
+            body_preview: None,
             message_id: 50,
             thread_root_id: None,
             mentioned_uids: Vec::new(),
@@ -1108,7 +1108,7 @@ mod tests {
                 first_attachment_kind: None,
                 is_deleted: false,
             },
-            legacy_message_preview: Some("[Sticker] 🎉".to_string()),
+            body_preview: Some("[Sticker] 🎉".to_string()),
             message_id: 51,
             thread_root_id: None,
             mentioned_uids: Vec::new(),
@@ -1133,7 +1133,7 @@ mod tests {
                 first_attachment_kind: Some("image/jpeg".to_string()),
                 is_deleted: false,
             },
-            legacy_message_preview: None,
+            body_preview: None,
             message_id: 52,
             thread_root_id: None,
             mentioned_uids: Vec::new(),
@@ -1158,7 +1158,7 @@ mod tests {
                 first_attachment_kind: Some("video/mp4".to_string()),
                 is_deleted: false,
             },
-            legacy_message_preview: None,
+            body_preview: None,
             message_id: 53,
             thread_root_id: None,
             mentioned_uids: Vec::new(),
@@ -1182,7 +1182,7 @@ mod tests {
                 first_attachment_kind: None,
                 is_deleted: false,
             },
-            legacy_message_preview: Some("sent an invite".to_string()),
+            body_preview: Some("sent an invite".to_string()),
             message_id: 54,
             thread_root_id: None,
             mentioned_uids: Vec::new(),

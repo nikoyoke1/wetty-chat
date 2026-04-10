@@ -529,7 +529,6 @@ async fn post_send_invite_message(
             client_generated_id: body.client_generated_id,
             attachment_ids: vec![],
             update_group_last_message: true,
-            push_preview_override: Some("sent an invite".to_string()),
         },
     )
     .await?;

@@ -402,7 +402,6 @@ async fn post_message(
                 client_generated_id: body.client_generated_id,
                 attachment_ids,
                 update_group_last_message: true,
-                push_preview_override: None,
             },
         )
         .await?;
@@ -500,7 +499,6 @@ pub(super) async fn post_thread_message(
                 client_generated_id: body.client_generated_id,
                 attachment_ids,
                 update_group_last_message: false,
-                push_preview_override: None,
             },
         )
         .await?;

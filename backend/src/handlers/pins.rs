@@ -239,7 +239,6 @@ async fn create_pin(
             client_generated_id: Uuid::new_v4().to_string(),
             attachment_ids: vec![],
             update_group_last_message: false,
-            push_preview_override: None,
         },
     )
     .await
@@ -315,7 +314,6 @@ async fn delete_pin(
             client_generated_id: Uuid::new_v4().to_string(),
             attachment_ids: vec![],
             update_group_last_message: false,
-            push_preview_override: None,
         },
     )
     .await

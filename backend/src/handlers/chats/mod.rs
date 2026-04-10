@@ -66,6 +66,20 @@ pub struct MentionInfo {
     pub user_group: Option<UserGroupInfo>,
 }
 
+fn parse_mention_token(text: &str, start: usize) -> Option<(i32, usize)> {
+    let bytes = text.as_bytes();
+    if bytes.get(start) != Some(&b'@') || bytes.get(start + 1) != Some(&b'[') {
+        return None;
+    }
+
+    let rest = text.get(start + 2..)?;
+    let close = rest.find(']')?;
+    let inner = &rest[..close];
+    let uid = inner.strip_prefix("uid:")?.parse::<i32>().ok()?;
+
+    Some((uid, start + 2 + close + 1))
+}
+
 /// Extract `@[uid:<N>]` tokens from a message string.
 pub fn extract_mention_uids(text: &str) -> Vec<i32> {
     let mut uids = Vec::new();
@@ -75,21 +89,12 @@ pub fn extract_mention_uids(text: &str) -> Vec<i32> {
     let mut i = 0;
 
     while i < len {
-        if bytes[i] == b'@' && i + 1 < len && bytes[i + 1] == b'[' {
-            if let Some(rest) = text.get(i + 2..) {
-                if let Some(close) = rest.find(']') {
-                    let inner = &rest[..close];
-                    if let Some(id_str) = inner.strip_prefix("uid:") {
-                        if let Ok(uid) = id_str.parse::<i32>() {
-                            if !uids.contains(&uid) {
-                                uids.push(uid);
-                            }
-                            i += 2 + close + 1;
-                            continue;
-                        }
-                    }
-                }
+        if let Some((uid, next)) = parse_mention_token(text, i) {
+            if !uids.contains(&uid) {
+                uids.push(uid);
             }
+            i = next;
+            continue;
         }
         i += 1;
     }
@@ -211,7 +216,6 @@ pub(crate) struct PreparedMessageSend {
     pub client_generated_id: String,
     pub attachment_ids: Vec<i64>,
     pub update_group_last_message: bool,
-    pub push_preview_override: Option<String>,
 }
 
 pub(crate) struct SendMessageResult {
@@ -433,6 +437,12 @@ fn sticker_preview_text(emoji: Option<&str>) -> String {
     }
 }
 
+struct PushPreviewBundle {
+    message_preview: PushMessagePreview,
+    body_preview: Option<String>,
+    mentioned_uids: Vec<i32>,
+}
+
 /// Replace `@[uid:N]` tokens with `@username` for human-readable previews.
 fn render_mentions_as_text(text: &str, mentions: &[MentionInfo]) -> String {
     if mentions.is_empty() {
@@ -447,46 +457,75 @@ fn render_mentions_as_text(text: &str, mentions: &[MentionInfo]) -> String {
     let bytes = text.as_bytes();
     let len = bytes.len();
     let mut i = 0;
+    let mut copied_until = 0;
     while i < len {
-        if bytes[i] == b'@' && i + 1 < len && bytes[i + 1] == b'[' {
-            if let Some(rest) = text.get(i + 2..) {
-                if let Some(close) = rest.find(']') {
-                    let inner = &rest[..close];
-                    if let Some(id_str) = inner.strip_prefix("uid:") {
-                        if let Ok(uid) = id_str.parse::<i32>() {
-                            let name = mention_map.get(&uid).copied().unwrap_or("Unknown User");
-                            result.push('@');
-                            result.push_str(name);
-                            i += 2 + close + 1;
-                            continue;
-                        }
-                    }
-                }
-            }
+        if let Some((uid, next)) = parse_mention_token(text, i) {
+            result.push_str(&text[copied_until..i]);
+            let name = mention_map.get(&uid).copied().unwrap_or("Unknown User");
+            result.push('@');
+            result.push_str(name);
+            i = next;
+            copied_until = next;
+            continue;
         }
-        result.push(bytes[i] as char);
         i += 1;
     }
+    result.push_str(&text[copied_until..]);
     result
 }
 
-fn push_message_preview_from_response(response: &MessageResponse) -> PushMessagePreview {
-    PushMessagePreview {
-        message: response
-            .message
-            .as_deref()
-            .map(|text| render_mentions_as_text(text, &response.mentions)),
-        message_type: response.message_type.clone(),
-        sticker: response.sticker.as_ref().and_then(|sticker| {
-            (!sticker.emoji.trim().is_empty()).then(|| PushMessagePreviewSticker {
-                emoji: sticker.emoji.clone(),
-            })
-        }),
-        first_attachment_kind: response
-            .attachments
-            .first()
-            .map(|attachment| attachment.kind.clone()),
-        is_deleted: response.is_deleted,
+fn build_push_preview_bundle(response: &MessageResponse) -> PushPreviewBundle {
+    let mentioned_uids = response
+        .message
+        .as_deref()
+        .map(extract_mention_uids)
+        .unwrap_or_default();
+    let rendered_message = response
+        .message
+        .as_deref()
+        .map(|text| render_mentions_as_text(text, &response.mentions));
+    let sticker = response.sticker.as_ref().and_then(|sticker| {
+        (!sticker.emoji.trim().is_empty()).then(|| PushMessagePreviewSticker {
+            emoji: sticker.emoji.clone(),
+        })
+    });
+    let first_attachment_kind = response
+        .attachments
+        .first()
+        .map(|attachment| attachment.kind.clone());
+    let is_deleted = response.is_deleted;
+
+    let body_preview = if is_deleted {
+        None
+    } else {
+        match response.message_type {
+            MessageType::Invite => Some("sent an invite".to_string()),
+            MessageType::Sticker => Some(sticker_preview_text(
+                response.sticker.as_ref().map(|s| s.emoji.as_str()),
+            )),
+            _ => rendered_message.clone(),
+        }
+    };
+
+    let preview_message = if is_deleted {
+        None
+    } else {
+        match response.message_type {
+            MessageType::Invite => None,
+            _ => rendered_message,
+        }
+    };
+
+    PushPreviewBundle {
+        message_preview: PushMessagePreview {
+            message: preview_message,
+            message_type: response.message_type.clone(),
+            sticker,
+            first_attachment_kind,
+            is_deleted,
+        },
+        body_preview,
+        mentioned_uids,
     }
 }
 
@@ -576,32 +615,17 @@ pub(crate) async fn send_prepared_message(
             .select(groups::dsl::name)
             .first::<String>(conn)
             .unwrap_or_else(|_| "Chat".to_string());
-        let mentioned_uids = response
-            .message
-            .as_deref()
-            .map(extract_mention_uids)
-            .unwrap_or_default();
+        let push_preview = build_push_preview_bundle(&response);
         Some(PushJob {
             chat_id: prepared.chat_id,
             sender_uid: prepared.sender_uid,
             sender_username,
             chat_name,
-            message_preview: push_message_preview_from_response(&response),
-            legacy_message_preview: prepared.push_preview_override.or_else(|| {
-                response
-                    .message
-                    .as_deref()
-                    .map(|text| render_mentions_as_text(text, &response.mentions))
-                    .or_else(|| {
-                        response
-                            .sticker
-                            .as_ref()
-                            .map(|sticker| sticker_preview_text(Some(&sticker.emoji)))
-                    })
-            }),
+            message_preview: push_preview.message_preview,
+            body_preview: push_preview.body_preview,
             message_id: response.id,
             thread_root_id: response.reply_root_id,
-            mentioned_uids,
+            mentioned_uids: push_preview.mentioned_uids,
         })
     } else {
         None
@@ -1463,7 +1487,10 @@ pub fn router() -> OpenApiRouter<crate::AppState> {
 
 #[cfg(test)]
 mod tests {
-    use super::{first_attachment_kind, sticker_preview_text, ReplyToMessage};
+    use super::{
+        build_push_preview_bundle, extract_mention_uids, first_attachment_kind,
+        render_mentions_as_text, sticker_preview_text, MentionInfo, ReplyToMessage,
+    };
     use crate::models::{Attachment, MessageType, Sender};
     use chrono::Utc;
     use serde_json::json;
@@ -1473,6 +1500,78 @@ mod tests {
     fn sticker_preview_text_includes_emoji_when_available() {
         assert_eq!(sticker_preview_text(Some("🙂")), "[Sticker] 🙂");
         assert_eq!(sticker_preview_text(None), "[Sticker]");
+    }
+
+    #[test]
+    fn render_mentions_as_text_preserves_cjk_text() {
+        let text = "@[uid:7] 你好，世界";
+        let mentions = vec![MentionInfo {
+            uid: 7,
+            username: Some("Alice".to_string()),
+            avatar_url: None,
+            gender: 0,
+            user_group: None,
+        }];
+
+        assert_eq!(
+            render_mentions_as_text(text, &mentions),
+            "@Alice 你好，世界"
+        );
+    }
+
+    #[test]
+    fn extract_mention_uids_keeps_scanning_after_cjk_text() {
+        let text = "@[uid:7] 你好 @[uid:8]";
+        assert_eq!(extract_mention_uids(text), vec![7, 8]);
+    }
+
+    #[test]
+    fn render_mentions_as_text_leaves_invalid_tokens_untouched() {
+        let text = "@[user:7] 你好";
+        let mentions = vec![MentionInfo {
+            uid: 7,
+            username: Some("Alice".to_string()),
+            avatar_url: None,
+            gender: 0,
+            user_group: None,
+        }];
+
+        assert_eq!(render_mentions_as_text(text, &mentions), text);
+        assert!(extract_mention_uids(text).is_empty());
+    }
+
+    #[test]
+    fn build_push_preview_bundle_uses_typed_invite_preview() {
+        let response = super::MessageResponse {
+            id: 1,
+            message: Some("abc123".to_string()),
+            message_type: MessageType::Invite,
+            sticker: None,
+            reply_root_id: None,
+            client_generated_id: "cgid".to_string(),
+            sender: Sender {
+                uid: 7,
+                avatar_url: None,
+                name: Some("Alice".to_string()),
+                gender: 0,
+                user_group: None,
+            },
+            chat_id: 10,
+            created_at: Utc::now(),
+            is_edited: false,
+            is_deleted: false,
+            has_attachments: false,
+            thread_info: None,
+            reply_to_message: None,
+            attachments: Vec::new(),
+            reactions: Vec::new(),
+            mentions: Vec::new(),
+        };
+
+        let preview = build_push_preview_bundle(&response);
+        assert_eq!(preview.body_preview, Some("sent an invite".to_string()));
+        assert_eq!(preview.message_preview.message_type, MessageType::Invite);
+        assert_eq!(preview.message_preview.message, None);
     }
 
     #[test]
