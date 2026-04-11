@@ -3,6 +3,7 @@ import { createBaseConfig } from './vite.config.base';
 import { execSync } from 'child_process';
 
 const ASSET_URL = 'https://chahui.app';
+const ASSET_BASE = `${ASSET_URL}/assets`;
 const API_BASE_URL = `${ASSET_URL}/_api`;
 
 let commitHash = 'unknown';
@@ -13,7 +14,7 @@ try {
 }
 
 export default mergeConfig(
-  createBaseConfig({ assetCdnOrigin: ASSET_URL }),
+  createBaseConfig({ assetBaseUrl: ASSET_BASE }),
   defineConfig({
     experimental: {
       renderBuiltUrl(filename, { type }) {
@@ -25,7 +26,7 @@ export default mergeConfig(
       },
     },
     define: {
-      __ASSET_BASE__: JSON.stringify(ASSET_URL),
+      __ASSET_BASE__: JSON.stringify(ASSET_BASE),
       __API_BASE__: JSON.stringify(API_BASE_URL),
       __APP_VERSION__: JSON.stringify(commitHash),
       __FEATURE_GATES_ENABLED__: JSON.stringify(false),

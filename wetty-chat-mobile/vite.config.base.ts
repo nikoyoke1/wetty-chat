@@ -8,15 +8,16 @@ import { patchCssModules } from 'vite-css-modules';
 const SRC_DIR = path.resolve(__dirname, './src');
 
 type BaseConfigOptions = {
-  assetCdnOrigin?: string;
+  assetBaseUrl?: string;
 };
 
 export function createBaseConfig(options: BaseConfigOptions = {}) {
-  const assetCdnOrigin = options.assetCdnOrigin?.replace(/\/+$/, '');
+  const assetBaseUrl = options.assetBaseUrl?.replace(/\/+$/, '');
 
   return defineConfig({
     define: {
       __API_BASE__: JSON.stringify('/_api'),
+      __ASSET_BASE__: JSON.stringify(null),
       __AUTH_REDIRECT_URL__: JSON.stringify(null),
       __FEATURE_GATES_ENABLED__: JSON.stringify(false),
     },
@@ -85,10 +86,10 @@ export function createBaseConfig(options: BaseConfigOptions = {}) {
         injectManifest: {
           maximumFileSizeToCacheInBytes: 5000000,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,wasm}'],
-          ...(assetCdnOrigin
+          ...(assetBaseUrl
             ? {
                 modifyURLPrefix: {
-                  'assets/': `${assetCdnOrigin}/assets/`,
+                  'assets/': `${assetBaseUrl}/`,
                 },
               }
             : {}),

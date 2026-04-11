@@ -36,7 +36,8 @@ const EXTERNAL_CACHEABLE_DESTINATIONS = new Set(['audio', 'font', 'image', 'scri
 const EXTERNAL_ASSET_EXTENSION_RE =
   /\.(?:avif|css|eot|gif|heic|ico|jpeg|jpg|js|json|m4a|mp3|mp4|ogg|otf|png|svg|ttf|wav|webm|webp|woff2?)(?:$|\?)/i;
 
-const appOrigin = self.location.origin;
+const assetBaseUrl = typeof __ASSET_BASE__ !== 'undefined' && __ASSET_BASE__ ? new URL(__ASSET_BASE__) : null;
+const normalizedAssetBasePath = assetBaseUrl ? normalizeBasePath(assetBaseUrl.pathname) : null;
 const apiBase = (() => {
   if (typeof __API_BASE__ !== 'undefined') {
     return __API_BASE__;
@@ -69,6 +70,15 @@ function urlMatchesBasePath(urlPathname: string, basePathname: string): boolean 
 
 function isApiUrl(url: URL): boolean {
   return url.origin === apiBaseUrl.origin && urlMatchesBasePath(url.pathname, normalizedApiBasePath);
+}
+
+function isUnderAssetBase(url: URL): boolean {
+  return (
+    assetBaseUrl != null &&
+    normalizedAssetBasePath != null &&
+    url.origin === assetBaseUrl.origin &&
+    urlMatchesBasePath(url.pathname, normalizedAssetBasePath)
+  );
 }
 
 function isCacheControlDisabled(cacheControl: string): boolean {
@@ -224,30 +234,36 @@ if (hasPrecachedIndex) {
   }, createHandlerBoundToURL('index.html'));
 }
 
-registerRoute(
-  ({ request, url }) => {
-    if (request.method !== 'GET') {
-      return false;
-    }
+if (!import.meta.env.DEV) {
+  registerRoute(
+    ({ request, url }) => {
+      if (request.method !== 'GET') {
+        return false;
+      }
 
-    if (url.origin === appOrigin || isApiUrl(url)) {
-      return false;
-    }
+      if (isApiUrl(url)) {
+        return false;
+      }
 
-    return EXTERNAL_CACHEABLE_DESTINATIONS.has(request.destination) || EXTERNAL_ASSET_EXTENSION_RE.test(url.pathname);
-  },
-  new CacheFirst({
-    cacheName: EXTERNAL_ASSET_CACHE_NAME,
-    plugins: [
-      externalAssetCacheControlPlugin,
-      new ExpirationPlugin({
-        maxEntries: 300,
-        maxAgeSeconds: 60 * 60 * 24 * 365,
-        purgeOnQuotaError: true,
-      }),
-    ],
-  }),
-);
+      if (!isUnderAssetBase(url)) {
+        return false;
+      }
+
+      return EXTERNAL_CACHEABLE_DESTINATIONS.has(request.destination) || EXTERNAL_ASSET_EXTENSION_RE.test(url.pathname);
+    },
+    new CacheFirst({
+      cacheName: EXTERNAL_ASSET_CACHE_NAME,
+      plugins: [
+        externalAssetCacheControlPlugin,
+        new ExpirationPlugin({
+          maxEntries: 300,
+          maxAgeSeconds: 60 * 60 * 24 * 365,
+          purgeOnQuotaError: true,
+        }),
+      ],
+    }),
+  );
+}
 
 self.addEventListener('push', (event) => {
   if (!event.data) return;
