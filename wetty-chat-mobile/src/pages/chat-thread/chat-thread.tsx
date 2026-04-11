@@ -544,6 +544,9 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
     if (!lastFullyVisibleMessageId) return;
     if (lastFullyVisibleMessageId === lastThreadReadIdRef.current) return;
 
+    const targetComparableId = parseComparableMessageId(lastFullyVisibleMessageId);
+    if (targetComparableId == null) return;
+
     // Debounce to avoid excessive API calls during rapid scrolling
     if (threadReadTimerRef.current) {
       clearTimeout(threadReadTimerRef.current);

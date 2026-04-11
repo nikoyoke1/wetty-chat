@@ -33,6 +33,8 @@ import { selectTotalUnreadChatCount } from '@/store/chatsSlice';
 import { ThreadsListInner } from '@/pages/threads';
 import { type ChatListTab, ChatListSegment } from './ChatListSegment';
 import { ThreadListRow } from '@/components/chat/ThreadListRow';
+import type { RootState } from '@/store';
+import { compareMessageOrder, isOptimisticMessageId } from '@/store/messageProjection';
 import styles from './ChatList.module.scss';
 
 function formatLastActivity(isoString: string | null, locale: string): string {
@@ -91,6 +93,27 @@ function getMessagePreview(message: MessageResponse | null, locale: string): Rea
   );
 }
 
+function getLatestConfirmedRootMessageId(
+  chat: ChatListEntry,
+  windows: RootState['messages']['chats'][string]['windows'] | undefined,
+): string | null {
+  if (chat.lastMessage && !isOptimisticMessageId(chat.lastMessage.id)) {
+    return chat.lastMessage.id;
+  }
+
+  let latestConfirmed: MessageResponse | null = null;
+  for (const window of windows ?? []) {
+    for (const message of window.messages) {
+      if (message.replyRootId != null || message.isDeleted || isOptimisticMessageId(message.id)) continue;
+      if (!latestConfirmed || compareMessageOrder(message, latestConfirmed) > 0) {
+        latestConfirmed = message;
+      }
+    }
+  }
+
+  return latestConfirmed?.id ?? null;
+}
+
 type MergedItem =
   | { type: 'group'; chat: ChatListEntry; sortTime: number }
   | { type: 'thread'; thread: import('@/api/threads').StoredThreadListItem; sortTime: number };
@@ -111,6 +134,7 @@ export function ChatList({ activeChatId, activeThreadId, onChatSelect, onThreadS
   const unreadThreadCount = useSelector(selectTotalUnreadThreadCount);
   const unreadChatCount = useSelector(selectTotalUnreadChatCount);
   const showAllTab = useSelector(selectShowAllTab);
+  const messageChats = useSelector((state: RootState) => state.messages.chats);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ChatListTab>(showAllTab ? 'all' : 'groups');
@@ -145,11 +169,13 @@ export function ChatList({ activeChatId, activeThreadId, onChatSelect, onThreadS
 
   const handleToggleRead = async (chat: ChatListEntry, slidingItem: HTMLIonItemSlidingElement | null) => {
     slidingItem?.close();
-    if (!chat.lastMessage) return;
 
     if (chat.unreadCount > 0) {
+      const targetMessageId = getLatestConfirmedRootMessageId(chat, messageChats[chat.id]?.windows);
+      if (!targetMessageId) return;
+
       try {
-        const res = await markMessagesAsRead(chat.id, chat.lastMessage.id);
+        const res = await markMessagesAsRead(chat.id, targetMessageId);
         dispatch(setChatLastReadMessageId({ chatId: chat.id, lastReadMessageId: res.data.lastReadMessageId }));
         dispatch(setChatUnreadCount({ chatId: chat.id, unreadCount: res.data.unreadCount }));
         await updateAppBadge();
@@ -157,6 +183,8 @@ export function ChatList({ activeChatId, activeThreadId, onChatSelect, onThreadS
         console.error('Failed to mark as read', err);
       }
     } else {
+      if (!chat.lastMessage) return;
+
       try {
         dispatch(setChatUnreadCount({ chatId: chat.id, unreadCount: 1 }));
         const res = await markChatAsUnread(chat.id);
