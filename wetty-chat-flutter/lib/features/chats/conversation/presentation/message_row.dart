@@ -58,6 +58,7 @@ class MessageRow extends StatefulWidget {
     this.onTapReply,
     this.onOpenThread,
     this.onToggleReaction,
+    this.onTapMention,
     this.showSenderName = true,
     this.showAvatar = true,
   });
@@ -71,6 +72,7 @@ class MessageRow extends StatefulWidget {
   final VoidCallback? onTapReply;
   final VoidCallback? onOpenThread;
   final ValueChanged<String>? onToggleReaction;
+  final void Function(int uid, MentionInfo? mention)? onTapMention;
   final bool showSenderName;
   final bool showAvatar;
 
@@ -83,6 +85,9 @@ class _MessageRowState extends State<MessageRow>
   static const double _replyThreshold = 60;
   static const double _rowHorizontalPadding =
       MessageBubblePresentation.rowHorizontalPadding / 2;
+  static const double _avatarLaneWidth =
+      MessageBubblePresentation.avatarSlotWidth +
+      MessageBubblePresentation.avatarGap;
   static const Set<String> _replyableMessageTypes = <String>{
     'text',
     'audio',
@@ -250,9 +255,7 @@ class _MessageRowState extends State<MessageRow>
     BuildContext context,
     MessageBubblePresentation presentation,
   ) {
-    final avatarColumnWidth =
-        MessageBubblePresentation.avatarSlotWidth +
-        MessageBubblePresentation.avatarGap;
+    final avatarColumnWidth = _avatarLaneWidth;
     final bubble = _isPureAudioMessage
         ? KeyedSubtree(
             key: _bubbleKey,
@@ -270,11 +273,13 @@ class _MessageRowState extends State<MessageRow>
             chatMessageFontSize: widget.chatMessageFontSize,
             isMe: _isMe,
             showSenderName: widget.showSenderName,
+            currentUserId: ApiSession.currentUserId,
             onTapSticker: widget.onTapSticker,
             onTapReply: widget.onTapReply,
             onOpenThread: widget.onOpenThread,
             onOpenAttachment: _openAttachment,
             onToggleReaction: widget.onToggleReaction,
+            onTapMention: widget.onTapMention,
           );
     final avatar = _buildAvatar(context, presentation.senderName);
     final trailingAvatarColumn = SizedBox(
