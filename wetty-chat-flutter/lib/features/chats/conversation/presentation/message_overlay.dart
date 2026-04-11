@@ -7,6 +7,7 @@ import '../../../../app/theme/style_config.dart';
 import '../../../../core/network/api_config.dart';
 import 'message_bubble/message_bubble.dart';
 import 'message_bubble/message_bubble_presentation.dart';
+import 'message_bubble/voice_message_bubble.dart';
 import 'message_overlay_preview.dart';
 import 'message_row.dart';
 
@@ -433,19 +434,32 @@ class MessageOverlay extends StatelessWidget {
       );
     }
 
-    return ClipRect(
-      child: Transform.translate(
-        offset: -previewPlacement.contentOffset,
-        child: SizedBox(
-          width: details.bubbleRect.width,
-          child: MessageBubble(
+    final isPureAudio = message.messageType == 'audio' &&
+        message.attachments.length == 1 &&
+        message.attachments.first.isAudio;
+
+    final bubble = isPureAudio
+        ? VoiceMessageBubble(
+            attachment: message.attachments.first,
+            isMe: details.isMe,
+            message: message,
+            presentation: presentation,
+          )
+        : MessageBubble(
             message: message,
             presentation: presentation,
             chatMessageFontSize: chatMessageFontSize,
             isMe: details.isMe,
             showSenderName: !details.isMe,
             currentUserId: ApiSession.currentUserId,
-          ),
+          );
+
+    return ClipRect(
+      child: Transform.translate(
+        offset: -previewPlacement.contentOffset,
+        child: SizedBox(
+          width: details.bubbleRect.width,
+          child: bubble,
         ),
       ),
     );
