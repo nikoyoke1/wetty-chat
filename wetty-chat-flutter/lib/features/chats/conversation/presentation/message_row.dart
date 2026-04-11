@@ -54,6 +54,7 @@ class MessageRow extends StatefulWidget {
     this.isHighlighted = false,
     this.onLongPress,
     this.onReply,
+    this.onTapSticker,
     this.onTapReply,
     this.onOpenThread,
     this.onToggleReaction,
@@ -66,6 +67,7 @@ class MessageRow extends StatefulWidget {
   final bool isHighlighted;
   final ValueChanged<MessageLongPressDetails>? onLongPress;
   final VoidCallback? onReply;
+  final VoidCallback? onTapSticker;
   final VoidCallback? onTapReply;
   final VoidCallback? onOpenThread;
   final ValueChanged<String>? onToggleReaction;
@@ -268,6 +270,7 @@ class _MessageRowState extends State<MessageRow>
             chatMessageFontSize: widget.chatMessageFontSize,
             isMe: _isMe,
             showSenderName: widget.showSenderName,
+            onTapSticker: widget.onTapSticker,
             onTapReply: widget.onTapReply,
             onOpenThread: widget.onOpenThread,
             onOpenAttachment: _openAttachment,
