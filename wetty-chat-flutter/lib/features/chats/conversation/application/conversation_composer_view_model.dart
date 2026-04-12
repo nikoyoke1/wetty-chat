@@ -920,6 +920,13 @@ class ConversationComposerViewModel
     final clientGeneratedId =
         '${DateTime.now().microsecondsSinceEpoch}-$currentUserId-${_scope.storageKey}';
     final mode = state.mode;
+    ref
+        .read(audioWaveformCacheServiceProvider)
+        .primeFromAttachmentMetadata(
+          attachmentId: uploadInfo.attachmentId,
+          duration: uploadDraft.duration,
+          samples: uploadDraft.waveformSamples,
+        );
     _repository.insertOptimisticSend(
       sender: Sender(uid: currentUserId, name: 'You'),
       text: '',

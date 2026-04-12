@@ -8,6 +8,28 @@ import 'package:chahua/features/chats/conversation/presentation/message_bubble/v
 import 'package:chahua/features/chats/models/message_models.dart';
 
 void main() {
+  group('resolveVoiceMessageDuration', () {
+    test('prefers a positive playback duration over zero metadata', () {
+      final duration = resolveVoiceMessageDuration(
+        attachmentDuration: Duration.zero,
+        playbackDuration: const Duration(seconds: 18),
+        waveformDuration: Duration.zero,
+      );
+
+      expect(duration, const Duration(seconds: 18));
+    });
+
+    test('falls back to waveform duration when metadata is unavailable', () {
+      final duration = resolveVoiceMessageDuration(
+        attachmentDuration: null,
+        playbackDuration: null,
+        waveformDuration: const Duration(seconds: 7),
+      );
+
+      expect(duration, const Duration(seconds: 7));
+    });
+  });
+
   group('voiceMessageBubbleWidthFor', () {
     test('uses metadata row width when it is wider than the waveform row', () {
       final width = voiceMessageBubbleWidthFor(

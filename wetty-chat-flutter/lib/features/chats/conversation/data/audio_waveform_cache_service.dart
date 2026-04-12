@@ -100,6 +100,24 @@ class AudioWaveformCacheService {
     return snapshot;
   }
 
+  AudioWaveformSnapshot? primeFromAttachmentMetadata({
+    required String attachmentId,
+    required Duration duration,
+    required List<int> samples,
+  }) {
+    final normalizedSamples = normalizeSampleCount(samples);
+    if (normalizedSamples.isEmpty) {
+      return null;
+    }
+
+    final snapshot = AudioWaveformSnapshot(
+      duration: duration,
+      samples: normalizedSamples,
+    );
+    _store(attachmentId, snapshot);
+    return snapshot;
+  }
+
   AudioWaveformSnapshot? _snapshotFromAttachment(AttachmentItem attachment) {
     final duration = attachment.duration;
     final samples = attachment.waveformSamples;

@@ -44,6 +44,7 @@ class _VoiceMessageBubbleState extends ConsumerState<VoiceMessageBubble> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.attachment.id != widget.attachment.id ||
         oldWidget.attachment.url != widget.attachment.url ||
+        oldWidget.attachment.durationMs != widget.attachment.durationMs ||
         oldWidget.attachment.waveformSamples !=
             widget.attachment.waveformSamples) {
       _waveformFuture = _resolveWaveform();
@@ -209,7 +210,11 @@ class _WaveformVoiceMessageBody extends ConsumerWidget {
     final phase = isActive
         ? playbackState.phase
         : VoiceMessagePlaybackPhase.idle;
-    final duration = attachment.duration ?? waveform.duration;
+    final duration = resolveVoiceMessageDuration(
+      attachmentDuration: attachment.duration,
+      playbackDuration: playbackState.durationFor(attachment.id),
+      waveformDuration: waveform.duration,
+    );
     final resolvedPosition = switch (phase) {
       VoiceMessagePlaybackPhase.completed => duration,
       _ => dragPosition ?? (isActive ? playbackState.position : Duration.zero),
@@ -588,6 +593,25 @@ Duration _positionFromDx(double dx, double width, Duration duration) {
   }
   final ratio = (dx / width).clamp(0.0, 1.0);
   return Duration(milliseconds: (duration.inMilliseconds * ratio).round());
+}
+
+@visibleForTesting
+Duration resolveVoiceMessageDuration({
+  Duration? attachmentDuration,
+  Duration? playbackDuration,
+  required Duration waveformDuration,
+}) {
+  final candidates = <Duration?>[
+    attachmentDuration,
+    playbackDuration,
+    waveformDuration,
+  ];
+  for (final candidate in candidates) {
+    if (candidate != null && candidate > Duration.zero) {
+      return candidate;
+    }
+  }
+  return attachmentDuration ?? playbackDuration ?? waveformDuration;
 }
 
 String _formatDuration(Duration? duration) {
