@@ -583,39 +583,18 @@ pub(super) async fn post_thread_message(
         state.ws_registry.broadcast_to_uids(&member_uids, ws_msg);
     }
 
-    // Broadcast ThreadUpdate to all subscribers of this thread
-    if let Ok(subscriber_uids) =
-        crate::services::threads::get_thread_subscriber_uids(conn, chat_id, thread_id)
-    {
-        if !subscriber_uids.is_empty() {
-            // Read reply_count from thread_meta (just updated above)
-            let reply_count: i64 = {
-                use crate::schema::thread_meta;
-                thread_meta::table
-                    .filter(
-                        thread_meta::chat_id
-                            .eq(chat_id)
-                            .and(thread_meta::thread_root_id.eq(thread_id)),
-                    )
-                    .select(thread_meta::reply_count)
-                    .first(conn)
-                    .unwrap_or(0)
-            };
-
-            let thread_update = std::sync::Arc::new(
-                crate::handlers::ws::messages::ServerWsMessage::ThreadUpdate(
-                    crate::handlers::ws::messages::ThreadUpdatePayload {
-                        thread_root_id: thread_id,
-                        chat_id,
-                        last_reply_at: response.created_at,
-                        reply_count,
-                    },
-                ),
-            );
-            state
-                .ws_registry
-                .broadcast_to_uids(&subscriber_uids, thread_update);
-        }
+    if let Err(err) = crate::services::threads::broadcast_thread_update_to_subscribers(
+        conn,
+        &state.ws_registry,
+        chat_id,
+        thread_id,
+    ) {
+        tracing::warn!(
+            chat_id,
+            thread_id,
+            ?err,
+            "failed to broadcast thread update to subscribers"
+        );
     }
 
     Ok((StatusCode::CREATED, Json(response)))
@@ -822,6 +801,22 @@ async fn delete_message(
         crate::handlers::ws::messages::ServerWsMessage::MessageDeleted(response.clone()),
     );
     state.ws_registry.broadcast_to_uids(&member_uids, ws_msg);
+
+    if let Some(reply_root_id) = response.reply_root_id {
+        if let Err(err) = crate::services::threads::broadcast_thread_update_to_subscribers(
+            conn,
+            &state.ws_registry,
+            chat_id,
+            reply_root_id,
+        ) {
+            tracing::warn!(
+                chat_id,
+                reply_root_id,
+                ?err,
+                "failed to broadcast thread update after reply deletion"
+            );
+        }
+    }
 
     Ok(StatusCode::NO_CONTENT)
 }

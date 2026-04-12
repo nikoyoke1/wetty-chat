@@ -20,6 +20,7 @@ pub enum ServerWsMessage {
     ReactionUpdated(ReactionUpdatePayload),
     PresenceUpdate(PresenceUpdatePayload),
     ThreadUpdate(ThreadUpdatePayload),
+    ThreadMembershipChanged(ThreadMembershipChangedPayload),
     PinAdded(PinUpdatePayload),
     PinRemoved(PinUpdatePayload),
     StickerPackOrderUpdated(StickerPackOrderUpdatePayload),
@@ -35,6 +36,7 @@ impl ServerWsMessage {
             Self::ReactionUpdated(_) => "reactionUpdated",
             Self::PresenceUpdate(_) => "presenceUpdate",
             Self::ThreadUpdate(_) => "threadUpdate",
+            Self::ThreadMembershipChanged(_) => "threadMembershipChanged",
             Self::PinAdded(_) => "pinAdded",
             Self::PinRemoved(_) => "pinRemoved",
             Self::StickerPackOrderUpdated(_) => "stickerPackOrderUpdated",
@@ -75,6 +77,17 @@ pub struct ThreadUpdatePayload {
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
+pub struct ThreadMembershipChangedPayload {
+    #[serde(with = "crate::serde_i64_string")]
+    #[schema(value_type = String)]
+    pub thread_root_id: i64,
+    #[serde(with = "crate::serde_i64_string")]
+    #[schema(value_type = String)]
+    pub chat_id: i64,
+}
+
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct PinUpdatePayload {
     #[serde(with = "crate::serde_i64_string")]
     #[schema(value_type = String)]
@@ -91,7 +104,7 @@ pub struct PinUpdatePayload {
 
 #[cfg(test)]
 mod tests {
-    use super::{PresenceUpdatePayload, ServerWsMessage};
+    use super::{PresenceUpdatePayload, ServerWsMessage, ThreadMembershipChangedPayload};
     use serde_json::json;
 
     #[test]
@@ -104,6 +117,21 @@ mod tests {
         assert_eq!(value["type"], json!("presenceUpdate"));
         assert_eq!(value["payload"]["activeConnections"], json!(3));
         assert!(value["payload"].get("active_connections").is_none());
+    }
+
+    #[test]
+    fn serializes_thread_membership_changed_as_camel_case() {
+        let value = serde_json::to_value(ServerWsMessage::ThreadMembershipChanged(
+            ThreadMembershipChangedPayload {
+                thread_root_id: 42,
+                chat_id: 7,
+            },
+        ))
+        .expect("serialize thread membership event");
+
+        assert_eq!(value["type"], json!("threadMembershipChanged"));
+        assert_eq!(value["payload"]["threadRootId"], json!("42"));
+        assert_eq!(value["payload"]["chatId"], json!("7"));
     }
 }
 

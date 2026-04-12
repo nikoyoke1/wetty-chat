@@ -179,6 +179,7 @@ pub struct ThreadSubscribePath {
 )]
 async fn subscribe_thread(
     CurrentUid(uid): CurrentUid,
+    State(state): State<AppState>,
     Path(ThreadSubscribePath {
         chat_id,
         thread_root_id,
@@ -203,7 +204,16 @@ async fn subscribe_thread(
         return Err(AppError::NotFound("Thread root message not found"));
     }
 
-    thread_svc::subscribe_to_thread(conn, chat_id, thread_root_id, uid)?;
+    let inserted = thread_svc::subscribe_to_thread(conn, chat_id, thread_root_id, uid)?;
+    if inserted {
+        thread_svc::broadcast_thread_update_to_uids(
+            conn,
+            &state.ws_registry,
+            &[uid],
+            chat_id,
+            thread_root_id,
+        )?;
+    }
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -224,6 +234,7 @@ async fn subscribe_thread(
 )]
 async fn unsubscribe_thread(
     CurrentUid(uid): CurrentUid,
+    State(state): State<AppState>,
     Path(ThreadSubscribePath {
         chat_id,
         thread_root_id,
@@ -234,7 +245,15 @@ async fn unsubscribe_thread(
 
     check_membership(conn, chat_id, uid)?;
 
-    thread_svc::unsubscribe_from_thread(conn, chat_id, thread_root_id, uid)?;
+    let removed = thread_svc::unsubscribe_from_thread(conn, chat_id, thread_root_id, uid)?;
+    if removed {
+        thread_svc::broadcast_thread_membership_changed_to_user(
+            &state.ws_registry,
+            uid,
+            chat_id,
+            thread_root_id,
+        );
+    }
 
     Ok(StatusCode::NO_CONTENT)
 }

@@ -6,6 +6,7 @@ use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::PgConnection;
 use futures::future::FutureExt;
+use std::collections::HashSet;
 use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 
@@ -177,6 +178,7 @@ fn process_bulk_delete(
 
     // 2. Chunked delete loop
     let mut total_deleted: usize = 0;
+    let mut affected_thread_ids = HashSet::new();
     loop {
         let mut query = messages::table
             .filter(dsl::chat_id.eq(chat_id))
@@ -199,6 +201,13 @@ fn process_bulk_delete(
         if batch_ids.is_empty() {
             break;
         }
+
+        let batch_thread_ids: Vec<Option<i64>> = messages::table
+            .filter(dsl::id.eq_any(&batch_ids))
+            .select(dsl::reply_root_id)
+            .load(conn)
+            .map_err(map_db)?;
+        affected_thread_ids.extend(batch_thread_ids.into_iter().flatten());
 
         let now = Utc::now();
 
@@ -237,8 +246,32 @@ fn process_bulk_delete(
         crate::handlers::chats::recalculate_group_last_message(conn, chat_id)
             .map_err(|e| format!("recalculate last message: {e:?}"))?;
 
-        if let Err(e) = crate::services::threads::recalculate_thread_meta_for_chat(conn, chat_id) {
-            warn!("recalculate thread_meta after bulk delete: {:?}", e);
+        for thread_root_id in &affected_thread_ids {
+            if let Err(e) =
+                crate::services::threads::recalculate_thread_meta(conn, chat_id, *thread_root_id)
+            {
+                warn!(
+                    chat_id,
+                    thread_root_id,
+                    ?e,
+                    "recalculate thread_meta after bulk delete"
+                );
+                continue;
+            }
+
+            if let Err(e) = crate::services::threads::broadcast_thread_update_to_subscribers(
+                conn,
+                ws_registry,
+                chat_id,
+                *thread_root_id,
+            ) {
+                warn!(
+                    chat_id,
+                    thread_root_id,
+                    ?e,
+                    "broadcast thread update after bulk delete"
+                );
+            }
         }
 
         info!(

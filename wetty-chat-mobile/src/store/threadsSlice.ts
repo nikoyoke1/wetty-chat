@@ -20,6 +20,7 @@ interface ThreadsState {
   nextCursor: string | null;
   totalUnreadCount: number;
   isLoaded: boolean;
+  subscriptionByThreadId: Record<string, boolean>;
 }
 
 const initialState: ThreadsState = {
@@ -27,6 +28,7 @@ const initialState: ThreadsState = {
   nextCursor: null,
   totalUnreadCount: 0,
   isLoaded: false,
+  subscriptionByThreadId: {},
 };
 
 const threadsSlice = createSlice({
@@ -37,6 +39,9 @@ const threadsSlice = createSlice({
       state.items = action.payload.threads.map(toStoredThread);
       state.nextCursor = action.payload.nextCursor;
       state.isLoaded = true;
+      state.subscriptionByThreadId = Object.fromEntries(
+        action.payload.threads.map((thread) => [thread.threadRootMessage.id, true]),
+      );
       state.totalUnreadCount = state.items.reduce((sum, t) => sum + (t.unreadCount ?? 0), 0);
     },
     appendThreads(state, action: PayloadAction<{ threads: ThreadListItem[]; nextCursor: string | null }>) {
@@ -46,6 +51,9 @@ const threadsSlice = createSlice({
         .map(toStoredThread);
       state.items.push(...newThreads);
       state.nextCursor = action.payload.nextCursor;
+      for (const thread of action.payload.threads) {
+        state.subscriptionByThreadId[thread.threadRootMessage.id] = true;
+      }
       state.totalUnreadCount = state.items.reduce((sum, t) => sum + (t.unreadCount ?? 0), 0);
     },
     updateThreadFromWs(state, action: PayloadAction<ThreadUpdatePayload>) {
@@ -95,8 +103,12 @@ const threadsSlice = createSlice({
       }
       state.totalUnreadCount = state.items.reduce((sum, t) => sum + (t.unreadCount ?? 0), 0);
     },
+    setThreadSubscriptionStatus(state, action: PayloadAction<{ threadRootId: string; subscribed: boolean }>) {
+      state.subscriptionByThreadId[action.payload.threadRootId] = action.payload.subscribed;
+    },
     removeThread(state, action: PayloadAction<{ threadRootId: string }>) {
       state.items = state.items.filter((t) => t.threadRootMessage.id !== action.payload.threadRootId);
+      state.subscriptionByThreadId[action.payload.threadRootId] = false;
       state.totalUnreadCount = state.items.reduce((sum, t) => sum + (t.unreadCount ?? 0), 0);
     },
     patchThreadRootMessage(
@@ -112,6 +124,7 @@ const threadsSlice = createSlice({
       state.items = [];
       state.nextCursor = null;
       state.isLoaded = false;
+      state.subscriptionByThreadId = {};
     },
   },
 });
@@ -124,6 +137,7 @@ export const {
   patchThreadCachedLastReply,
   incrementThreadUnread,
   markThreadRead,
+  setThreadSubscriptionStatus,
   removeThread,
   patchThreadRootMessage,
   clearThreads,
@@ -133,6 +147,8 @@ export const selectThreads = (state: RootState) => state.threads.items;
 export const selectThreadsLoaded = (state: RootState) => state.threads.isLoaded;
 export const selectThreadsNextCursor = (state: RootState) => state.threads.nextCursor;
 export const selectTotalUnreadThreadCount = (state: RootState) => state.threads.totalUnreadCount;
+export const selectThreadSubscriptionStatus = (state: RootState, threadRootId: string) =>
+  state.threads.subscriptionByThreadId[threadRootId] ?? null;
 export const selectShouldShowThreadsRow = (state: RootState) =>
   state.threads.totalUnreadCount > 0 || (state.threads.isLoaded && state.threads.items.length > 0);
 

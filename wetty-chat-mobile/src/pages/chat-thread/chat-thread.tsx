@@ -105,7 +105,13 @@ import {
   subscribeToThread,
   unsubscribeFromThread,
 } from '@/api/threads';
-import { markThreadRead as markThreadReadAction, removeThread, setThreadsList } from '@/store/threadsSlice';
+import {
+  markThreadRead as markThreadReadAction,
+  removeThread,
+  selectThreadSubscriptionStatus,
+  setThreadSubscriptionStatus,
+  setThreadsList,
+} from '@/store/threadsSlice';
 import { listPins, createPin, deletePin } from '@/api/pins';
 import { setPins, selectPinsForChat, selectPinsLoaded } from '@/store/pinsSlice';
 import { PinBanner } from '@/components/chat/PinBanner';
@@ -255,14 +261,26 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
   // Thread subscription state
   const [threadSubscribed, setThreadSubscribed] = useState<boolean | null>(null);
   const [threadSubLoading, setThreadSubLoading] = useState(false);
+  const syncedThreadSubscribed = useSelector((state: RootState) =>
+    threadId ? selectThreadSubscriptionStatus(state, threadId) : null,
+  );
 
   useEffect(() => {
     if (!threadId || !chatId) return;
     setThreadSubscribed(null);
     getThreadSubscriptionStatus(chatId, threadId)
-      .then((res) => setThreadSubscribed(res.data.subscribed))
+      .then((res) => {
+        setThreadSubscribed(res.data.subscribed);
+        dispatch(setThreadSubscriptionStatus({ threadRootId: threadId, subscribed: res.data.subscribed }));
+      })
       .catch(() => setThreadSubscribed(null));
-  }, [chatId, threadId]);
+  }, [chatId, threadId, dispatch]);
+
+  useEffect(() => {
+    if (syncedThreadSubscribed != null) {
+      setThreadSubscribed(syncedThreadSubscribed);
+    }
+  }, [syncedThreadSubscribed]);
 
   const handleToggleThreadSubscription = useCallback(async () => {
     if (!threadId || !chatId || threadSubscribed == null) return;
@@ -271,10 +289,12 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
       if (threadSubscribed) {
         await unsubscribeFromThread(chatId, threadId);
         setThreadSubscribed(false);
+        dispatch(setThreadSubscriptionStatus({ threadRootId: threadId, subscribed: false }));
         dispatch(removeThread({ threadRootId: threadId }));
       } else {
         await subscribeToThread(chatId, threadId);
         setThreadSubscribed(true);
+        dispatch(setThreadSubscriptionStatus({ threadRootId: threadId, subscribed: true }));
         // Refresh threads list so the newly subscribed thread appears
         getThreads({ limit: 20 })
           .then((res) => dispatch(setThreadsList({ threads: res.data.threads, nextCursor: res.data.nextCursor })))

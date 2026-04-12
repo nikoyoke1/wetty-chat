@@ -7,12 +7,17 @@ use std::collections::HashMap;
 use tracing::warn;
 
 use crate::handlers::chats::{build_mention_info, extract_mention_uids, MentionInfo};
+use crate::handlers::ws::messages::{
+    ServerWsMessage, ThreadMembershipChangedPayload, ThreadUpdatePayload,
+};
 use crate::models::{Attachment, Message, MessageType};
 use crate::schema::{attachments, messages, stickers, thread_meta, thread_subscriptions};
 use crate::services::chat::MAX_UNREAD_COUNT;
 use crate::services::media::build_public_object_url;
 use crate::services::user::{lookup_user_avatars, lookup_user_profiles};
+use crate::services::ws_registry::ConnectionRegistry;
 use crate::AppState;
+use std::sync::Arc;
 
 /// Insert a subscription if one doesn't exist (auto-subscribe on participation).
 pub fn ensure_thread_subscription(
@@ -20,8 +25,8 @@ pub fn ensure_thread_subscription(
     chat_id: i64,
     thread_root_id: i64,
     uid: i32,
-) -> Result<(), diesel::result::Error> {
-    diesel::insert_into(thread_subscriptions::table)
+) -> Result<bool, diesel::result::Error> {
+    let inserted = diesel::insert_into(thread_subscriptions::table)
         .values((
             thread_subscriptions::chat_id.eq(chat_id),
             thread_subscriptions::thread_root_id.eq(thread_root_id),
@@ -30,7 +35,7 @@ pub fn ensure_thread_subscription(
         ))
         .on_conflict_do_nothing()
         .execute(conn)?;
-    Ok(())
+    Ok(inserted > 0)
 }
 
 /// Explicit subscribe (for "Follow thread" button). Same upsert.
@@ -39,7 +44,7 @@ pub fn subscribe_to_thread(
     chat_id: i64,
     thread_root_id: i64,
     uid: i32,
-) -> Result<(), diesel::result::Error> {
+) -> Result<bool, diesel::result::Error> {
     ensure_thread_subscription(conn, chat_id, thread_root_id, uid)
 }
 
@@ -197,21 +202,92 @@ pub fn recalculate_thread_meta(
     Ok(())
 }
 
-/// Recalculate thread_meta for all threads affected by a bulk delete in a chat.
-pub fn recalculate_thread_meta_for_chat(
+pub fn build_thread_update_payload(
     conn: &mut PgConnection,
     chat_id: i64,
-) -> Result<(), diesel::result::Error> {
-    // Find all threads in this chat that have a meta row
-    let thread_ids: Vec<i64> = thread_meta::table
-        .filter(thread_meta::chat_id.eq(chat_id))
-        .select(thread_meta::thread_root_id)
-        .load(conn)?;
+    thread_root_id: i64,
+) -> Result<Option<ThreadUpdatePayload>, diesel::result::Error> {
+    let root_created_at = messages::table
+        .filter(
+            messages::id
+                .eq(thread_root_id)
+                .and(messages::chat_id.eq(chat_id)),
+        )
+        .select(messages::created_at)
+        .first::<DateTime<Utc>>(conn)
+        .optional()?;
 
-    for tid in thread_ids {
-        recalculate_thread_meta(conn, chat_id, tid)?;
+    let Some(root_created_at) = root_created_at else {
+        return Ok(None);
+    };
+
+    let meta_row = thread_meta::table
+        .filter(
+            thread_meta::chat_id
+                .eq(chat_id)
+                .and(thread_meta::thread_root_id.eq(thread_root_id)),
+        )
+        .select((thread_meta::reply_count, thread_meta::last_reply_at))
+        .first::<(i64, Option<DateTime<Utc>>)>(conn)
+        .optional()?;
+
+    let (reply_count, last_reply_at) = match meta_row {
+        Some((reply_count, last_reply_at)) => {
+            (reply_count, last_reply_at.unwrap_or(root_created_at))
+        }
+        None => (0, root_created_at),
+    };
+
+    Ok(Some(ThreadUpdatePayload {
+        thread_root_id,
+        chat_id,
+        last_reply_at,
+        reply_count,
+    }))
+}
+
+pub fn broadcast_thread_update_to_uids(
+    conn: &mut PgConnection,
+    ws_registry: &Arc<ConnectionRegistry>,
+    target_uids: &[i32],
+    chat_id: i64,
+    thread_root_id: i64,
+) -> Result<(), diesel::result::Error> {
+    if target_uids.is_empty() {
+        return Ok(());
     }
+
+    if let Some(payload) = build_thread_update_payload(conn, chat_id, thread_root_id)? {
+        let msg = Arc::new(ServerWsMessage::ThreadUpdate(payload));
+        ws_registry.broadcast_to_uids(target_uids, msg);
+    }
+
     Ok(())
+}
+
+pub fn broadcast_thread_update_to_subscribers(
+    conn: &mut PgConnection,
+    ws_registry: &Arc<ConnectionRegistry>,
+    chat_id: i64,
+    thread_root_id: i64,
+) -> Result<(), diesel::result::Error> {
+    let subscriber_uids = get_thread_subscriber_uids(conn, chat_id, thread_root_id)?;
+    broadcast_thread_update_to_uids(conn, ws_registry, &subscriber_uids, chat_id, thread_root_id)
+}
+
+pub fn broadcast_thread_membership_changed_to_user(
+    ws_registry: &Arc<ConnectionRegistry>,
+    uid: i32,
+    chat_id: i64,
+    thread_root_id: i64,
+) {
+    let msg = Arc::new(ServerWsMessage::ThreadMembershipChanged(
+        ThreadMembershipChangedPayload {
+            thread_root_id,
+            chat_id,
+        },
+    ));
+    ws_registry.broadcast_to_uids(&[uid], msg);
 }
 
 #[derive(QueryableByName)]

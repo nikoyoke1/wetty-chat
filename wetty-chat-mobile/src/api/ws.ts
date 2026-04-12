@@ -3,11 +3,17 @@ import { syncApp } from '@/api/sync';
 import type { MessageResponse, ReactionSummary } from '@/api/messages';
 import { setActiveConnections, setWsConnected } from '@/store/connectionSlice';
 import { selectEffectiveLocale } from '@/store/settingsSlice';
-import { updateThreadFromWs, setThreadsList, type ThreadUpdatePayload } from '@/store/threadsSlice';
+import {
+  removeThread,
+  setThreadSubscriptionStatus,
+  setThreadsList,
+  updateThreadFromWs,
+  type ThreadUpdatePayload,
+} from '@/store/threadsSlice';
 import { addPin, removePin } from '@/store/pinsSlice';
 import { replaceStickerPackOrderFromWs } from '@/store/stickerPreferencesSlice';
 import type { PinResponse } from '@/api/pins';
-import { getThreads } from '@/api/threads';
+import { getThreadSubscriptionStatus, getThreads } from '@/api/threads';
 import store from '@/store/index';
 import {
   messageAdded,
@@ -46,6 +52,11 @@ interface PingMessage {
 interface AppStateMessage {
   type: 'appState';
   state: WebSocketAppState;
+}
+
+interface ThreadMembershipChangedPayload {
+  chatId: string;
+  threadRootId: string;
 }
 
 const STABLE_CONNECTION_MS = 5_000;
@@ -246,6 +257,14 @@ function handleWsMessage(payload: unknown): void {
   }
 }
 
+function refreshThreadsList(): void {
+  getThreads({ limit: 20 })
+    .then((res) => {
+      store.dispatch(setThreadsList({ threads: res.data.threads, nextCursor: res.data.nextCursor }));
+    })
+    .catch((err) => console.error('Failed to refresh threads list from websocket event', err));
+}
+
 function sendJson(message: AuthMessage | PingMessage | AppStateMessage): void {
   if (ws?.readyState !== WebSocket.OPEN) return;
   ws.send(JSON.stringify(message));
@@ -433,15 +452,39 @@ async function connectWebSocket(): Promise<void> {
           if (payload.threadRootId && payload.chatId) {
             const threadsState = store.getState().threads;
             const alreadyKnown = threadsState.items.some((t) => t.threadRootMessage.id === payload.threadRootId);
+            store.dispatch(setThreadSubscriptionStatus({ threadRootId: payload.threadRootId, subscribed: true }));
             store.dispatch(updateThreadFromWs(payload));
             if (!alreadyKnown && threadsState.isLoaded) {
-              getThreads({ limit: 20 })
-                .then((res) => {
-                  store.dispatch(setThreadsList({ threads: res.data.threads, nextCursor: res.data.nextCursor }));
-                })
-                .catch((err) => console.error('Failed to refresh threads after new subscription', err));
+              refreshThreadsList();
             }
           }
+          return;
+        }
+
+        if (message.type === 'threadMembershipChanged' && message.payload != null) {
+          const payload = message.payload as ThreadMembershipChangedPayload;
+          if (payload.threadRootId && payload.chatId) {
+            getThreadSubscriptionStatus(payload.chatId, payload.threadRootId)
+              .then((res) => {
+                store.dispatch(
+                  setThreadSubscriptionStatus({
+                    threadRootId: payload.threadRootId,
+                    subscribed: res.data.subscribed,
+                  }),
+                );
+
+                if (!res.data.subscribed) {
+                  store.dispatch(removeThread({ threadRootId: payload.threadRootId }));
+                  return;
+                }
+
+                if (store.getState().threads.isLoaded) {
+                  refreshThreadsList();
+                }
+              })
+              .catch((err) => console.error('Failed to refresh thread membership after websocket event', err));
+          }
+          return;
         }
 
         if (message.type === 'stickerPackOrderUpdated' && message.payload != null) {
