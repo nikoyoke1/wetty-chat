@@ -543,6 +543,12 @@ class _ConversationComposerBarState
     if (_activeAudioPointerId != null) {
       return;
     }
+    if (widget.isStickerPickerOpen) {
+      widget.onToggleStickerPicker?.call();
+    }
+    if (_isAttachmentPanelOpen) {
+      _closeAttachmentMenu();
+    }
     _activeAudioPointerId = event.pointer;
     _audioPointerOrigin = event.position;
     setState(() {
@@ -785,10 +791,6 @@ class _ConversationComposerBarState
                                           _inputScrollController,
                                       snapPosition: _audioSnapPosition,
                                       fieldMinHeight: _composerFieldMinHeight,
-                                      onTextFieldTap: widget.isStickerPickerOpen
-                                          ? () => widget.onToggleStickerPicker
-                                                ?.call()
-                                          : null,
                                       onRemoveAttachment: (localId) {
                                         ref
                                             .read(
@@ -816,6 +818,10 @@ class _ConversationComposerBarState
                                             )
                                             .cancelAudioRecording();
                                       },
+                                      onToggleStickerPicker:
+                                          _toggleStickerPicker,
+                                      isStickerPickerOpen:
+                                          widget.isStickerPickerOpen,
                                       onDraftChanged: (value) {
                                         unawaited(
                                           ref
@@ -827,24 +833,6 @@ class _ConversationComposerBarState
                                               .updateDraft(value),
                                         );
                                       },
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    width: 32,
-                                    height: 36,
-                                    child: CupertinoButton(
-                                      padding: const EdgeInsets.only(right: 4),
-                                      minimumSize: const Size(32, 36),
-                                      onPressed: _toggleStickerPicker,
-                                      child: Icon(
-                                        CupertinoIcons.smiley,
-                                        color: widget.isStickerPickerOpen
-                                            ? CupertinoColors.activeBlue
-                                                  .resolveFrom(context)
-                                            : CupertinoColors.systemGrey
-                                                  .resolveFrom(context),
-                                        size: 24,
-                                      ),
                                     ),
                                   ),
                                 ],

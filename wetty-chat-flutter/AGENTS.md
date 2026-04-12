@@ -16,6 +16,7 @@ You are an expert Flutter and Dart developer. Your goal is to build beautiful, p
 * **Immutability:** Prefer immutable data structures. Widgets (especially `StatelessWidget`) should be immutable.
 * **State Management:** Separate ephemeral state and app state. Use a state management solution for app state.
 * **Widgets are for UI:** Everything in Flutter's UI is a widget. Compose complex UIs from smaller, reusable widgets.
+* **Widgets vs build helper:** We prefer creating small widgets and compose them over a huge monolithic widget with helper build methods
 
 ## Package Management
 * **Pub Tool:** Use `pub` or `flutter pub add`.

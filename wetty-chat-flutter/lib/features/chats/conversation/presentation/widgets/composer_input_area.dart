@@ -3,13 +3,14 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show CircularProgressIndicator;
 
-import '../../../../../app/theme/style_config.dart';
-import '../../../../../l10n/app_localizations.dart';
 import '../../../models/message_preview_formatter.dart';
 import '../../application/conversation_composer_view_model.dart';
 import '../../data/attachment_picker_service.dart';
 import '../../domain/conversation_message.dart';
+import '../../../../../app/theme/style_config.dart';
+import '../../../../../l10n/app_localizations.dart';
 import 'composer_audio_controls.dart';
+import 'composer_content_row.dart';
 
 class ComposerInputArea extends StatelessWidget {
   const ComposerInputArea({
@@ -24,7 +25,8 @@ class ComposerInputArea extends StatelessWidget {
     required this.onRemoveAttachment,
     required this.onRetryAttachment,
     required this.onDeleteAudioDraft,
-    this.onTextFieldTap,
+    required this.onToggleStickerPicker,
+    required this.isStickerPickerOpen,
   });
 
   final ConversationComposerState composer;
@@ -37,30 +39,11 @@ class ComposerInputArea extends StatelessWidget {
   final ValueChanged<String> onRemoveAttachment;
   final Future<void> Function(String localId) onRetryAttachment;
   final Future<void> Function() onDeleteAudioDraft;
-  final VoidCallback? onTextFieldTap;
-
-  bool get _isRecordingPhase {
-    final draft = composer.audioDraft;
-    if (draft == null) {
-      return false;
-    }
-    return draft.phase == ComposerAudioDraftPhase.requestingPermission ||
-        draft.phase == ComposerAudioDraftPhase.recording;
-  }
-
-  bool get _isSavedDraftPhase {
-    final draft = composer.audioDraft;
-    if (draft == null) {
-      return false;
-    }
-    return draft.phase == ComposerAudioDraftPhase.recorded ||
-        draft.phase == ComposerAudioDraftPhase.uploading;
-  }
+  final VoidCallback onToggleStickerPicker;
+  final bool isStickerPickerOpen;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -70,42 +53,18 @@ class ComposerInputArea extends StatelessWidget {
             onRemoveAttachment: onRemoveAttachment,
             onRetryAttachment: onRetryAttachment,
           ),
-        ConstrainedBox(
-          constraints: BoxConstraints(minHeight: fieldMinHeight),
-          child: _isRecordingPhase
-              ? VoiceDraftPanel(
-                  draft: composer.audioDraft!,
-                  snapPosition: snapPosition,
-                  onDelete: null,
-                  showDelete: false,
-                )
-              : _isSavedDraftPhase
-              ? VoiceDraftPanel(
-                  draft: composer.audioDraft!,
-                  snapPosition: snapPosition,
-                  onDelete: composer.hasUploadingAudioDraft
-                      ? null
-                      : () => unawaited(onDeleteAudioDraft()),
-                  showDelete: true,
-                )
-              : CupertinoScrollbar(
-                  controller: inputScrollController,
-                  child: CupertinoTextField(
-                    controller: textController,
-                    focusNode: focusNode,
-                    scrollController: inputScrollController,
-                    onChanged: onDraftChanged,
-                    onTap: onTextFieldTap,
-                    placeholder: l10n.message,
-                    maxLines: 5,
-                    minLines: 1,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: null,
-                  ),
-                ),
+        ComposerContentRow(
+          composer: composer,
+          textController: textController,
+          focusNode: focusNode,
+          inputScrollController: inputScrollController,
+          snapPosition: snapPosition,
+          fieldMinHeight: fieldMinHeight,
+          onDraftChanged: onDraftChanged,
+          onDeleteAudioDraft: onDeleteAudioDraft,
+          onToggleStickerPicker: onToggleStickerPicker,
+          isStickerPickerOpen: isStickerPickerOpen,
+          onTextFieldTap: isStickerPickerOpen ? onToggleStickerPicker : null,
         ),
       ],
     );
