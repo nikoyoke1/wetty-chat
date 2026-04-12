@@ -1,10 +1,20 @@
-import 'package:flutter/cupertino.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'dart:async';
 
+import 'package:dio/dio.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:chahua/core/providers/shared_preferences_provider.dart';
 import 'package:chahua/features/chats/conversation/domain/conversation_message.dart';
 import 'package:chahua/features/chats/conversation/domain/conversation_scope.dart';
+import 'package:chahua/features/chats/conversation/data/audio_playback_driver.dart';
+import 'package:chahua/features/chats/conversation/data/audio_source_resolver_service.dart';
+import 'package:chahua/features/chats/conversation/presentation/message_overlay.dart';
 import 'package:chahua/features/chats/conversation/presentation/message_bubble/message_bubble_presentation.dart';
 import 'package:chahua/features/chats/conversation/presentation/message_bubble/voice_message_bubble.dart';
+import 'package:chahua/features/chats/conversation/presentation/message_row.dart';
 import 'package:chahua/features/chats/models/message_models.dart';
 
 void main() {
@@ -99,6 +109,218 @@ void main() {
         expect(outgoingWidth, greaterThanOrEqualTo(incomingWidth));
       },
     );
+
+    testWidgets('renders the sender header when enabled', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final message = _buildMessage(isMe: false);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            sharedPreferencesProvider.overrideWithValue(prefs),
+            audioPlaybackDriverProvider.overrideWithValue(
+              _FakeAudioPlaybackDriver(),
+            ),
+            audioSourceResolverServiceProvider.overrideWithValue(
+              AudioSourceResolverService(Dio(), prefs),
+            ),
+          ],
+          child: CupertinoApp(
+            home: CupertinoPageScaffold(
+              child: MediaQuery(
+                data: const MediaQueryData(size: Size(390, 844)),
+                child: Builder(
+                  builder: (context) {
+                    final presentation = MessageBubblePresentation.fromContext(
+                      context: context,
+                      message: message,
+                      isMe: false,
+                      chatMessageFontSize: 16,
+                    );
+
+                    return Center(
+                      child: VoiceMessageBubble(
+                        attachment: message.attachments.first,
+                        isMe: false,
+                        showSenderName: true,
+                        message: message,
+                        presentation: presentation,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Other'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('audio overlay expands for long sender names', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final message = _buildMessage(
+        isMe: false,
+        senderName: 'Very Long Sender Name For Audio Overlay',
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            sharedPreferencesProvider.overrideWithValue(prefs),
+            audioPlaybackDriverProvider.overrideWithValue(
+              _FakeAudioPlaybackDriver(),
+            ),
+            audioSourceResolverServiceProvider.overrideWithValue(
+              AudioSourceResolverService(Dio(), prefs),
+            ),
+          ],
+          child: CupertinoApp(
+            home: CupertinoPageScaffold(
+              child: MediaQuery(
+                data: const MediaQueryData(size: Size(390, 844)),
+                child: Builder(
+                  builder: (context) {
+                    final presentation = MessageBubblePresentation.fromContext(
+                      context: context,
+                      message: message,
+                      isMe: false,
+                      chatMessageFontSize: 16,
+                    );
+
+                    return Center(
+                      child: VoiceMessageBubble(
+                        attachment: message.attachments.first,
+                        isMe: false,
+                        showSenderName: false,
+                        message: message,
+                        presentation: presentation,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final originalSize = tester.getSize(find.byType(VoiceMessageBubble));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            sharedPreferencesProvider.overrideWithValue(prefs),
+            audioPlaybackDriverProvider.overrideWithValue(
+              _FakeAudioPlaybackDriver(),
+            ),
+            audioSourceResolverServiceProvider.overrideWithValue(
+              AudioSourceResolverService(Dio(), prefs),
+            ),
+          ],
+          child: CupertinoApp(
+            home: CupertinoPageScaffold(
+              child: MediaQuery(
+                data: const MediaQueryData(size: Size(390, 844)),
+                child: SizedBox.expand(
+                  child: MessageOverlay(
+                    details: MessageLongPressDetails(
+                      message: message,
+                      bubbleRect: Rect.fromLTWH(
+                        40,
+                        120,
+                        originalSize.width,
+                        originalSize.height,
+                      ),
+                      isMe: false,
+                      sourceShowsSenderName: false,
+                    ),
+                    visible: true,
+                    chatMessageFontSize: 16,
+                    actions: [
+                      MessageOverlayAction(label: 'Reply', onPressed: () {}),
+                    ],
+                    quickReactionEmojis: const <String>['👍'],
+                    onDismiss: () {},
+                    onToggleReaction: (_) {},
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final overlayWidth = tester
+          .getSize(find.byType(VoiceMessageBubble))
+          .width;
+      expect(overlayWidth, greaterThanOrEqualTo(originalSize.width));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('audio overlay shows thread info', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final message = _buildMessage(
+        isMe: false,
+        threadInfo: const ThreadInfo(replyCount: 4),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            sharedPreferencesProvider.overrideWithValue(prefs),
+            audioPlaybackDriverProvider.overrideWithValue(
+              _FakeAudioPlaybackDriver(),
+            ),
+            audioSourceResolverServiceProvider.overrideWithValue(
+              AudioSourceResolverService(Dio(), prefs),
+            ),
+          ],
+          child: CupertinoApp(
+            home: CupertinoPageScaffold(
+              child: MediaQuery(
+                data: const MediaQueryData(size: Size(390, 844)),
+                child: Builder(
+                  builder: (context) {
+                    final presentation = MessageBubblePresentation.fromContext(
+                      context: context,
+                      message: message,
+                      isMe: false,
+                      chatMessageFontSize: 16,
+                    );
+
+                    return Center(
+                      child: VoiceMessageBubble(
+                        attachment: message.attachments.first,
+                        isMe: false,
+                        showSenderName: false,
+                        showThreadIndicator: true,
+                        message: message,
+                        presentation: presentation,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('4 replies'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
   });
 }
 
@@ -118,13 +340,20 @@ Future<void> _pumpMeasurementApp({
   );
 }
 
-ConversationMessage _buildMessage({required bool isMe}) {
+ConversationMessage _buildMessage({
+  required bool isMe,
+  String? senderName,
+  ThreadInfo? threadInfo,
+}) {
   return ConversationMessage(
     scope: const ConversationScope.chat(chatId: 'chat-1'),
     serverMessageId: isMe ? 42 : 7,
     localMessageId: null,
     clientGeneratedId: 'client-id',
-    sender: Sender(uid: isMe ? 1 : 2, name: isMe ? 'Me' : 'Other'),
+    sender: Sender(
+      uid: isMe ? 1 : 2,
+      name: senderName ?? (isMe ? 'Me' : 'Other'),
+    ),
     message: null,
     messageType: 'audio',
     sticker: null,
@@ -147,6 +376,43 @@ ConversationMessage _buildMessage({required bool isMe}) {
     ],
     reactions: const <ReactionSummary>[],
     mentions: const <MentionInfo>[],
-    threadInfo: null,
+    threadInfo: threadInfo,
   );
+}
+
+class _FakeAudioPlaybackDriver implements AudioPlaybackDriver {
+  final StreamController<AudioPlaybackStatus> _statusController =
+      StreamController<AudioPlaybackStatus>.broadcast();
+
+  @override
+  Stream<AudioPlaybackStatus> get statusStream => _statusController.stream;
+
+  @override
+  AudioPlaybackStatus get currentStatus => const AudioPlaybackStatus(
+    phase: AudioPlaybackDriverPhase.idle,
+    isPlaying: false,
+    position: Duration.zero,
+    bufferedPosition: Duration.zero,
+  );
+
+  @override
+  Future<void> dispose() => _statusController.close();
+
+  @override
+  Future<void> pause() async {}
+
+  @override
+  Future<void> play() async {}
+
+  @override
+  Future<void> seek(Duration position) async {}
+
+  @override
+  Future<Duration?> setSourceFilePath(String path) async => Duration.zero;
+
+  @override
+  Future<Duration?> setSourceUrl(String url) async => Duration.zero;
+
+  @override
+  Future<void> stop() async {}
 }

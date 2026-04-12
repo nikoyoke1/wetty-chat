@@ -1,6 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-
 import '../../domain/conversation_message.dart';
 import '../../../../../app/theme/style_config.dart';
 import '../../../models/message_models.dart';
@@ -12,6 +10,7 @@ import 'linkified_message_text.dart';
 import 'message_bubble_meta.dart';
 import 'message_bubble_presentation.dart';
 import 'message_reactions.dart';
+import 'message_sender_header.dart';
 import 'sticker_image_widget.dart';
 import 'message_thread_indicator.dart';
 import 'voice_message_bubble.dart';
@@ -24,6 +23,7 @@ class MessageBubbleContent extends StatelessWidget {
     required this.chatMessageFontSize,
     required this.isMe,
     required this.showSenderName,
+    required this.showThreadIndicator,
     required this.currentUserId,
     this.onTapReply,
     this.onOpenThread,
@@ -37,6 +37,7 @@ class MessageBubbleContent extends StatelessWidget {
   final double chatMessageFontSize;
   final bool isMe;
   final bool showSenderName;
+  final bool showThreadIndicator;
   final int? currentUserId;
   final VoidCallback? onTapReply;
   final VoidCallback? onOpenThread;
@@ -68,17 +69,29 @@ class MessageBubbleContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasAttachments = message.attachments.isNotEmpty;
-    final contentChildren = <Widget>[
-      if (showSenderName) _buildSenderHeader(context),
-      if (message.replyToMessage != null)
+    final contentChildren = <Widget>[];
+
+    if (showSenderName) {
+      contentChildren.add(_buildSenderHeader(context));
+      contentChildren.add(
+        const SizedBox(height: MessageBubblePresentation.senderHeaderBodyGap),
+      );
+    }
+
+    if (message.replyToMessage != null) {
+      contentChildren.add(
         GestureDetector(
           onTap: onTapReply,
           child: _buildReplyQuote(context, message.replyToMessage!),
         ),
-    ];
+      );
+    }
 
     // deleted message
     if (message.isDeleted) {
+      if (contentChildren.isNotEmpty) {
+        contentChildren.add(const SizedBox(height: 4));
+      }
       contentChildren.add(
         Text(
           '[Deleted]',
@@ -107,7 +120,8 @@ class MessageBubbleContent extends StatelessWidget {
       );
     }
 
-    if (contentChildren.isNotEmpty) {
+    if (contentChildren.isNotEmpty &&
+        (message.replyToMessage != null || hasAttachments)) {
       contentChildren.add(const SizedBox(height: 4));
     }
     contentChildren.add(_buildMessageBody(context));
@@ -115,7 +129,7 @@ class MessageBubbleContent extends StatelessWidget {
     final threadInfo = message.threadInfo;
     if (threadInfo != null &&
         threadInfo.replyCount > 0 &&
-        onOpenThread != null) {
+        (showThreadIndicator || onOpenThread != null)) {
       contentChildren.add(const SizedBox(height: 4));
       contentChildren.add(
         MessageThreadIndicator(
@@ -140,49 +154,10 @@ class MessageBubbleContent extends StatelessWidget {
   }
 
   Widget _buildSenderHeader(BuildContext context) {
-    final gender = message.sender.gender;
-    const String maleBadgeSvg =
-        '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M896.35739 415.483806V127.690194h-287.794636l107.116623 107.116623-108.319007 108.316961c-49.568952-34.997072-110.052488-55.56348-175.344541-55.56348-168.101579 0-304.374242 136.273686-304.374242 304.374242s136.273686 304.374242 304.374242 304.374243S736.390072 760.03612 736.390072 591.93454c0-61.631686-18.3356-118.972649-49.824779-166.901241L796.238135 315.365574l100.119255 100.118232zM432.015829 800.190655c-115.015523 0-208.256114-93.240591-208.256115-208.256115s93.240591-208.256114 208.256115-208.256114 208.256114 93.240591 208.256114 208.256114-93.240591 208.256114-208.256114 208.256115z" fill="#CCCCCC"/></svg>';
-    const String femaleBadgeSvg =
-        '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M815.562249 368.20706c0-167.652348-135.909389-303.56276-303.562761-303.562761S208.436728 200.554712 208.436728 368.20706c0 151.34187 110.7555 276.800233 255.632121 299.782667v67.687612H304.299029v95.862301h159.76982v127.816061h95.862302V831.53964h159.76982v-95.862301H559.930127v-67.687612c144.875598-22.982434 255.632121-148.440797 255.632122-299.782667z m-511.26322 0c0-114.708532 92.991927-207.700459 207.700459-207.700459s207.700459 92.991927 207.700459 207.700459-92.991927 207.700459-207.700459 207.700459-207.700459-92.991927-207.700459-207.700459z" fill="#CCCCCC"/></svg>';
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Flexible(
-            child: Text(
-              presentation.senderName,
-              style: _bubbleStyle(
-                context,
-                fontWeight: FontWeight.w700,
-                fontSize: AppFontSizes.body,
-                color: presentation.textColor,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          if (gender == 1 || gender == 2) ...[
-            const SizedBox(width: 4),
-            Opacity(
-              opacity: 0.9,
-              child: SvgPicture.string(
-                gender == 1 ? maleBadgeSvg : femaleBadgeSvg,
-                width: 11,
-                height: 11,
-                colorFilter: ColorFilter.mode(
-                  gender == 1
-                      ? const Color(0xFF4A90E2)
-                      : const Color(0xFFE86DA8),
-                  BlendMode.srcIn,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
+    return MessageSenderHeader(
+      senderName: presentation.senderName,
+      textColor: presentation.textColor,
+      gender: message.sender.gender,
     );
   }
 

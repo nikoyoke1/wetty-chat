@@ -11,6 +11,8 @@ import '../../domain/conversation_message.dart';
 import '../../../models/message_models.dart';
 import 'message_bubble_meta.dart';
 import 'message_bubble_presentation.dart';
+import 'message_sender_header.dart';
+import 'message_thread_indicator.dart';
 import 'voice_message_bubble_fallback.dart';
 
 class VoiceMessageBubble extends ConsumerStatefulWidget {
@@ -18,12 +20,16 @@ class VoiceMessageBubble extends ConsumerStatefulWidget {
     super.key,
     required this.attachment,
     required this.isMe,
+    this.showSenderName = false,
+    this.showThreadIndicator = false,
     this.message,
     this.presentation,
   });
 
   final AttachmentItem attachment;
   final bool isMe;
+  final bool showSenderName;
+  final bool showThreadIndicator;
   final ConversationMessage? message;
   final MessageBubblePresentation? presentation;
 
@@ -43,6 +49,8 @@ class _VoiceMessageBubbleState extends ConsumerState<VoiceMessageBubble> {
     return presentationAsync.when(
       loading: () => _UnavailableVoiceMessageBody(
         isMe: widget.isMe,
+        showSenderName: widget.showSenderName,
+        showThreadIndicator: widget.showThreadIndicator,
         message: widget.message,
         presentation: widget.presentation,
         statusText: 'Preparing audio...',
@@ -50,6 +58,8 @@ class _VoiceMessageBubbleState extends ConsumerState<VoiceMessageBubble> {
       ),
       error: (_, _) => _UnavailableVoiceMessageBody(
         isMe: widget.isMe,
+        showSenderName: widget.showSenderName,
+        showThreadIndicator: widget.showThreadIndicator,
         message: widget.message,
         presentation: widget.presentation,
         statusText: 'Audio is not playable.',
@@ -73,6 +83,8 @@ class _VoiceMessageBubbleState extends ConsumerState<VoiceMessageBubble> {
           }
           return _UnavailableVoiceMessageBody(
             isMe: widget.isMe,
+            showSenderName: widget.showSenderName,
+            showThreadIndicator: widget.showThreadIndicator,
             message: widget.message,
             presentation: widget.presentation,
             statusText: 'Audio is not playable.',
@@ -86,6 +98,8 @@ class _VoiceMessageBubbleState extends ConsumerState<VoiceMessageBubble> {
         return _WaveformVoiceMessageBody(
           attachment: widget.attachment,
           isMe: widget.isMe,
+          showSenderName: widget.showSenderName,
+          showThreadIndicator: widget.showThreadIndicator,
           message: widget.message,
           presentation: widget.presentation,
           waveform: waveform,
@@ -111,6 +125,8 @@ class _VoiceMessageBubbleState extends ConsumerState<VoiceMessageBubble> {
 class _UnavailableVoiceMessageBody extends StatelessWidget {
   const _UnavailableVoiceMessageBody({
     required this.isMe,
+    required this.showSenderName,
+    required this.showThreadIndicator,
     required this.message,
     required this.presentation,
     required this.statusText,
@@ -118,6 +134,8 @@ class _UnavailableVoiceMessageBody extends StatelessWidget {
   });
 
   final bool isMe;
+  final bool showSenderName;
+  final bool showThreadIndicator;
   final ConversationMessage? message;
   final MessageBubblePresentation? presentation;
   final String statusText;
@@ -144,6 +162,17 @@ class _UnavailableVoiceMessageBody extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (showSenderName && message != null && presentation != null)
+            Padding(
+              padding: const EdgeInsets.only(
+                bottom: MessageBubblePresentation.senderHeaderBodyGap,
+              ),
+              child: MessageSenderHeader(
+                senderName: presentation!.senderName,
+                textColor: presentation!.textColor,
+                gender: message!.sender.gender,
+              ),
+            ),
           Row(
             children: [
               SizedBox(width: 32, height: 32, child: Center(child: icon)),
@@ -171,6 +200,16 @@ class _UnavailableVoiceMessageBody extends StatelessWidget {
                 ),
               ],
             ),
+            if (showThreadIndicator &&
+                message!.threadInfo != null &&
+                message!.threadInfo!.replyCount > 0) ...[
+              const SizedBox(height: 4),
+              MessageThreadIndicator(
+                threadInfo: message!.threadInfo!,
+                isMe: isMe,
+                presentation: presentation!,
+              ),
+            ],
           ],
         ],
       ),
@@ -182,6 +221,8 @@ class _WaveformVoiceMessageBody extends ConsumerWidget {
   const _WaveformVoiceMessageBody({
     required this.attachment,
     required this.isMe,
+    required this.showSenderName,
+    required this.showThreadIndicator,
     required this.message,
     required this.presentation,
     required this.waveform,
@@ -194,6 +235,8 @@ class _WaveformVoiceMessageBody extends ConsumerWidget {
 
   final AttachmentItem attachment;
   final bool isMe;
+  final bool showSenderName;
+  final bool showThreadIndicator;
   final ConversationMessage? message;
   final MessageBubblePresentation? presentation;
   final AudioWaveformSnapshot waveform;
@@ -269,118 +312,147 @@ class _WaveformVoiceMessageBody extends ConsumerWidget {
       maxBubbleWidth: presentation?.maxBubbleWidth,
     );
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: canPlay ? () => controller.togglePlayback(attachment) : null,
-      child: Container(
-        width: bubbleWidth,
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        decoration: BoxDecoration(
-          color: bubbleColor,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: buttonBackground,
-                    shape: BoxShape.circle,
-                  ),
-                  child: CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size.square(32),
-                    onPressed: canPlay
-                        ? () => controller.togglePlayback(attachment)
-                        : null,
-                    child: _PlaybackIcon(phase: phase, iconColor: accent),
-                  ),
+    return Container(
+      width: bubbleWidth,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: bubbleColor,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (showSenderName && message != null && presentation != null)
+            Padding(
+              padding: const EdgeInsets.only(
+                bottom: MessageBubblePresentation.senderHeaderBodyGap,
+              ),
+              child: MessageSenderHeader(
+                senderName: presentation!.senderName,
+                textColor: presentation!.textColor,
+                gender: message!.sender.gender,
+              ),
+            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: buttonBackground,
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(width: 10),
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onHorizontalDragStart: !canPlay
-                      ? null
-                      : (details) {
-                          onPreviewSeek(
-                            _positionFromDx(
-                              details.localPosition.dx,
-                              waveformWidth,
-                              duration,
-                            ),
-                          );
-                        },
-                  onHorizontalDragUpdate: !canPlay
-                      ? null
-                      : (details) {
-                          onPreviewSeek(
-                            _positionFromDx(
-                              details.localPosition.dx,
-                              waveformWidth,
-                              duration,
-                            ),
-                          );
-                        },
-                  onHorizontalDragEnd: !canPlay || dragPosition == null
-                      ? null
-                      : (_) async {
-                          final target = dragPosition!;
-                          onCommitSeek();
-                          await controller.playFromPosition(attachment, target);
-                        },
-                  onHorizontalDragCancel: onCommitSeek,
-                  child: SizedBox(
-                    height: 32,
-                    width: waveformWidth,
-                    child: CustomPaint(
-                      painter: _WaveformPainter(
-                        samples: visibleSamples,
-                        progress: progress,
-                        activeColor: accent,
-                        inactiveColor: inactiveWaveformColor,
-                      ),
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size.square(32),
+                  onPressed: canPlay
+                      ? () => controller.togglePlayback(attachment)
+                      : null,
+                  child: _PlaybackIcon(phase: phase, iconColor: accent),
+                ),
+              ),
+              const SizedBox(width: 10),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTapDown: !canPlay
+                    ? null
+                    : (details) async {
+                        final target = _positionFromDx(
+                          details.localPosition.dx,
+                          waveformWidth,
+                          duration,
+                        );
+                        await controller.playFromPosition(attachment, target);
+                      },
+                onHorizontalDragStart: !canPlay
+                    ? null
+                    : (details) {
+                        onPreviewSeek(
+                          _positionFromDx(
+                            details.localPosition.dx,
+                            waveformWidth,
+                            duration,
+                          ),
+                        );
+                      },
+                onHorizontalDragUpdate: !canPlay
+                    ? null
+                    : (details) {
+                        onPreviewSeek(
+                          _positionFromDx(
+                            details.localPosition.dx,
+                            waveformWidth,
+                            duration,
+                          ),
+                        );
+                      },
+                onHorizontalDragEnd: !canPlay || dragPosition == null
+                    ? null
+                    : (_) async {
+                        final target = dragPosition!;
+                        onCommitSeek();
+                        await controller.playFromPosition(attachment, target);
+                      },
+                onHorizontalDragCancel: onCommitSeek,
+                child: SizedBox(
+                  height: 32,
+                  width: waveformWidth,
+                  child: CustomPaint(
+                    painter: _WaveformPainter(
+                      samples: visibleSamples,
+                      progress: progress,
+                      activeColor: accent,
+                      inactiveColor: inactiveWaveformColor,
                     ),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    secondaryText,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style:
-                        appSecondaryTextStyle(
-                          context,
-                          fontSize: AppFontSizes.meta,
-                        ).copyWith(
-                          color: phase == VoiceMessagePlaybackPhase.error
-                              ? CupertinoColors.systemRed.resolveFrom(context)
-                              : metaColor,
-                        ),
-                  ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  secondaryText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style:
+                      appSecondaryTextStyle(
+                        context,
+                        fontSize: AppFontSizes.meta,
+                      ).copyWith(
+                        color: phase == VoiceMessagePlaybackPhase.error
+                            ? CupertinoColors.systemRed.resolveFrom(context)
+                            : metaColor,
+                      ),
                 ),
-                if (message != null && presentation != null) ...[
-                  const SizedBox(width: 8),
-                  MessageBubbleMeta(
-                    message: message!,
-                    presentation: presentation!,
-                    isMe: isMe,
-                  ),
-                ],
+              ),
+              if (message != null && presentation != null) ...[
+                const SizedBox(width: 8),
+                MessageBubbleMeta(
+                  message: message!,
+                  presentation: presentation!,
+                  isMe: isMe,
+                ),
               ],
+            ],
+          ),
+          if (showThreadIndicator &&
+              message != null &&
+              presentation != null &&
+              message!.threadInfo != null &&
+              message!.threadInfo!.replyCount > 0) ...[
+            const SizedBox(height: 4),
+            MessageThreadIndicator(
+              threadInfo: message!.threadInfo!,
+              isMe: isMe,
+              presentation: presentation!,
             ),
           ],
-        ),
+        ],
       ),
     );
   }

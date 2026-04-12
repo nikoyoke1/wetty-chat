@@ -7,6 +7,8 @@ import '../../models/message_models.dart';
 import '../../models/message_preview_formatter.dart';
 import '../domain/conversation_message.dart';
 import 'message_bubble/message_bubble_presentation.dart';
+import 'message_bubble/message_sender_header.dart';
+import 'message_bubble/message_thread_indicator.dart';
 
 class MessageOverlayPreview extends StatelessWidget {
   const MessageOverlayPreview({
@@ -22,11 +24,12 @@ class MessageOverlayPreview extends StatelessWidget {
   static const double _horizontalPadding = 12;
   static const double _verticalPadding = 8;
   static const double _lineHeight = 1.28;
-  static const double _senderHeaderGap = 4;
   static const double _replyGap = 6;
   static const double _replyBlockHeight = 36;
   static const double _attachmentChipHeight = 32;
   static const double _attachmentGap = 6;
+  static const double _threadIndicatorGap = 4;
+  static const double _threadIndicatorHeight = 52;
 
   final ConversationMessage message;
   final MessageBubblePresentation presentation;
@@ -64,9 +67,14 @@ class MessageOverlayPreview extends StatelessWidget {
           var usedHeight = 0.0;
           final children = <Widget>[];
 
-          if (!isMe && showSenderName) {
+          if (showSenderName) {
             children.add(_buildSenderHeader(context));
-            usedHeight += chatMessageFontSize + _senderHeaderGap;
+            children.add(
+              const SizedBox(
+                height: MessageBubblePresentation.senderHeaderBodyGap,
+              ),
+            );
+            usedHeight += MessageBubblePresentation.senderHeaderReservedHeight;
           }
 
           final reply = message.replyToMessage;
@@ -84,8 +92,27 @@ class MessageOverlayPreview extends StatelessWidget {
             usedHeight += _attachmentChipHeight + _attachmentGap;
           }
 
-          final remainingHeight = math.max(0.0, contentHeight - usedHeight);
+          final threadInfo = message.threadInfo;
+          final showsThreadIndicator =
+              threadInfo != null &&
+              threadInfo.replyCount > 0 &&
+              contentHeight - usedHeight > _threadIndicatorHeight;
+          final threadReservedHeight = showsThreadIndicator
+              ? _threadIndicatorHeight +
+                    (children.isNotEmpty ? _threadIndicatorGap : 0)
+              : 0.0;
+          final remainingHeight = math.max(
+            0.0,
+            contentHeight - usedHeight - threadReservedHeight,
+          );
           children.add(_buildBody(context, remainingHeight));
+
+          if (showsThreadIndicator) {
+            if (children.isNotEmpty) {
+              children.add(const SizedBox(height: _threadIndicatorGap));
+            }
+            children.add(_buildThreadIndicator(threadInfo));
+          }
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -97,19 +124,10 @@ class MessageOverlayPreview extends StatelessWidget {
   }
 
   Widget _buildSenderHeader(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: _senderHeaderGap),
-      child: Text(
-        presentation.senderName,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: appBubbleTextStyle(
-          context,
-          fontWeight: FontWeight.w700,
-          fontSize: AppFontSizes.body,
-          color: presentation.textColor,
-        ),
-      ),
+    return MessageSenderHeader(
+      senderName: presentation.senderName,
+      textColor: presentation.textColor,
+      gender: message.sender.gender,
     );
   }
 
@@ -191,6 +209,14 @@ class MessageOverlayPreview extends StatelessWidget {
           color: context.appColors.textPrimary,
         ),
       ),
+    );
+  }
+
+  Widget _buildThreadIndicator(ThreadInfo threadInfo) {
+    return MessageThreadIndicator(
+      threadInfo: threadInfo,
+      isMe: isMe,
+      presentation: presentation,
     );
   }
 

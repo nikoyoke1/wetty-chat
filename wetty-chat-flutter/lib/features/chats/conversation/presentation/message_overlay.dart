@@ -82,7 +82,6 @@ class MessageOverlay extends StatelessWidget {
   static const double _actionIconGap = 10;
   static const double _minTallPreviewLines = 4;
   static const double _bubbleVerticalPadding = 16;
-  static const double _senderHeaderHeight = 20;
   static const double _overlayReactionBarWidth = 236;
 
   final MessageLongPressDetails details;
@@ -116,6 +115,7 @@ class MessageOverlay extends StatelessWidget {
           details.bubbleRect.width.clamp(0.0, viewportWidth).toDouble(),
           details.bubbleRect.height.clamp(0.0, viewportHeight).toDouble(),
         );
+        final contentMinWidth = _measureOverlayMinimumBubbleWidth(context);
         final actionWidth = _measureActionWidth(
           context,
           maxWidth: viewportWidth - (_screenPadding * 2),
@@ -126,6 +126,7 @@ class MessageOverlay extends StatelessWidget {
           safeBottom: bottomLimit,
           viewportWidth: viewportWidth,
           actionWidth: actionWidth,
+          contentMinWidth: contentMinWidth,
         );
         final previewPlacement = overlayLayout.preview;
         final reactionWidth = math.min(_overlayReactionBarWidth, maxPanelWidth);
@@ -248,6 +249,7 @@ class MessageOverlay extends StatelessWidget {
     required double safeBottom,
     required double viewportWidth,
     required double actionWidth,
+    required double contentMinWidth,
   }) {
     final actionHeight = _actionListHeight(actions.length);
     final reservedTop = _showReactionBar
@@ -256,6 +258,8 @@ class MessageOverlay extends StatelessWidget {
     final actionTop = math.max(safeTop, safeBottom - actionHeight);
     final previewMinTop = safeTop + reservedTop;
     final previewMaxBottomWithoutOverlap = actionTop - _clusterGap;
+    final injectedHeaderHeight = _overlayInjectedSenderHeaderHeight();
+    final targetPreviewHeight = bubbleRect.height + injectedHeaderHeight;
     final availableHeightWithoutOverlap = math.max(
       0.0,
       previewMaxBottomWithoutOverlap - previewMinTop,
@@ -267,12 +271,10 @@ class MessageOverlay extends StatelessWidget {
     );
     final minVisiblePreviewHeight = _minimumVisiblePreviewHeight();
     final previewWidth = math.min(
-      bubbleRect.width,
+      math.max(bubbleRect.width, contentMinWidth),
       math.max(0.0, viewportWidth - (_screenPadding * 2)),
     );
-    final horizontalClipOffset = details.isMe
-        ? math.max(0.0, bubbleRect.width - previewWidth)
-        : 0.0;
+    final horizontalClipOffset = 0.0;
 
     final previewLeft = _alignedPanelLeft(
       bubbleRect: Rect.fromLTWH(
@@ -286,13 +288,13 @@ class MessageOverlay extends StatelessWidget {
     );
 
     late final _OverlayPlacement preview;
-    if (bubbleRect.height <= availableHeightWithoutOverlap) {
+    if (targetPreviewHeight <= availableHeightWithoutOverlap) {
       final previewTop = bubbleRect.top
           .clamp(
             previewMinTop,
             math.max(
               previewMinTop,
-              previewMaxBottomWithoutOverlap - bubbleRect.height,
+              previewMaxBottomWithoutOverlap - targetPreviewHeight,
             ),
           )
           .toDouble();
@@ -300,7 +302,7 @@ class MessageOverlay extends StatelessWidget {
         left: previewLeft,
         top: previewTop,
         width: previewWidth,
-        height: bubbleRect.height,
+        height: targetPreviewHeight,
         contentOffset: Offset(horizontalClipOffset, 0),
       );
 
@@ -315,11 +317,11 @@ class MessageOverlay extends StatelessWidget {
       );
     } else {
       final previewHeight = math.min(
-        bubbleRect.height,
+        targetPreviewHeight,
         availableHeightWithOverlap,
       );
       final resolvedPreviewHeight = math.max(
-        math.min(previewHeight, bubbleRect.height),
+        math.min(previewHeight, targetPreviewHeight),
         math.min(minVisiblePreviewHeight, previewHeight),
       );
       final previewTop = bubbleRect.top
@@ -355,10 +357,40 @@ class MessageOverlay extends StatelessWidget {
 
   double _minimumVisiblePreviewHeight() {
     final lineHeight = chatMessageFontSize * 1.28;
-    final senderHeaderAllowance = details.isMe ? 0.0 : _senderHeaderHeight;
+    final senderHeaderAllowance = _overlayInjectedSenderHeaderHeight();
     return _bubbleVerticalPadding +
         senderHeaderAllowance +
         (lineHeight * _minTallPreviewLines);
+  }
+
+  double _overlayInjectedSenderHeaderHeight() {
+    if (details.sourceShowsSenderName) {
+      return 0.0;
+    }
+    return MessageBubblePresentation.senderHeaderReservedHeight;
+  }
+
+  double _measureOverlayMinimumBubbleWidth(BuildContext context) {
+    final senderName =
+        details.message.sender.name ?? 'User ${details.message.sender.uid}';
+    final headerContentWidth =
+        MessageBubblePresentation.measureSenderHeaderWidth(
+          context,
+          senderName,
+          gender: details.message.sender.gender,
+        );
+    var requiredContentWidth = headerContentWidth;
+    final threadInfo = details.message.threadInfo;
+    if (threadInfo != null && threadInfo.replyCount > 0) {
+      requiredContentWidth = math.max(
+        requiredContentWidth,
+        MessageBubblePresentation.measureThreadIndicatorWidth(
+          context,
+          threadInfo,
+        ),
+      );
+    }
+    return requiredContentWidth + 24;
   }
 
   double _alignedPanelLeft({
@@ -420,7 +452,7 @@ class MessageOverlay extends StatelessWidget {
       message: message,
       isMe: details.isMe,
       chatMessageFontSize: chatMessageFontSize,
-      maxBubbleWidth: details.bubbleRect.width,
+      maxBubbleWidth: previewPlacement.width,
     );
 
     if (previewPlacement.allowsActionOverlap) {
@@ -429,7 +461,7 @@ class MessageOverlay extends StatelessWidget {
         presentation: presentation,
         chatMessageFontSize: chatMessageFontSize,
         isMe: details.isMe,
-        showSenderName: !details.isMe,
+        showSenderName: true,
         maxHeight: previewPlacement.height,
       );
     }
@@ -443,6 +475,10 @@ class MessageOverlay extends StatelessWidget {
         ? VoiceMessageBubble(
             attachment: message.attachments.first,
             isMe: details.isMe,
+            showSenderName: true,
+            showThreadIndicator:
+                message.threadInfo != null &&
+                message.threadInfo!.replyCount > 0,
             message: message,
             presentation: presentation,
           )
@@ -451,14 +487,17 @@ class MessageOverlay extends StatelessWidget {
             presentation: presentation,
             chatMessageFontSize: chatMessageFontSize,
             isMe: details.isMe,
-            showSenderName: !details.isMe,
+            showSenderName: true,
+            showThreadIndicator:
+                message.threadInfo != null &&
+                message.threadInfo!.replyCount > 0,
             currentUserId: ApiSession.currentUserId,
           );
 
     return ClipRect(
       child: Transform.translate(
         offset: -previewPlacement.contentOffset,
-        child: SizedBox(width: details.bubbleRect.width, child: bubble),
+        child: SizedBox(width: previewPlacement.width, child: bubble),
       ),
     );
   }

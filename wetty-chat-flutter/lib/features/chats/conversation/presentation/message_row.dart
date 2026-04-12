@@ -22,6 +22,7 @@ class MessageLongPressDetails {
     required this.message,
     required this.bubbleRect,
     required this.isMe,
+    required this.sourceShowsSenderName,
     Rect? visibleRect,
   }) : visibleRect = visibleRect ?? bubbleRect;
 
@@ -29,6 +30,7 @@ class MessageLongPressDetails {
     ConversationMessage? message,
     Rect? bubbleRect,
     bool? isMe,
+    bool? sourceShowsSenderName,
     Rect? visibleRect,
   }) {
     final nextBubbleRect = bubbleRect ?? this.bubbleRect;
@@ -36,6 +38,8 @@ class MessageLongPressDetails {
       message: message ?? this.message,
       bubbleRect: nextBubbleRect,
       isMe: isMe ?? this.isMe,
+      sourceShowsSenderName:
+          sourceShowsSenderName ?? this.sourceShowsSenderName,
       visibleRect: visibleRect ?? nextBubbleRect,
     );
   }
@@ -43,6 +47,7 @@ class MessageLongPressDetails {
   final ConversationMessage message;
   final Rect bubbleRect;
   final bool isMe;
+  final bool sourceShowsSenderName;
   final Rect visibleRect;
 
   Rect get sourceRect => bubbleRect;
@@ -142,6 +147,7 @@ class _MessageRowState extends State<MessageRow> {
         message: widget.message,
         bubbleRect: origin & renderBox.size,
         isMe: _isMe,
+        sourceShowsSenderName: widget.showSenderName,
       ),
     );
   }
@@ -222,6 +228,7 @@ class _MessageRowState extends State<MessageRow> {
             child: VoiceMessageBubble(
               attachment: widget.message.attachments.first,
               isMe: _isMe,
+              showSenderName: widget.showSenderName,
               message: widget.message,
               presentation: presentation,
             ),

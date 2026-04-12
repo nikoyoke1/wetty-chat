@@ -17,6 +17,7 @@ class MessageBubble extends StatelessWidget {
     required this.isMe,
     required this.showSenderName,
     required this.currentUserId,
+    this.showThreadIndicator = false,
     this.onTapSticker,
     this.onTapReply,
     this.onOpenThread,
@@ -31,6 +32,7 @@ class MessageBubble extends StatelessWidget {
   final bool isMe;
   final bool showSenderName;
   final int? currentUserId;
+  final bool showThreadIndicator;
   final VoidCallback? onTapSticker;
   final VoidCallback? onTapReply;
   final VoidCallback? onOpenThread;
@@ -56,6 +58,7 @@ class MessageBubble extends StatelessWidget {
           message: message,
           presentation: presentation,
           isMe: isMe,
+          showThreadIndicator: showThreadIndicator,
           onTapSticker: onTapSticker,
           onTapReply: onTapReply,
           onOpenThread: onOpenThread,
@@ -98,6 +101,7 @@ class MessageBubble extends StatelessWidget {
               chatMessageFontSize: chatMessageFontSize,
               isMe: isMe,
               showSenderName: showSenderName,
+              showThreadIndicator: showThreadIndicator,
               currentUserId: currentUserId,
               onTapReply: onTapReply,
               onOpenThread: onOpenThread,

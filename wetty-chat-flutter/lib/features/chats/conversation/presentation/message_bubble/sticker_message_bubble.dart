@@ -15,6 +15,7 @@ class StickerMessageBubble extends StatelessWidget {
     required this.message,
     required this.presentation,
     required this.isMe,
+    this.showThreadIndicator = false,
     this.onTapSticker,
     this.onTapReply,
     this.onOpenThread,
@@ -24,6 +25,7 @@ class StickerMessageBubble extends StatelessWidget {
   final ConversationMessage message;
   final MessageBubblePresentation presentation;
   final bool isMe;
+  final bool showThreadIndicator;
   final VoidCallback? onTapSticker;
   final VoidCallback? onTapReply;
   final VoidCallback? onOpenThread;
@@ -53,7 +55,7 @@ class StickerMessageBubble extends StatelessWidget {
     final threadInfo = message.threadInfo;
     if (threadInfo != null &&
         threadInfo.replyCount > 0 &&
-        onOpenThread != null) {
+        (showThreadIndicator || onOpenThread != null)) {
       children.add(const SizedBox(height: 4));
       children.add(
         MessageThreadIndicator(
