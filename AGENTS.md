@@ -12,9 +12,6 @@ Before making changes always produce at least a high level overview of what you 
     - What is the change you want to put in at a high level
     - Is this a quick patch to get the problem resolved or the best design given our requirements
 
-## Review
-After making change, always dispatch a subagent to review and see if there are any issues
-
 ## Project Layout
 
 ### Frontend
