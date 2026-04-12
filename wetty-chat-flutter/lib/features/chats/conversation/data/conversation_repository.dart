@@ -542,12 +542,27 @@ class ConversationRepository {
       message,
       deliveryState: ConversationDeliveryState.sent,
     );
-    if (payload.replyRootId != null) {
-      _store.applyWebsocketMessageCreated(merged);
-    } else {
-      _store.applyWebsocketMessageUpdated(merged);
+    switch (_eventTypeFor(payload, deleted: deleted)) {
+      case _ConversationRealtimeEventType.created:
+        _store.applyWebsocketMessageCreated(merged);
+      case _ConversationRealtimeEventType.updated:
+        _store.applyWebsocketMessageUpdated(merged);
+      case _ConversationRealtimeEventType.deleted:
+        throw StateError('Deleted realtime events should return earlier.');
     }
     return true;
+  }
+
+  _ConversationRealtimeEventType _eventTypeFor(
+    MessageItemDto payload, {
+    required bool deleted,
+  }) {
+    if (deleted) {
+      return _ConversationRealtimeEventType.deleted;
+    }
+    return _messageForServerId(payload.id) == null
+        ? _ConversationRealtimeEventType.created
+        : _ConversationRealtimeEventType.updated;
   }
 
   bool _applyReactionEvent(ReactionUpdatePayloadDto payload) {
@@ -894,6 +909,8 @@ class ConversationRepository {
     );
   }
 }
+
+enum _ConversationRealtimeEventType { created, updated, deleted }
 
 final conversationRepositoryProvider =
     Provider.family<ConversationRepository, ConversationScope>((ref, scope) {

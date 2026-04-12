@@ -267,6 +267,45 @@ void main() {
         );
       },
     );
+
+    test(
+      'chat-scope realtime root message create is inserted into visible window',
+      () async {
+        final service = _FakeMessageApiService(
+          messages: [
+            _message(id: 10, message: 'Root one'),
+            _message(id: 11, message: 'Root two'),
+          ],
+        );
+        final repository = ConversationRepository(
+          scope: const ConversationScope.chat(chatId: '1'),
+          service: service,
+          store: MessageDomainStore(),
+        );
+
+        await repository.loadLatestWindow();
+
+        final handled = repository.applyRealtimeEvent(
+          MessageCreatedWsEvent(
+            payload: _message(id: 12, message: 'Root three'),
+          ),
+        );
+
+        expect(handled, isTrue);
+        expect(
+          repository
+              .latestWindowStableKeys()
+              .map(
+                (stableKey) => repository
+                    .messagesForWindow([stableKey])
+                    .single
+                    .serverMessageId,
+              )
+              .toList(),
+          [10, 11, 12],
+        );
+      },
+    );
   });
 
   group('ConversationRepository reactions', () {
