@@ -5,6 +5,7 @@ import '../../../models/message_models.dart';
 import '../../../models/message_preview_formatter.dart';
 import '../../domain/conversation_message.dart';
 import 'message_bubble_presentation.dart';
+import 'message_render_spec.dart';
 import 'message_reactions.dart';
 import 'message_thread_indicator.dart';
 import 'sticker_image_widget.dart';
@@ -15,7 +16,7 @@ class StickerMessageBubble extends StatelessWidget {
     required this.message,
     required this.presentation,
     required this.isMe,
-    this.showThreadIndicator = false,
+    required this.renderSpec,
     this.onTapSticker,
     this.onTapReply,
     this.onOpenThread,
@@ -25,7 +26,7 @@ class StickerMessageBubble extends StatelessWidget {
   final ConversationMessage message;
   final MessageBubblePresentation presentation;
   final bool isMe;
-  final bool showThreadIndicator;
+  final MessageRenderSpec renderSpec;
   final VoidCallback? onTapSticker;
   final VoidCallback? onTapReply;
   final VoidCallback? onOpenThread;
@@ -55,19 +56,19 @@ class StickerMessageBubble extends StatelessWidget {
     final threadInfo = message.threadInfo;
     if (threadInfo != null &&
         threadInfo.replyCount > 0 &&
-        (showThreadIndicator || onOpenThread != null)) {
+        renderSpec.showThreadIndicator) {
       children.add(const SizedBox(height: 4));
       children.add(
         MessageThreadIndicator(
           threadInfo: threadInfo,
           isMe: isMe,
           presentation: presentation,
-          onTap: onOpenThread,
+          onTap: renderSpec.isInteractive ? onOpenThread : null,
         ),
       );
     }
 
-    if (message.reactions.isNotEmpty) {
+    if (renderSpec.showReactions && message.reactions.isNotEmpty) {
       children.add(const SizedBox(height: 8));
       children.add(
         MessageReactions(

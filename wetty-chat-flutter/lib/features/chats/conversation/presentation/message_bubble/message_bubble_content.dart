@@ -9,6 +9,7 @@ import '../video_popup_player.dart';
 import 'linkified_message_text.dart';
 import 'message_bubble_meta.dart';
 import 'message_bubble_presentation.dart';
+import 'message_render_spec.dart';
 import 'message_reactions.dart';
 import 'message_sender_header.dart';
 import 'sticker_image_widget.dart';
@@ -22,9 +23,9 @@ class MessageBubbleContent extends StatelessWidget {
     required this.presentation,
     required this.chatMessageFontSize,
     required this.isMe,
-    required this.showSenderName,
-    required this.showThreadIndicator,
+    required this.renderSpec,
     required this.currentUserId,
+    this.attachmentMaxWidthOverride,
     this.onTapReply,
     this.onOpenThread,
     this.onOpenAttachment,
@@ -36,9 +37,9 @@ class MessageBubbleContent extends StatelessWidget {
   final MessageBubblePresentation presentation;
   final double chatMessageFontSize;
   final bool isMe;
-  final bool showSenderName;
-  final bool showThreadIndicator;
+  final MessageRenderSpec renderSpec;
   final int? currentUserId;
+  final double? attachmentMaxWidthOverride;
   final VoidCallback? onTapReply;
   final VoidCallback? onOpenThread;
   final ValueChanged<MessageAttachmentOpenRequest>? onOpenAttachment;
@@ -71,14 +72,14 @@ class MessageBubbleContent extends StatelessWidget {
     final hasAttachments = message.attachments.isNotEmpty;
     final contentChildren = <Widget>[];
 
-    if (showSenderName) {
+    if (renderSpec.showSenderName) {
       contentChildren.add(_buildSenderHeader(context));
       contentChildren.add(
         const SizedBox(height: MessageBubblePresentation.senderHeaderBodyGap),
       );
     }
 
-    if (message.replyToMessage != null) {
+    if (renderSpec.showReplyQuote && message.replyToMessage != null) {
       contentChildren.add(
         GestureDetector(
           onTap: onTapReply,
@@ -111,7 +112,7 @@ class MessageBubbleContent extends StatelessWidget {
       );
     }
 
-    if (hasAttachments) {
+    if (renderSpec.showAttachments && hasAttachments) {
       if (contentChildren.isNotEmpty) {
         contentChildren.add(const SizedBox(height: 8));
       }
@@ -121,27 +122,29 @@ class MessageBubbleContent extends StatelessWidget {
     }
 
     if (contentChildren.isNotEmpty &&
-        (message.replyToMessage != null || hasAttachments)) {
+        (renderSpec.showReplyQuote || renderSpec.showAttachments)) {
       contentChildren.add(const SizedBox(height: 4));
     }
-    contentChildren.add(_buildMessageBody(context));
+    if (renderSpec.showBody || renderSpec.showMeta) {
+      contentChildren.add(_buildMessageBody(context));
+    }
 
     final threadInfo = message.threadInfo;
     if (threadInfo != null &&
         threadInfo.replyCount > 0 &&
-        (showThreadIndicator || onOpenThread != null)) {
+        renderSpec.showThreadIndicator) {
       contentChildren.add(const SizedBox(height: 4));
       contentChildren.add(
         MessageThreadIndicator(
           threadInfo: threadInfo,
           isMe: isMe,
           presentation: presentation,
-          onTap: onOpenThread,
+          onTap: renderSpec.isInteractive ? onOpenThread : null,
         ),
       );
     }
 
-    if (message.reactions.isNotEmpty) {
+    if (renderSpec.showReactions && message.reactions.isNotEmpty) {
       contentChildren.add(const SizedBox(height: 8));
       contentChildren.add(_buildReactions(context));
     }
@@ -230,7 +233,8 @@ class MessageBubbleContent extends StatelessWidget {
     BuildContext context,
     List<AttachmentItem> attachments,
   ) {
-    final maxAttachmentWidth = presentation.maxBubbleWidth - 24;
+    final maxAttachmentWidth =
+        attachmentMaxWidthOverride ?? (presentation.maxBubbleWidth - 24);
 
     return Align(
       alignment: Alignment.centerRight,
@@ -265,6 +269,7 @@ class MessageBubbleContent extends StatelessWidget {
       return VoiceMessageBubble(
         attachment: attachment,
         isMe: isMe,
+        renderSpec: renderSpec,
         message: message,
         presentation: presentation,
       );

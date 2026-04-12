@@ -7,6 +7,9 @@ import '../../domain/conversation_message.dart';
 import '../../../models/message_models.dart';
 import 'message_bubble_meta.dart';
 import 'message_bubble_presentation.dart';
+import 'message_render_spec.dart';
+import 'message_sender_header.dart';
+import 'message_thread_indicator.dart';
 import 'voice_message_bubble.dart';
 
 class VoiceMessageBubbleFallback extends ConsumerStatefulWidget {
@@ -14,6 +17,7 @@ class VoiceMessageBubbleFallback extends ConsumerStatefulWidget {
     super.key,
     required this.attachment,
     required this.isMe,
+    required this.renderSpec,
     this.resolvedDuration,
     this.message,
     this.presentation,
@@ -21,6 +25,7 @@ class VoiceMessageBubbleFallback extends ConsumerStatefulWidget {
 
   final AttachmentItem attachment;
   final bool isMe;
+  final MessageRenderSpec renderSpec;
   final Duration? resolvedDuration;
   final ConversationMessage? message;
   final MessageBubblePresentation? presentation;
@@ -92,6 +97,19 @@ class _VoiceMessageBubbleFallbackState
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (widget.renderSpec.showSenderName &&
+                widget.message != null &&
+                widget.presentation != null)
+              Padding(
+                padding: const EdgeInsets.only(
+                  bottom: MessageBubblePresentation.senderHeaderBodyGap,
+                ),
+                child: MessageSenderHeader(
+                  senderName: widget.presentation!.senderName,
+                  textColor: widget.presentation!.textColor,
+                  gender: widget.message!.sender.gender,
+                ),
+              ),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -177,6 +195,18 @@ class _VoiceMessageBubbleFallbackState
                 ],
               ],
             ),
+            if (widget.renderSpec.showThreadIndicator &&
+                widget.message != null &&
+                widget.presentation != null &&
+                widget.message!.threadInfo != null &&
+                widget.message!.threadInfo!.replyCount > 0) ...[
+              const SizedBox(height: 4),
+              MessageThreadIndicator(
+                threadInfo: widget.message!.threadInfo!,
+                isMe: widget.isMe,
+                presentation: widget.presentation!,
+              ),
+            ],
           ],
         ),
       ),

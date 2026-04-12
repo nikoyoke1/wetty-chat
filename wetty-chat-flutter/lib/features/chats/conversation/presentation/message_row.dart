@@ -13,6 +13,7 @@ import '../domain/conversation_message.dart';
 import 'attachment_viewer_request.dart';
 import 'message_bubble/message_bubble.dart';
 import 'message_bubble/message_bubble_presentation.dart';
+import 'message_bubble/message_render_spec.dart';
 import 'message_bubble/voice_message_bubble.dart';
 import 'reply_swipe_action.dart';
 import 'video_popup_player.dart';
@@ -222,13 +223,19 @@ class _MessageRowState extends State<MessageRow> {
             ),
           )
         : null;
+    final renderSpec = MessageRenderSpec.timeline(
+      message: widget.message,
+      showSenderName: widget.showSenderName,
+      showThreadIndicator: widget.onOpenThread != null,
+      isInteractive: true,
+    );
     final bubble = _isPureAudioMessage
         ? KeyedSubtree(
             key: _bubbleKey,
             child: VoiceMessageBubble(
               attachment: widget.message.attachments.first,
               isMe: _isMe,
-              showSenderName: widget.showSenderName,
+              renderSpec: renderSpec,
               message: widget.message,
               presentation: presentation,
             ),
@@ -239,7 +246,7 @@ class _MessageRowState extends State<MessageRow> {
             presentation: presentation,
             chatMessageFontSize: widget.chatMessageFontSize,
             isMe: _isMe,
-            showSenderName: widget.showSenderName,
+            renderSpec: renderSpec,
             currentUserId: ApiSession.currentUserId,
             onTapSticker: widget.onTapSticker,
             onTapReply: widget.onTapReply,

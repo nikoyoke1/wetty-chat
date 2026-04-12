@@ -7,6 +7,7 @@ import '../../models/message_models.dart';
 import '../../models/message_preview_formatter.dart';
 import '../domain/conversation_message.dart';
 import 'message_bubble/message_bubble_presentation.dart';
+import 'message_bubble/message_render_spec.dart';
 import 'message_bubble/message_sender_header.dart';
 import 'message_bubble/message_thread_indicator.dart';
 
@@ -17,7 +18,7 @@ class MessageOverlayPreview extends StatelessWidget {
     required this.presentation,
     required this.chatMessageFontSize,
     required this.isMe,
-    required this.showSenderName,
+    required this.renderSpec,
     required this.maxHeight,
   });
 
@@ -35,7 +36,7 @@ class MessageOverlayPreview extends StatelessWidget {
   final MessageBubblePresentation presentation;
   final double chatMessageFontSize;
   final bool isMe;
-  final bool showSenderName;
+  final MessageRenderSpec renderSpec;
   final double maxHeight;
 
   @override
@@ -67,7 +68,7 @@ class MessageOverlayPreview extends StatelessWidget {
           var usedHeight = 0.0;
           final children = <Widget>[];
 
-          if (showSenderName) {
+          if (renderSpec.showSenderName) {
             children.add(_buildSenderHeader(context));
             children.add(
               const SizedBox(
@@ -78,15 +79,14 @@ class MessageOverlayPreview extends StatelessWidget {
           }
 
           final reply = message.replyToMessage;
-          if (reply != null && contentHeight - usedHeight > _replyBlockHeight) {
+          if (renderSpec.showReplyQuote &&
+              reply != null &&
+              contentHeight - usedHeight > _replyBlockHeight) {
             children.add(_buildReplyPreview(context, reply));
             usedHeight += _replyBlockHeight + _replyGap;
           }
 
-          final showAttachmentSummary =
-              message.attachments.isNotEmpty &&
-              (message.message?.trim().isEmpty ?? true);
-          if (showAttachmentSummary &&
+          if (renderSpec.showAttachmentSummary &&
               contentHeight - usedHeight > _attachmentChipHeight) {
             children.add(_buildAttachmentSummary(context));
             usedHeight += _attachmentChipHeight + _attachmentGap;
@@ -94,6 +94,7 @@ class MessageOverlayPreview extends StatelessWidget {
 
           final threadInfo = message.threadInfo;
           final showsThreadIndicator =
+              renderSpec.showThreadIndicator &&
               threadInfo != null &&
               threadInfo.replyCount > 0 &&
               contentHeight - usedHeight > _threadIndicatorHeight;
@@ -105,7 +106,9 @@ class MessageOverlayPreview extends StatelessWidget {
             0.0,
             contentHeight - usedHeight - threadReservedHeight,
           );
-          children.add(_buildBody(context, remainingHeight));
+          if (renderSpec.showBody) {
+            children.add(_buildBody(context, remainingHeight));
+          }
 
           if (showsThreadIndicator) {
             if (children.isNotEmpty) {

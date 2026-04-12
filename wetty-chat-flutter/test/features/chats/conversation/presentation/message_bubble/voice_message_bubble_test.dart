@@ -1,11 +1,11 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:chahua/core/cache/media_cache_service.dart';
 import 'package:chahua/core/providers/shared_preferences_provider.dart';
 import 'package:chahua/features/chats/conversation/domain/conversation_message.dart';
 import 'package:chahua/features/chats/conversation/domain/conversation_scope.dart';
@@ -13,6 +13,7 @@ import 'package:chahua/features/chats/conversation/data/audio_playback_driver.da
 import 'package:chahua/features/chats/conversation/data/audio_source_resolver_service.dart';
 import 'package:chahua/features/chats/conversation/presentation/message_overlay.dart';
 import 'package:chahua/features/chats/conversation/presentation/message_bubble/message_bubble_presentation.dart';
+import 'package:chahua/features/chats/conversation/presentation/message_bubble/message_render_spec.dart';
 import 'package:chahua/features/chats/conversation/presentation/message_bubble/voice_message_bubble.dart';
 import 'package:chahua/features/chats/conversation/presentation/message_row.dart';
 import 'package:chahua/features/chats/models/message_models.dart';
@@ -123,7 +124,9 @@ void main() {
               _FakeAudioPlaybackDriver(),
             ),
             audioSourceResolverServiceProvider.overrideWithValue(
-              AudioSourceResolverService(Dio(), prefs),
+              _FakeAudioSourceResolverService(
+                MediaCacheService(cacheNamespace: 'voice-message-bubble-test'),
+              ),
             ),
           ],
           child: CupertinoApp(
@@ -143,7 +146,12 @@ void main() {
                       child: VoiceMessageBubble(
                         attachment: message.attachments.first,
                         isMe: false,
-                        showSenderName: true,
+                        renderSpec: MessageRenderSpec.timeline(
+                          message: message,
+                          showSenderName: true,
+                          showThreadIndicator: false,
+                          isInteractive: true,
+                        ),
                         message: message,
                         presentation: presentation,
                       ),
@@ -177,7 +185,9 @@ void main() {
               _FakeAudioPlaybackDriver(),
             ),
             audioSourceResolverServiceProvider.overrideWithValue(
-              AudioSourceResolverService(Dio(), prefs),
+              _FakeAudioSourceResolverService(
+                MediaCacheService(cacheNamespace: 'voice-message-bubble-test'),
+              ),
             ),
           ],
           child: CupertinoApp(
@@ -197,7 +207,12 @@ void main() {
                       child: VoiceMessageBubble(
                         attachment: message.attachments.first,
                         isMe: false,
-                        showSenderName: false,
+                        renderSpec: MessageRenderSpec.timeline(
+                          message: message,
+                          showSenderName: false,
+                          showThreadIndicator: false,
+                          isInteractive: true,
+                        ),
                         message: message,
                         presentation: presentation,
                       ),
@@ -223,7 +238,9 @@ void main() {
               _FakeAudioPlaybackDriver(),
             ),
             audioSourceResolverServiceProvider.overrideWithValue(
-              AudioSourceResolverService(Dio(), prefs),
+              _FakeAudioSourceResolverService(
+                MediaCacheService(cacheNamespace: 'voice-message-bubble-test'),
+              ),
             ),
           ],
           child: CupertinoApp(
@@ -283,7 +300,9 @@ void main() {
               _FakeAudioPlaybackDriver(),
             ),
             audioSourceResolverServiceProvider.overrideWithValue(
-              AudioSourceResolverService(Dio(), prefs),
+              _FakeAudioSourceResolverService(
+                MediaCacheService(cacheNamespace: 'voice-message-bubble-test'),
+              ),
             ),
           ],
           child: CupertinoApp(
@@ -303,8 +322,12 @@ void main() {
                       child: VoiceMessageBubble(
                         attachment: message.attachments.first,
                         isMe: false,
-                        showSenderName: false,
-                        showThreadIndicator: true,
+                        renderSpec: MessageRenderSpec.timeline(
+                          message: message,
+                          showSenderName: false,
+                          showThreadIndicator: true,
+                          isInteractive: true,
+                        ),
                         message: message,
                         presentation: presentation,
                       ),
@@ -415,4 +438,18 @@ class _FakeAudioPlaybackDriver implements AudioPlaybackDriver {
 
   @override
   Future<void> stop() async {}
+}
+
+class _FakeAudioSourceResolverService extends AudioSourceResolverService {
+  _FakeAudioSourceResolverService(super.mediaCacheService);
+
+  @override
+  Future<AudioPlaybackSource?> resolvePlaybackSource(
+    AttachmentItem attachment,
+  ) async {
+    return AudioPlaybackSource.file(
+      filePath: '/tmp/${attachment.id}.m4a',
+      localWaveformPath: '/tmp/${attachment.id}.m4a',
+    );
+  }
 }

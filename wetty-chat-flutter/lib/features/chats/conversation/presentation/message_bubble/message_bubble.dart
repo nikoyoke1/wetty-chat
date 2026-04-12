@@ -6,6 +6,7 @@ import '../../../models/message_models.dart';
 import '../attachment_viewer_request.dart';
 import 'message_bubble_content.dart';
 import 'message_bubble_presentation.dart';
+import 'message_render_spec.dart';
 import 'sticker_message_bubble.dart';
 
 class MessageBubble extends StatelessWidget {
@@ -15,9 +16,9 @@ class MessageBubble extends StatelessWidget {
     required this.presentation,
     required this.chatMessageFontSize,
     required this.isMe,
-    required this.showSenderName,
+    required this.renderSpec,
     required this.currentUserId,
-    this.showThreadIndicator = false,
+    this.attachmentMaxWidthOverride,
     this.onTapSticker,
     this.onTapReply,
     this.onOpenThread,
@@ -30,9 +31,9 @@ class MessageBubble extends StatelessWidget {
   final MessageBubblePresentation presentation;
   final double chatMessageFontSize;
   final bool isMe;
-  final bool showSenderName;
+  final MessageRenderSpec renderSpec;
   final int? currentUserId;
-  final bool showThreadIndicator;
+  final double? attachmentMaxWidthOverride;
   final VoidCallback? onTapSticker;
   final VoidCallback? onTapReply;
   final VoidCallback? onOpenThread;
@@ -58,7 +59,7 @@ class MessageBubble extends StatelessWidget {
           message: message,
           presentation: presentation,
           isMe: isMe,
-          showThreadIndicator: showThreadIndicator,
+          renderSpec: renderSpec,
           onTapSticker: onTapSticker,
           onTapReply: onTapReply,
           onOpenThread: onOpenThread,
@@ -100,9 +101,9 @@ class MessageBubble extends StatelessWidget {
               presentation: presentation,
               chatMessageFontSize: chatMessageFontSize,
               isMe: isMe,
-              showSenderName: showSenderName,
-              showThreadIndicator: showThreadIndicator,
+              renderSpec: renderSpec,
               currentUserId: currentUserId,
+              attachmentMaxWidthOverride: attachmentMaxWidthOverride,
               onTapReply: onTapReply,
               onOpenThread: onOpenThread,
               onOpenAttachment: onOpenAttachment,

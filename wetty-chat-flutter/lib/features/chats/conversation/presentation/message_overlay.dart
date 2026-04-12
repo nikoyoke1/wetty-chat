@@ -5,8 +5,11 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../../app/theme/style_config.dart';
 import '../../../../core/network/api_config.dart';
+import '../../models/message_models.dart';
+import 'message_attachment_previews.dart';
 import 'message_bubble/message_bubble.dart';
 import 'message_bubble/message_bubble_presentation.dart';
+import 'message_bubble/message_render_spec.dart';
 import 'message_bubble/voice_message_bubble.dart';
 import 'message_overlay_preview.dart';
 import 'message_row.dart';
@@ -33,6 +36,7 @@ class _OverlayPlacement {
     required this.height,
     this.contentOffset = Offset.zero,
     this.allowsActionOverlap = false,
+    this.useCompactPreview = false,
   });
 
   final double left;
@@ -41,6 +45,7 @@ class _OverlayPlacement {
   final double height;
   final Offset contentOffset;
   final bool allowsActionOverlap;
+  final bool useCompactPreview;
 }
 
 class _OverlayLayout {
@@ -82,6 +87,11 @@ class MessageOverlay extends StatelessWidget {
   static const double _actionIconGap = 10;
   static const double _minTallPreviewLines = 4;
   static const double _bubbleVerticalPadding = 16;
+  static const double _bubbleHorizontalPadding = 24;
+  static const double _fullBubbleHeightSafetyMargin = 2;
+  static const double _attachmentSectionLeadingGap = 8;
+  static const double _multiImageHeightSafetyMargin = 10;
+  static const double _tallImageAspectRatioThreshold = 3.0;
   static const double _overlayReactionBarWidth = 236;
 
   final MessageLongPressDetails details;
@@ -251,6 +261,10 @@ class MessageOverlay extends StatelessWidget {
     required double actionWidth,
     required double contentMinWidth,
   }) {
+    final forceCompactPreview = _shouldForceCompactPreviewForImageOverlay(
+      bubbleRect: bubbleRect,
+    );
+    final prefersClippedFullBubble = _prefersClippedFullBubbleOverlay();
     final actionHeight = _actionListHeight(actions.length);
     final reservedTop = _showReactionBar
         ? _reactionBarHeight + _clusterGap
@@ -258,8 +272,11 @@ class MessageOverlay extends StatelessWidget {
     final actionTop = math.max(safeTop, safeBottom - actionHeight);
     final previewMinTop = safeTop + reservedTop;
     final previewMaxBottomWithoutOverlap = actionTop - _clusterGap;
-    final injectedHeaderHeight = _overlayInjectedSenderHeaderHeight();
-    final targetPreviewHeight = bubbleRect.height + injectedHeaderHeight;
+    final previewWidth = math.min(
+      math.max(bubbleRect.width, contentMinWidth),
+      math.max(0.0, viewportWidth - (_screenPadding * 2)),
+    );
+    final targetPreviewHeight = _targetPreviewHeight(bubbleRect: bubbleRect);
     final availableHeightWithoutOverlap = math.max(
       0.0,
       previewMaxBottomWithoutOverlap - previewMinTop,
@@ -270,10 +287,6 @@ class MessageOverlay extends StatelessWidget {
       maxAllowedPreviewBottom - previewMinTop,
     );
     final minVisiblePreviewHeight = _minimumVisiblePreviewHeight();
-    final previewWidth = math.min(
-      math.max(bubbleRect.width, contentMinWidth),
-      math.max(0.0, viewportWidth - (_screenPadding * 2)),
-    );
     final horizontalClipOffset = 0.0;
 
     final previewLeft = _alignedPanelLeft(
@@ -288,7 +301,8 @@ class MessageOverlay extends StatelessWidget {
     );
 
     late final _OverlayPlacement preview;
-    if (targetPreviewHeight <= availableHeightWithoutOverlap) {
+    if (!forceCompactPreview &&
+        targetPreviewHeight <= availableHeightWithoutOverlap) {
       final previewTop = bubbleRect.top
           .clamp(
             previewMinTop,
@@ -341,6 +355,7 @@ class MessageOverlay extends StatelessWidget {
         height: resolvedPreviewHeight,
         contentOffset: Offset(horizontalClipOffset, 0),
         allowsActionOverlap: true,
+        useCompactPreview: !prefersClippedFullBubble || forceCompactPreview,
       );
 
       return _OverlayLayout(
@@ -355,19 +370,98 @@ class MessageOverlay extends StatelessWidget {
     }
   }
 
+  double _targetPreviewHeight({required Rect bubbleRect}) {
+    final injectedHeaderHeight = _overlayInjectedSenderHeaderHeight();
+    final multiImageDelta = _imageAttachments.length > 1
+        ? _multiImageHeightSafetyMargin
+        : 0.0;
+    if (_usesPreservedImageOverlay()) {
+      return bubbleRect.height + injectedHeaderHeight + multiImageDelta;
+    }
+    return bubbleRect.height + injectedHeaderHeight + multiImageDelta;
+  }
+
   double _minimumVisiblePreviewHeight() {
     final lineHeight = chatMessageFontSize * 1.28;
-    final senderHeaderAllowance = _overlayInjectedSenderHeaderHeight();
+    final compactOverlaySpec = MessageRenderSpec.overlay(
+      message: details.message,
+      sourceShowsSenderName: details.sourceShowsSenderName,
+      compact: true,
+    );
+    final senderHeaderAllowance = compactOverlaySpec.showSenderName
+        ? MessageBubblePresentation.senderHeaderReservedHeight
+        : 0.0;
     return _bubbleVerticalPadding +
         senderHeaderAllowance +
         (lineHeight * _minTallPreviewLines);
   }
 
   double _overlayInjectedSenderHeaderHeight() {
-    if (details.sourceShowsSenderName) {
+    final overlaySpec = MessageRenderSpec.overlay(
+      message: details.message,
+      sourceShowsSenderName: details.sourceShowsSenderName,
+      compact: false,
+    );
+    if (!overlaySpec.injectsSenderHeader) {
       return 0.0;
     }
-    return MessageBubblePresentation.senderHeaderReservedHeight;
+    final attachmentSectionDelta = overlaySpec.showAttachments
+        ? _attachmentSectionLeadingGap
+        : 0.0;
+    return MessageBubblePresentation.senderHeaderReservedHeight +
+        attachmentSectionDelta +
+        _fullBubbleHeightSafetyMargin;
+  }
+
+  bool _usesPreservedImageOverlay() {
+    final renderSpec = MessageRenderSpec.overlay(
+      message: details.message,
+      sourceShowsSenderName: details.sourceShowsSenderName,
+      compact: false,
+    );
+    return renderSpec.showAttachments && _imageAttachments.isNotEmpty;
+  }
+
+  bool _prefersClippedFullBubbleOverlay() {
+    return _usesPreservedImageOverlay() && _imageAttachments.length > 1;
+  }
+
+  bool _shouldForceCompactPreviewForImageOverlay({required Rect bubbleRect}) {
+    if (_imageAttachments.isEmpty) {
+      return false;
+    }
+
+    if (_imageAttachments.length > 1) {
+      return false;
+    }
+
+    final sourceMaxAttachmentWidth = _sourceAttachmentMaxWidth(
+      bubbleWidth: bubbleRect.width,
+    );
+    for (final attachment in _imageAttachments) {
+      final layout = computeAttachmentPreviewLayout(
+        attachment,
+        maxWidth: sourceMaxAttachmentWidth,
+      );
+      final width = attachment.width?.toDouble();
+      final height = attachment.height?.toDouble();
+      final aspectRatio = (width != null && height != null && width > 0)
+          ? height / width
+          : 0.0;
+      if (layout != null && aspectRatio >= _tallImageAspectRatioThreshold) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  List<AttachmentItem> get _imageAttachments => details.message.attachments
+      .where((attachment) => attachment.isImage && attachment.url.isNotEmpty)
+      .toList(growable: false);
+
+  double _sourceAttachmentMaxWidth({required double bubbleWidth}) {
+    return math.max(0.0, bubbleWidth - _bubbleHorizontalPadding);
   }
 
   double _measureOverlayMinimumBubbleWidth(BuildContext context) {
@@ -447,6 +541,11 @@ class MessageOverlay extends StatelessWidget {
     required _OverlayPlacement previewPlacement,
   }) {
     final message = details.message;
+    final renderSpec = MessageRenderSpec.overlay(
+      message: message,
+      sourceShowsSenderName: details.sourceShowsSenderName,
+      compact: previewPlacement.useCompactPreview,
+    );
     final presentation = MessageBubblePresentation.fromContext(
       context: context,
       message: message,
@@ -455,13 +554,13 @@ class MessageOverlay extends StatelessWidget {
       maxBubbleWidth: previewPlacement.width,
     );
 
-    if (previewPlacement.allowsActionOverlap) {
+    if (previewPlacement.useCompactPreview) {
       return MessageOverlayPreview(
         message: message,
         presentation: presentation,
         chatMessageFontSize: chatMessageFontSize,
         isMe: details.isMe,
-        showSenderName: true,
+        renderSpec: renderSpec,
         maxHeight: previewPlacement.height,
       );
     }
@@ -470,15 +569,15 @@ class MessageOverlay extends StatelessWidget {
         message.messageType == 'audio' &&
         message.attachments.length == 1 &&
         message.attachments.first.isAudio;
+    final attachmentMaxWidthOverride = _usesPreservedImageOverlay()
+        ? _sourceAttachmentMaxWidth(bubbleWidth: details.bubbleRect.width)
+        : null;
 
     final bubble = isPureAudio
         ? VoiceMessageBubble(
             attachment: message.attachments.first,
             isMe: details.isMe,
-            showSenderName: true,
-            showThreadIndicator:
-                message.threadInfo != null &&
-                message.threadInfo!.replyCount > 0,
+            renderSpec: renderSpec,
             message: message,
             presentation: presentation,
           )
@@ -487,19 +586,31 @@ class MessageOverlay extends StatelessWidget {
             presentation: presentation,
             chatMessageFontSize: chatMessageFontSize,
             isMe: details.isMe,
-            showSenderName: true,
-            showThreadIndicator:
-                message.threadInfo != null &&
-                message.threadInfo!.replyCount > 0,
+            renderSpec: renderSpec,
             currentUserId: ApiSession.currentUserId,
+            attachmentMaxWidthOverride: attachmentMaxWidthOverride,
           );
 
-    return ClipRect(
-      child: Transform.translate(
-        offset: -previewPlacement.contentOffset,
-        child: SizedBox(width: previewPlacement.width, child: bubble),
-      ),
+    final bubbleContent = Transform.translate(
+      offset: -previewPlacement.contentOffset,
+      child: SizedBox(width: previewPlacement.width, child: bubble),
     );
+
+    if (previewPlacement.allowsActionOverlap &&
+        !previewPlacement.useCompactPreview) {
+      return ClipRect(
+        child: OverflowBox(
+          alignment: Alignment.topCenter,
+          minWidth: previewPlacement.width,
+          maxWidth: previewPlacement.width,
+          minHeight: 0,
+          maxHeight: double.infinity,
+          child: bubbleContent,
+        ),
+      );
+    }
+
+    return ClipRect(child: bubbleContent);
   }
 
   Widget _buildReactionBar(

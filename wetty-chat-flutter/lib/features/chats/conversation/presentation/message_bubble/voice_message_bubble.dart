@@ -11,6 +11,7 @@ import '../../domain/conversation_message.dart';
 import '../../../models/message_models.dart';
 import 'message_bubble_meta.dart';
 import 'message_bubble_presentation.dart';
+import 'message_render_spec.dart';
 import 'message_sender_header.dart';
 import 'message_thread_indicator.dart';
 import 'voice_message_bubble_fallback.dart';
@@ -20,16 +21,14 @@ class VoiceMessageBubble extends ConsumerStatefulWidget {
     super.key,
     required this.attachment,
     required this.isMe,
-    this.showSenderName = false,
-    this.showThreadIndicator = false,
+    required this.renderSpec,
     this.message,
     this.presentation,
   });
 
   final AttachmentItem attachment;
   final bool isMe;
-  final bool showSenderName;
-  final bool showThreadIndicator;
+  final MessageRenderSpec renderSpec;
   final ConversationMessage? message;
   final MessageBubblePresentation? presentation;
 
@@ -49,8 +48,7 @@ class _VoiceMessageBubbleState extends ConsumerState<VoiceMessageBubble> {
     return presentationAsync.when(
       loading: () => _UnavailableVoiceMessageBody(
         isMe: widget.isMe,
-        showSenderName: widget.showSenderName,
-        showThreadIndicator: widget.showThreadIndicator,
+        renderSpec: widget.renderSpec,
         message: widget.message,
         presentation: widget.presentation,
         statusText: 'Preparing audio...',
@@ -58,8 +56,7 @@ class _VoiceMessageBubbleState extends ConsumerState<VoiceMessageBubble> {
       ),
       error: (_, _) => _UnavailableVoiceMessageBody(
         isMe: widget.isMe,
-        showSenderName: widget.showSenderName,
-        showThreadIndicator: widget.showThreadIndicator,
+        renderSpec: widget.renderSpec,
         message: widget.message,
         presentation: widget.presentation,
         statusText: 'Audio is not playable.',
@@ -76,6 +73,7 @@ class _VoiceMessageBubbleState extends ConsumerState<VoiceMessageBubble> {
             return VoiceMessageBubbleFallback(
               attachment: widget.attachment,
               isMe: widget.isMe,
+              renderSpec: widget.renderSpec,
               message: widget.message,
               presentation: widget.presentation,
               resolvedDuration: presentationData.duration,
@@ -83,8 +81,7 @@ class _VoiceMessageBubbleState extends ConsumerState<VoiceMessageBubble> {
           }
           return _UnavailableVoiceMessageBody(
             isMe: widget.isMe,
-            showSenderName: widget.showSenderName,
-            showThreadIndicator: widget.showThreadIndicator,
+            renderSpec: widget.renderSpec,
             message: widget.message,
             presentation: widget.presentation,
             statusText: 'Audio is not playable.',
@@ -98,8 +95,7 @@ class _VoiceMessageBubbleState extends ConsumerState<VoiceMessageBubble> {
         return _WaveformVoiceMessageBody(
           attachment: widget.attachment,
           isMe: widget.isMe,
-          showSenderName: widget.showSenderName,
-          showThreadIndicator: widget.showThreadIndicator,
+          renderSpec: widget.renderSpec,
           message: widget.message,
           presentation: widget.presentation,
           waveform: waveform,
@@ -125,8 +121,7 @@ class _VoiceMessageBubbleState extends ConsumerState<VoiceMessageBubble> {
 class _UnavailableVoiceMessageBody extends StatelessWidget {
   const _UnavailableVoiceMessageBody({
     required this.isMe,
-    required this.showSenderName,
-    required this.showThreadIndicator,
+    required this.renderSpec,
     required this.message,
     required this.presentation,
     required this.statusText,
@@ -134,8 +129,7 @@ class _UnavailableVoiceMessageBody extends StatelessWidget {
   });
 
   final bool isMe;
-  final bool showSenderName;
-  final bool showThreadIndicator;
+  final MessageRenderSpec renderSpec;
   final ConversationMessage? message;
   final MessageBubblePresentation? presentation;
   final String statusText;
@@ -162,7 +156,9 @@ class _UnavailableVoiceMessageBody extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (showSenderName && message != null && presentation != null)
+          if (renderSpec.showSenderName &&
+              message != null &&
+              presentation != null)
             Padding(
               padding: const EdgeInsets.only(
                 bottom: MessageBubblePresentation.senderHeaderBodyGap,
@@ -200,7 +196,7 @@ class _UnavailableVoiceMessageBody extends StatelessWidget {
                 ),
               ],
             ),
-            if (showThreadIndicator &&
+            if (renderSpec.showThreadIndicator &&
                 message!.threadInfo != null &&
                 message!.threadInfo!.replyCount > 0) ...[
               const SizedBox(height: 4),
@@ -221,8 +217,7 @@ class _WaveformVoiceMessageBody extends ConsumerWidget {
   const _WaveformVoiceMessageBody({
     required this.attachment,
     required this.isMe,
-    required this.showSenderName,
-    required this.showThreadIndicator,
+    required this.renderSpec,
     required this.message,
     required this.presentation,
     required this.waveform,
@@ -235,8 +230,7 @@ class _WaveformVoiceMessageBody extends ConsumerWidget {
 
   final AttachmentItem attachment;
   final bool isMe;
-  final bool showSenderName;
-  final bool showThreadIndicator;
+  final MessageRenderSpec renderSpec;
   final ConversationMessage? message;
   final MessageBubblePresentation? presentation;
   final AudioWaveformSnapshot waveform;
@@ -323,7 +317,9 @@ class _WaveformVoiceMessageBody extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (showSenderName && message != null && presentation != null)
+          if (renderSpec.showSenderName &&
+              message != null &&
+              presentation != null)
             Padding(
               padding: const EdgeInsets.only(
                 bottom: MessageBubblePresentation.senderHeaderBodyGap,
@@ -440,7 +436,7 @@ class _WaveformVoiceMessageBody extends ConsumerWidget {
               ],
             ],
           ),
-          if (showThreadIndicator &&
+          if (renderSpec.showThreadIndicator &&
               message != null &&
               presentation != null &&
               message!.threadInfo != null &&
