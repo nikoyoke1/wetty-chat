@@ -120,6 +120,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsTextSize => '字体大小';
 
   @override
+  String get settingsCache => '缓存';
+
+  @override
+  String get settingsCacheTitle => '缓存';
+
+  @override
+  String get settingsCacheSectionHeader => '应用缓存';
+
+  @override
+  String get settingsCacheDescription => '包含此设备上受管理的缓存媒体，例如图片、已下载音频、转码音频和波形数据。';
+
+  @override
+  String get settingsCacheUsage => '已使用空间';
+
+  @override
+  String get settingsClearCache => '清除缓存';
+
+  @override
+  String get settingsClearCacheTitle => '清除缓存？';
+
+  @override
+  String get settingsClearCacheMessage => '这会移除此设备上缓存的媒体文件和波形数据。';
+
+  @override
   String get settingsChat => '聊天';
 
   @override
@@ -381,6 +405,30 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsTextSize => '字型大小';
+
+  @override
+  String get settingsCache => '快取';
+
+  @override
+  String get settingsCacheTitle => '快取';
+
+  @override
+  String get settingsCacheSectionHeader => '應用程式快取';
+
+  @override
+  String get settingsCacheDescription => '包含此裝置上受管理的快取媒體，例如圖片、已下載音訊、轉碼音訊與波形資料。';
+
+  @override
+  String get settingsCacheUsage => '已使用空間';
+
+  @override
+  String get settingsClearCache => '清除快取';
+
+  @override
+  String get settingsClearCacheTitle => '清除快取？';
+
+  @override
+  String get settingsClearCacheMessage => '這會移除此裝置上快取的媒體檔案與波形資料。';
 
   @override
   String get settingsChat => '聊天';

@@ -920,7 +920,7 @@ class ConversationComposerViewModel
     final clientGeneratedId =
         '${DateTime.now().microsecondsSinceEpoch}-$currentUserId-${_scope.storageKey}';
     final mode = state.mode;
-    ref
+    await ref
         .read(audioWaveformCacheServiceProvider)
         .primeFromAttachmentMetadata(
           attachmentId: uploadInfo.attachmentId,

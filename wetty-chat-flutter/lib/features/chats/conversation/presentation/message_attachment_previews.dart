@@ -1,6 +1,6 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../../core/cache/app_cached_network_image.dart';
 import '../../models/message_models.dart';
 
 class AttachmentPreviewLayout {
@@ -76,7 +76,7 @@ class MessageImageAttachmentPreview extends StatelessWidget {
           child: SizedBox(
             width: previewWidth,
             height: previewHeight,
-            child: CachedNetworkImage(
+            child: AppCachedNetworkImage(
               imageUrl: attachment.url,
               width: previewWidth,
               height: previewHeight,

@@ -13,6 +13,7 @@ void main() {
       final duration = resolveVoiceMessageDuration(
         attachmentDuration: Duration.zero,
         playbackDuration: const Duration(seconds: 18),
+        resolvedDuration: null,
         waveformDuration: Duration.zero,
       );
 
@@ -23,10 +24,22 @@ void main() {
       final duration = resolveVoiceMessageDuration(
         attachmentDuration: null,
         playbackDuration: null,
+        resolvedDuration: null,
         waveformDuration: const Duration(seconds: 7),
       );
 
       expect(duration, const Duration(seconds: 7));
+    });
+
+    test('uses preloaded duration before playback starts', () {
+      final duration = resolveVoiceMessageDuration(
+        attachmentDuration: null,
+        playbackDuration: null,
+        resolvedDuration: const Duration(seconds: 11),
+        waveformDuration: null,
+      );
+
+      expect(duration, const Duration(seconds: 11));
     });
   });
 

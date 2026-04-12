@@ -3,23 +3,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../app/theme/style_config.dart';
 import '../../application/voice_message_playback_controller.dart';
-import '../../data/audio_waveform_cache_service.dart';
 import '../../domain/conversation_message.dart';
 import '../../../models/message_models.dart';
 import 'message_bubble_meta.dart';
 import 'message_bubble_presentation.dart';
+import 'voice_message_bubble.dart';
 
 class VoiceMessageBubbleFallback extends ConsumerStatefulWidget {
   const VoiceMessageBubbleFallback({
     super.key,
     required this.attachment,
     required this.isMe,
+    this.resolvedDuration,
     this.message,
     this.presentation,
   });
 
   final AttachmentItem attachment;
   final bool isMe;
+  final Duration? resolvedDuration;
   final ConversationMessage? message;
   final MessageBubblePresentation? presentation;
 
@@ -44,6 +46,7 @@ class _VoiceMessageBubbleFallbackState
         : VoiceMessagePlaybackPhase.idle;
     final duration =
         widget.attachment.duration ??
+        widget.resolvedDuration ??
         playbackState.durationFor(widget.attachment.id);
     final livePosition = switch (phase) {
       VoiceMessagePlaybackPhase.completed => duration ?? Duration.zero,
@@ -53,7 +56,7 @@ class _VoiceMessageBubbleFallbackState
     final clampedSliderPosition = duration == null
         ? sliderPosition
         : _clampDuration(sliderPosition, Duration.zero, duration);
-    final waveformWidth = _fallbackWaveformWidthForDuration(duration);
+    final waveformWidth = voiceMessageUniformWaveformWidth;
     final bubbleWidth = _fallbackBubbleWidthForWaveformWidth(waveformWidth);
     final bubbleColor =
         widget.presentation?.bubbleColor ??
@@ -238,27 +241,6 @@ Duration _clampDuration(Duration value, Duration min, Duration max) {
     return max;
   }
   return value;
-}
-
-const double _fallbackWaveformMinWidth = 88;
-const double _fallbackWaveformMaxWidth = 173;
-const int _fallbackWaveformMinBars = 16;
-const int _fallbackWaveformBarsPerSecond = 4;
-const double _fallbackWaveformBarWidth = 3;
-const double _fallbackWaveformGap = 2;
-
-double _fallbackWaveformWidthForDuration(Duration? duration) {
-  final seconds = duration?.inSeconds ?? 0;
-  final barCount = (seconds * _fallbackWaveformBarsPerSecond).clamp(
-    _fallbackWaveformMinBars,
-    AudioWaveformCacheService.targetBarCount,
-  );
-  final rawWidth =
-      (barCount * _fallbackWaveformBarWidth) +
-      ((barCount - 1) * _fallbackWaveformGap);
-  return rawWidth
-      .clamp(_fallbackWaveformMinWidth, _fallbackWaveformMaxWidth)
-      .toDouble();
 }
 
 double _fallbackBubbleWidthForWaveformWidth(double waveformWidth) {

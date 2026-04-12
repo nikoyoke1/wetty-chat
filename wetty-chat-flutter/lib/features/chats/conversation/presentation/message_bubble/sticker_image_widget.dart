@@ -1,6 +1,6 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../../../core/cache/app_cached_network_image.dart';
 import '../../../models/message_models.dart';
 
 /// Renders a sticker image or video placeholder.
@@ -38,7 +38,7 @@ class StickerImage extends StatelessWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: CachedNetworkImage(
+      child: AppCachedNetworkImage(
         imageUrl: stickerMedia.url,
         fit: fit,
         memCacheWidth: cacheWidth,

@@ -1,30 +1,29 @@
-import 'dart:convert';
+import 'dart:async';
 import 'dart:developer';
 import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:voice_message/voice_message.dart';
 
-import '../../../../core/providers/shared_preferences_provider.dart';
+import '../../../../core/cache/media_cache_service.dart';
 import '../../models/message_models.dart';
 import 'audio_source_resolver_service.dart';
 
 class AudioWaveformSnapshot {
   const AudioWaveformSnapshot({required this.duration, required this.samples});
 
-  final Duration duration;
+  final Duration? duration;
   final List<int> samples;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-    'durationMs': duration.inMilliseconds,
+    if (duration != null) 'durationMs': duration!.inMilliseconds,
     'samples': samples,
   };
 
   static AudioWaveformSnapshot? fromJson(Map<String, dynamic> json) {
     final durationMs = json['durationMs'];
     final samples = json['samples'];
-    if (durationMs is! int || samples is! List) {
+    if (samples is! List) {
       return null;
     }
     final normalizedSamples = AudioWaveformCacheService.normalizeSampleCount(
@@ -34,7 +33,7 @@ class AudioWaveformSnapshot {
       return null;
     }
     return AudioWaveformSnapshot(
-      duration: Duration(milliseconds: durationMs),
+      duration: durationMs is int ? Duration(milliseconds: durationMs) : null,
       samples: normalizedSamples,
     );
   }
@@ -42,14 +41,12 @@ class AudioWaveformSnapshot {
 
 class AudioWaveformCacheService {
   AudioWaveformCacheService(
-    this._preferences,
+    this._mediaCacheService,
     this._audioSourceResolverService,
   );
-
-  static const String _cachePrefix = 'voice_waveform:v2:';
   static const int targetBarCount = 35;
 
-  final SharedPreferences _preferences;
+  final MediaCacheService _mediaCacheService;
   final AudioSourceResolverService _audioSourceResolverService;
   final Map<String, AudioWaveformSnapshot> _memoryCache =
       <String, AudioWaveformSnapshot>{};
@@ -57,19 +54,25 @@ class AudioWaveformCacheService {
       <String, Future<AudioWaveformSnapshot?>>{};
 
   Future<AudioWaveformSnapshot?> resolveForAttachment(
-    AttachmentItem attachment,
-  ) {
+    AttachmentItem attachment, {
+    Duration? preferredDuration,
+    String? waveformInputPath,
+  }) async {
     final cacheKey = _cacheKeyForAttachment(attachment);
-    final immediate = _snapshotFromAttachment(attachment);
+    final immediate = _snapshotFromAttachment(attachment, preferredDuration);
     if (immediate != null) {
-      _store(cacheKey, immediate);
-      return Future<AudioWaveformSnapshot?>.value(immediate);
+      await _store(cacheKey, immediate);
+      return immediate;
     }
 
-    final cached = _memoryCache[cacheKey] ?? _restore(cacheKey);
+    final cached = _memoryCache[cacheKey] ?? await _restore(cacheKey);
     if (cached != null) {
-      _memoryCache[cacheKey] = cached;
-      return Future<AudioWaveformSnapshot?>.value(cached);
+      final hydrated = _withPreferredDuration(cached, preferredDuration);
+      _memoryCache[cacheKey] = hydrated;
+      if (hydrated.duration != cached.duration) {
+        await _store(cacheKey, hydrated);
+      }
+      return hydrated;
     }
 
     final existing = _inFlight[cacheKey];
@@ -77,7 +80,12 @@ class AudioWaveformCacheService {
       return existing;
     }
 
-    final future = _extractAndCache(attachment, cacheKey);
+    final future = _extractAndCache(
+      attachment,
+      cacheKey,
+      preferredDuration: preferredDuration,
+      waveformInputPath: waveformInputPath,
+    );
     _inFlight[cacheKey] = future;
     future.whenComplete(() {
       _inFlight.remove(cacheKey);
@@ -90,21 +98,23 @@ class AudioWaveformCacheService {
     required String audioFilePath,
     required Duration duration,
   }) async {
+    final cacheKey = _mediaCacheService.cacheKeyForAttachmentId(attachmentId);
     final snapshot = await _extractFromFile(
       audioFilePath: audioFilePath,
       duration: duration,
     );
     if (snapshot != null) {
-      _store(attachmentId, snapshot);
+      await _store(cacheKey, snapshot);
     }
     return snapshot;
   }
 
-  AudioWaveformSnapshot? primeFromAttachmentMetadata({
+  Future<AudioWaveformSnapshot?> primeFromAttachmentMetadata({
     required String attachmentId,
     required Duration duration,
     required List<int> samples,
-  }) {
+  }) async {
+    final cacheKey = _mediaCacheService.cacheKeyForAttachmentId(attachmentId);
     final normalizedSamples = normalizeSampleCount(samples);
     if (normalizedSamples.isEmpty) {
       return null;
@@ -114,14 +124,17 @@ class AudioWaveformCacheService {
       duration: duration,
       samples: normalizedSamples,
     );
-    _store(attachmentId, snapshot);
+    await _store(cacheKey, snapshot);
     return snapshot;
   }
 
-  AudioWaveformSnapshot? _snapshotFromAttachment(AttachmentItem attachment) {
-    final duration = attachment.duration;
+  AudioWaveformSnapshot? _snapshotFromAttachment(
+    AttachmentItem attachment,
+    Duration? preferredDuration,
+  ) {
+    final duration = attachment.duration ?? preferredDuration;
     final samples = attachment.waveformSamples;
-    if (duration == null || samples == null || samples.isEmpty) {
+    if (samples == null || samples.isEmpty) {
       return null;
     }
     return AudioWaveformSnapshot(
@@ -130,46 +143,49 @@ class AudioWaveformCacheService {
     );
   }
 
-  AudioWaveformSnapshot? _restore(String cacheKey) {
-    final raw = _preferences.getString('$_cachePrefix$cacheKey');
-    if (raw == null || raw.isEmpty) {
+  Future<AudioWaveformSnapshot?> _restore(String cacheKey) async {
+    final raw = await _mediaCacheService.getJsonSidecar(
+      _mediaCacheService.sidecarKey(cacheKey, 'waveform'),
+    );
+    if (raw == null) {
       return null;
     }
     try {
-      return AudioWaveformSnapshot.fromJson(
-        jsonDecode(raw) as Map<String, dynamic>,
-      );
+      return AudioWaveformSnapshot.fromJson(raw);
     } catch (_) {
       return null;
     }
   }
 
-  void _store(String cacheKey, AudioWaveformSnapshot snapshot) {
+  Future<void> _store(String cacheKey, AudioWaveformSnapshot snapshot) async {
     _memoryCache[cacheKey] = snapshot;
-    _preferences.setString(
-      '$_cachePrefix$cacheKey',
-      jsonEncode(snapshot.toJson()),
+    await _mediaCacheService.putJsonSidecar(
+      key: _mediaCacheService.sidecarKey(cacheKey, 'waveform'),
+      json: snapshot.toJson(),
     );
   }
 
   Future<AudioWaveformSnapshot?> _extractAndCache(
     AttachmentItem attachment,
-    String cacheKey,
-  ) async {
-    final waveformInputPath = await _audioSourceResolverService
-        .resolveWaveformInputPath(attachment);
-    if (waveformInputPath == null || waveformInputPath.isEmpty) {
+    String cacheKey, {
+    required Duration? preferredDuration,
+    String? waveformInputPath,
+  }) async {
+    final resolvedWaveformInputPath =
+        waveformInputPath ??
+        await _audioSourceResolverService.resolveWaveformInputPath(attachment);
+    if (resolvedWaveformInputPath == null ||
+        resolvedWaveformInputPath.isEmpty) {
       return null;
     }
 
     try {
-      final knownDuration = attachment.duration;
       final snapshot = await _extractFromFile(
-        audioFilePath: waveformInputPath,
-        duration: knownDuration,
+        audioFilePath: resolvedWaveformInputPath,
+        duration: attachment.duration ?? preferredDuration,
       );
       if (snapshot != null) {
-        _store(cacheKey, snapshot);
+        await _store(cacheKey, snapshot);
       }
       return snapshot;
     } catch (error, stackTrace) {
@@ -195,9 +211,22 @@ class AudioWaveformCacheService {
       return null;
     }
 
+    return AudioWaveformSnapshot(duration: duration, samples: samples);
+  }
+
+  AudioWaveformSnapshot _withPreferredDuration(
+    AudioWaveformSnapshot snapshot,
+    Duration? preferredDuration,
+  ) {
+    if (preferredDuration == null || snapshot.duration == preferredDuration) {
+      return snapshot;
+    }
+    if (snapshot.duration != null && snapshot.duration! > Duration.zero) {
+      return snapshot;
+    }
     return AudioWaveformSnapshot(
-      duration: duration ?? Duration.zero,
-      samples: samples,
+      duration: preferredDuration,
+      samples: snapshot.samples,
     );
   }
 
@@ -228,10 +257,12 @@ class AudioWaveformCacheService {
   }
 
   String _cacheKeyForAttachment(AttachmentItem attachment) {
-    if (attachment.id.isNotEmpty) {
-      return attachment.id;
-    }
-    return attachment.url;
+    return _mediaCacheService.cacheKeyForAttachment(attachment);
+  }
+
+  void clearMemory() {
+    _memoryCache.clear();
+    _inFlight.clear();
   }
 }
 
@@ -239,7 +270,7 @@ final audioWaveformCacheServiceProvider = Provider<AudioWaveformCacheService>((
   ref,
 ) {
   return AudioWaveformCacheService(
-    ref.watch(sharedPreferencesProvider),
+    ref.watch(mediaCacheServiceProvider),
     ref.watch(audioSourceResolverServiceProvider),
   );
 });

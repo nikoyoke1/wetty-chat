@@ -1,6 +1,6 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../../../core/cache/app_cached_network_image.dart';
 import '../../../../../app/theme/style_config.dart';
 import '../../../models/message_models.dart';
 
@@ -299,7 +299,7 @@ class _ReactionReactorAvatar extends StatelessWidget {
       ),
       child: ClipOval(
         child: avatarUrl != null && avatarUrl.isNotEmpty
-            ? CachedNetworkImage(
+            ? AppCachedNetworkImage(
                 imageUrl: avatarUrl,
                 width: size,
                 height: size,

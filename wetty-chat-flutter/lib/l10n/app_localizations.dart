@@ -321,6 +321,54 @@ abstract class AppLocalizations {
   /// **'Text Size'**
   String get settingsTextSize;
 
+  /// Cache settings entry label
+  ///
+  /// In en, this message translates to:
+  /// **'Cache'**
+  String get settingsCache;
+
+  /// Cache settings page title
+  ///
+  /// In en, this message translates to:
+  /// **'Cache'**
+  String get settingsCacheTitle;
+
+  /// Header for the cache settings section
+  ///
+  /// In en, this message translates to:
+  /// **'APP CACHE'**
+  String get settingsCacheSectionHeader;
+
+  /// Description of what the managed media cache contains
+  ///
+  /// In en, this message translates to:
+  /// **'Includes managed cached media such as images, downloaded audio files, transcoded audio, and waveform data.'**
+  String get settingsCacheDescription;
+
+  /// Label for managed cache usage
+  ///
+  /// In en, this message translates to:
+  /// **'Storage Used'**
+  String get settingsCacheUsage;
+
+  /// Clear cache action label
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Cache'**
+  String get settingsClearCache;
+
+  /// Confirmation dialog title for clearing cache
+  ///
+  /// In en, this message translates to:
+  /// **'Clear cache?'**
+  String get settingsClearCacheTitle;
+
+  /// Confirmation dialog message for clearing cache
+  ///
+  /// In en, this message translates to:
+  /// **'This removes cached media files and waveform data stored on this device.'**
+  String get settingsClearCacheMessage;
+
   /// Chat settings section header
   ///
   /// In en, this message translates to:

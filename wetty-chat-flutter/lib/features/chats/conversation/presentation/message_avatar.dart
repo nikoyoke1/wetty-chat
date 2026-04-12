@@ -1,5 +1,6 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
+
+import '../../../../core/cache/app_cached_network_image.dart';
 
 class MessageAvatar extends StatelessWidget {
   const MessageAvatar({
@@ -16,7 +17,7 @@ class MessageAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipOval(
-      child: CachedNetworkImage(
+      child: AppCachedNetworkImage(
         imageUrl: avatarUrl,
         width: avatarSize,
         height: avatarSize,

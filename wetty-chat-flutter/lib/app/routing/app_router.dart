@@ -17,6 +17,7 @@ import '../../features/groups/settings/presentation/group_settings_view.dart';
 import '../../features/settings/presentation/dev_session_settings_view.dart';
 import '../../features/settings/presentation/font_size_settings_view.dart';
 import '../../features/settings/presentation/language_settings_view.dart';
+import '../../features/settings/presentation/cache_settings_view.dart';
 import '../../features/settings/presentation/notification_settings_view.dart';
 import '../../features/settings/presentation/profile_settings_view.dart';
 import '../../features/settings/presentation/settings_view.dart';
@@ -167,6 +168,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                     path: 'notifications',
                     pageBuilder: (context, state) =>
                         const CupertinoPage(child: NotificationSettingsPage()),
+                  ),
+                  GoRoute(
+                    path: 'cache',
+                    pageBuilder: (context, state) =>
+                        const CupertinoPage(child: CacheSettingsPage()),
                   ),
                   GoRoute(
                     path: 'sticker-packs',

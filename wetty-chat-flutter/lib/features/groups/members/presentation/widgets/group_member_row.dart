@@ -1,6 +1,6 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../../../core/cache/app_cached_network_image.dart';
 import '../../data/group_member_models.dart';
 
 class GroupMemberRow extends StatelessWidget {
@@ -73,7 +73,7 @@ class _GroupMemberAvatar extends StatelessWidget {
     final avatarUrl = member.avatarUrl;
     if (avatarUrl != null && avatarUrl.isNotEmpty) {
       return ClipOval(
-        child: CachedNetworkImage(
+        child: AppCachedNetworkImage(
           imageUrl: avatarUrl,
           width: _size,
           height: _size,

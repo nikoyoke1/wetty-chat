@@ -1,15 +1,21 @@
 import 'dart:async';
 
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:chahua/core/cache/media_cache_service.dart';
 import 'package:chahua/features/chats/conversation/application/voice_message_playback_controller.dart';
 import 'package:chahua/features/chats/conversation/data/audio_playback_driver.dart';
+import 'package:chahua/features/chats/conversation/data/audio_source_resolver_service.dart';
 import 'package:chahua/features/chats/models/message_models.dart';
-import 'package:chahua/core/providers/shared_preferences_provider.dart';
+import '../../../../test_utils/path_provider_mock.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(setUpPathProviderMock);
+  tearDownAll(tearDownPathProviderMock);
+
   group('VoiceMessagePlaybackController', () {
     test('first tap loads and starts playback', () async {
       final driver = FakeAudioPlaybackDriver();
@@ -24,7 +30,7 @@ void main() {
       );
 
       final state = container.read(voiceMessagePlaybackControllerProvider);
-      expect(driver.loadedUrls, ['https://example.com/a1.m4a']);
+      expect(driver.loadedUrls, ['/tmp/a1.m4a']);
       expect(driver.playCalls, 1);
       expect(state.activeAttachmentId, 'a1');
       expect(state.phase, VoiceMessagePlaybackPhase.playing);
@@ -77,10 +83,7 @@ void main() {
       );
 
       final state = container.read(voiceMessagePlaybackControllerProvider);
-      expect(driver.loadedUrls, [
-        'https://example.com/a1.m4a',
-        'https://example.com/a2.m4a',
-      ]);
+      expect(driver.loadedUrls, ['/tmp/a1.m4a', '/tmp/a2.m4a']);
       expect(state.activeAttachmentId, 'a2');
       expect(state.phase, VoiceMessagePlaybackPhase.playing);
     });
@@ -129,12 +132,23 @@ void main() {
 Future<ProviderContainer> _createContainer(
   FakeAudioPlaybackDriver driver,
 ) async {
-  SharedPreferences.setMockInitialValues(const <String, Object>{});
-  final preferences = await SharedPreferences.getInstance();
+  const cacheNamespace = 'voice-message-playback-test';
+  final mediaCacheService = MediaCacheService(
+    cacheNamespace: cacheNamespace,
+    cacheManager: CacheManager(
+      Config(
+        cacheNamespace,
+        stalePeriod: const Duration(days: 1),
+        maxNrOfCacheObjects: 20,
+      ),
+    ),
+  );
   return ProviderContainer(
     overrides: [
       audioPlaybackDriverProvider.overrideWithValue(driver),
-      sharedPreferencesProvider.overrideWithValue(preferences),
+      audioSourceResolverServiceProvider.overrideWithValue(
+        FakeAudioSourceResolverService(mediaCacheService),
+      ),
     ],
   );
 }
@@ -247,5 +261,24 @@ class FakeAudioPlaybackDriver implements AudioPlaybackDriver {
   @override
   Future<void> dispose() async {
     await _controller.close();
+  }
+}
+
+class FakeAudioSourceResolverService extends AudioSourceResolverService {
+  FakeAudioSourceResolverService(super.mediaCacheService);
+
+  @override
+  Future<AudioPlaybackSource?> resolvePlaybackSource(
+    AttachmentItem attachment,
+  ) async {
+    return AudioPlaybackSource.file(
+      filePath: '/tmp/${attachment.id}.m4a',
+      localWaveformPath: '/tmp/${attachment.id}.m4a',
+    );
+  }
+
+  @override
+  Future<String?> resolveWaveformInputPath(AttachmentItem attachment) async {
+    return '/tmp/${attachment.id}.m4a';
   }
 }

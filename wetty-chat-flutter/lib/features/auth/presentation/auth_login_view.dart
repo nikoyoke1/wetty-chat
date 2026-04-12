@@ -39,8 +39,35 @@ class _AuthLoginPageState extends ConsumerState<AuthLoginPage> {
 
     if (username.isEmpty || password.isEmpty) {
       setState(() {
-        _errorText = l10n.missingFields;
+        _isSubmitting = true;
+        _errorText = null;
       });
+      try {
+        await ref.read(authSessionProvider.notifier).bootstrap();
+      } catch (_) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _errorText = l10n.loginFailed;
+        });
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isSubmitting = false;
+          });
+        }
+      }
+      if (!mounted) {
+        return;
+      }
+
+      final session = ref.read(authSessionProvider);
+      if (!session.isAuthenticated) {
+        setState(() {
+          _errorText = l10n.loginFailed;
+        });
+      }
       return;
     }
 

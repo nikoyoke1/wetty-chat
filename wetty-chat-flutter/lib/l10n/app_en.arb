@@ -112,6 +112,30 @@
   "settingsTextSize": "Text Size",
   "@settingsTextSize": { "description": "Text size setting label" },
 
+  "settingsCache": "Cache",
+  "@settingsCache": { "description": "Cache settings entry label" },
+
+  "settingsCacheTitle": "Cache",
+  "@settingsCacheTitle": { "description": "Cache settings page title" },
+
+  "settingsCacheSectionHeader": "APP CACHE",
+  "@settingsCacheSectionHeader": { "description": "Header for the cache settings section" },
+
+  "settingsCacheDescription": "Includes managed cached media such as images, downloaded audio files, transcoded audio, and waveform data.",
+  "@settingsCacheDescription": { "description": "Description of what the managed media cache contains" },
+
+  "settingsCacheUsage": "Storage Used",
+  "@settingsCacheUsage": { "description": "Label for managed cache usage" },
+
+  "settingsClearCache": "Clear Cache",
+  "@settingsClearCache": { "description": "Clear cache action label" },
+
+  "settingsClearCacheTitle": "Clear cache?",
+  "@settingsClearCacheTitle": { "description": "Confirmation dialog title for clearing cache" },
+
+  "settingsClearCacheMessage": "This removes cached media files and waveform data stored on this device.",
+  "@settingsClearCacheMessage": { "description": "Confirmation dialog message for clearing cache" },
+
   "settingsChat": "Chat",
   "@settingsChat": { "description": "Chat settings section header" },
 

@@ -1,6 +1,6 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../../core/cache/app_cached_network_image.dart';
 import '../../../../app/theme/style_config.dart';
 import '../../chat_timestamp_formatter.dart';
 import '../../models/message_models.dart';
@@ -285,7 +285,7 @@ class _OverlayAvatar extends StatelessWidget {
   }) {
     if (imageUrl != null && imageUrl.isNotEmpty) {
       return ClipOval(
-        child: CachedNetworkImage(
+        child: AppCachedNetworkImage(
           imageUrl: imageUrl,
           width: size,
           height: size,

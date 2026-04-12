@@ -1,7 +1,7 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/cache/app_cached_network_image.dart';
 import '../../models/message_models.dart';
 
 class AttachmentViewerPage extends StatelessWidget {
@@ -41,7 +41,7 @@ class AttachmentViewerPage extends StatelessWidget {
               ? _ZoomableImageViewport(
                   imageWidth: attachment.width?.toDouble(),
                   imageHeight: attachment.height?.toDouble(),
-                  child: CachedNetworkImage(
+                  child: AppCachedNetworkImage(
                     imageUrl: attachment.url,
                     fit: BoxFit.contain,
                     filterQuality: FilterQuality.medium,

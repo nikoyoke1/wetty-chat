@@ -5,11 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../app/theme/style_config.dart';
 import '../../application/voice_message_playback_controller.dart';
+import '../../application/voice_message_presentation_provider.dart';
 import '../../data/audio_waveform_cache_service.dart';
 import '../../domain/conversation_message.dart';
 import '../../../models/message_models.dart';
 import 'message_bubble_meta.dart';
 import 'message_bubble_presentation.dart';
+import 'voice_message_bubble_fallback.dart';
 
 class VoiceMessageBubble extends ConsumerStatefulWidget {
   const VoiceMessageBubble({
@@ -31,49 +33,44 @@ class VoiceMessageBubble extends ConsumerStatefulWidget {
 
 class _VoiceMessageBubbleState extends ConsumerState<VoiceMessageBubble> {
   Duration? _dragPosition;
-  Future<AudioWaveformSnapshot?>? _waveformFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _waveformFuture = _resolveWaveform();
-  }
-
-  @override
-  void didUpdateWidget(covariant VoiceMessageBubble oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.attachment.id != widget.attachment.id ||
-        oldWidget.attachment.url != widget.attachment.url ||
-        oldWidget.attachment.durationMs != widget.attachment.durationMs ||
-        oldWidget.attachment.waveformSamples !=
-            widget.attachment.waveformSamples) {
-      _waveformFuture = _resolveWaveform();
-    }
-  }
-
-  Future<AudioWaveformSnapshot?> _resolveWaveform() {
-    return ref
-        .read(audioWaveformCacheServiceProvider)
-        .resolveForAttachment(widget.attachment);
-  }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<AudioWaveformSnapshot?>(
-      future: _waveformFuture,
-      builder: (context, snapshot) {
-        final waveform = snapshot.data;
-        if (snapshot.connectionState != ConnectionState.done &&
-            waveform == null) {
-          return _UnavailableVoiceMessageBody(
-            isMe: widget.isMe,
-            message: widget.message,
-            presentation: widget.presentation,
-            statusText: 'Preparing audio...',
-            icon: const CupertinoActivityIndicator(),
-          );
-        }
+    final presentationAsync = ref.watch(
+      voiceMessagePresentationProvider(widget.attachment),
+    );
+
+    return presentationAsync.when(
+      loading: () => _UnavailableVoiceMessageBody(
+        isMe: widget.isMe,
+        message: widget.message,
+        presentation: widget.presentation,
+        statusText: 'Preparing audio...',
+        icon: const CupertinoActivityIndicator(),
+      ),
+      error: (_, _) => _UnavailableVoiceMessageBody(
+        isMe: widget.isMe,
+        message: widget.message,
+        presentation: widget.presentation,
+        statusText: 'Audio is not playable.',
+        icon: const Icon(
+          CupertinoIcons.exclamationmark_triangle_fill,
+          size: 18,
+          color: CupertinoColors.systemYellow,
+        ),
+      ),
+      data: (presentationData) {
+        final waveform = presentationData.waveform;
         if (waveform == null) {
+          if (presentationData.canPlay) {
+            return VoiceMessageBubbleFallback(
+              attachment: widget.attachment,
+              isMe: widget.isMe,
+              message: widget.message,
+              presentation: widget.presentation,
+              resolvedDuration: presentationData.duration,
+            );
+          }
           return _UnavailableVoiceMessageBody(
             isMe: widget.isMe,
             message: widget.message,
@@ -92,6 +89,8 @@ class _VoiceMessageBubbleState extends ConsumerState<VoiceMessageBubble> {
           message: widget.message,
           presentation: widget.presentation,
           waveform: waveform,
+          resolvedDuration: presentationData.duration,
+          canPlay: presentationData.canPlay,
           dragPosition: _dragPosition,
           onPreviewSeek: (position) {
             setState(() {
@@ -186,6 +185,8 @@ class _WaveformVoiceMessageBody extends ConsumerWidget {
     required this.message,
     required this.presentation,
     required this.waveform,
+    required this.resolvedDuration,
+    required this.canPlay,
     required this.dragPosition,
     required this.onPreviewSeek,
     required this.onCommitSeek,
@@ -196,6 +197,8 @@ class _WaveformVoiceMessageBody extends ConsumerWidget {
   final ConversationMessage? message;
   final MessageBubblePresentation? presentation;
   final AudioWaveformSnapshot waveform;
+  final Duration? resolvedDuration;
+  final bool canPlay;
   final Duration? dragPosition;
   final ValueChanged<Duration> onPreviewSeek;
   final VoidCallback onCommitSeek;
@@ -214,6 +217,7 @@ class _WaveformVoiceMessageBody extends ConsumerWidget {
       attachmentDuration: attachment.duration,
       playbackDuration: playbackState.durationFor(attachment.id),
       waveformDuration: waveform.duration,
+      resolvedDuration: resolvedDuration,
     );
     final resolvedPosition = switch (phase) {
       VoiceMessagePlaybackPhase.completed => duration,
@@ -225,12 +229,11 @@ class _WaveformVoiceMessageBody extends ConsumerWidget {
       duration,
     );
     final progress = _progressFor(clampedPosition, duration);
-    final visibleBarCount = _visibleBarCountForDuration(duration);
     final visibleSamples = _visibleSamplesForWaveform(
       waveform.samples,
-      visibleBarCount,
+      AudioWaveformCacheService.targetBarCount,
     );
-    final waveformWidth = _waveformWidthForBarCount(visibleBarCount);
+    final waveformWidth = voiceMessageUniformWaveformWidth;
     final bubbleColor =
         presentation?.bubbleColor ??
         (isMe
@@ -247,7 +250,6 @@ class _WaveformVoiceMessageBody extends ConsumerWidget {
     final inactiveWaveformColor = isMe
         ? CupertinoColors.white.withAlpha(92)
         : accent.withAlpha(72);
-    final canPlay = attachment.url.isNotEmpty;
     final secondaryText = phase == VoiceMessagePlaybackPhase.error
         ? playbackState.errorMessage ?? 'Audio playback failed'
         : '${_formatDuration(clampedPosition)} / ${_formatDuration(duration)}';
@@ -481,8 +483,8 @@ const double _voiceWaveformButtonSize = 32;
 const double _voiceWaveformGap = 10;
 const double _voiceWaveformMinWidth = 88;
 const double _voiceWaveformMaxWidth = 173;
-const int _voiceWaveformMinBars = 16;
-const int _voiceWaveformBarsPerSecond = 4;
+
+const double voiceMessageUniformWaveformWidth = _voiceWaveformMaxWidth;
 
 List<int> _visibleSamplesForWaveform(List<int> samples, int targetCount) {
   if (samples.isEmpty || targetCount <= 0) {
@@ -504,13 +506,6 @@ List<int> _visibleSamplesForWaveform(List<int> samples, int targetCount) {
     }
     return peak;
   }, growable: false);
-}
-
-int _visibleBarCountForDuration(Duration duration) {
-  final target = duration.inSeconds * _voiceWaveformBarsPerSecond;
-  return target
-      .clamp(_voiceWaveformMinBars, AudioWaveformCacheService.targetBarCount)
-      .toInt();
 }
 
 double _waveformWidthForBarCount(int barCount) {
@@ -599,11 +594,13 @@ Duration _positionFromDx(double dx, double width, Duration duration) {
 Duration resolveVoiceMessageDuration({
   Duration? attachmentDuration,
   Duration? playbackDuration,
-  required Duration waveformDuration,
+  Duration? resolvedDuration,
+  required Duration? waveformDuration,
 }) {
   final candidates = <Duration?>[
     attachmentDuration,
     playbackDuration,
+    resolvedDuration,
     waveformDuration,
   ];
   for (final candidate in candidates) {
@@ -611,7 +608,11 @@ Duration resolveVoiceMessageDuration({
       return candidate;
     }
   }
-  return attachmentDuration ?? playbackDuration ?? waveformDuration;
+  return attachmentDuration ??
+      playbackDuration ??
+      resolvedDuration ??
+      waveformDuration ??
+      Duration.zero;
 }
 
 String _formatDuration(Duration? duration) {

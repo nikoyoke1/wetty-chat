@@ -120,6 +120,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsTextSize => 'Text Size';
 
   @override
+  String get settingsCache => 'Cache';
+
+  @override
+  String get settingsCacheTitle => 'Cache';
+
+  @override
+  String get settingsCacheSectionHeader => 'APP CACHE';
+
+  @override
+  String get settingsCacheDescription =>
+      'Includes managed cached media such as images, downloaded audio files, transcoded audio, and waveform data.';
+
+  @override
+  String get settingsCacheUsage => 'Storage Used';
+
+  @override
+  String get settingsClearCache => 'Clear Cache';
+
+  @override
+  String get settingsClearCacheTitle => 'Clear cache?';
+
+  @override
+  String get settingsClearCacheMessage =>
+      'This removes cached media files and waveform data stored on this device.';
+
+  @override
   String get settingsChat => 'Chat';
 
   @override

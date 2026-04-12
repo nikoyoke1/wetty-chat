@@ -78,6 +78,14 @@ class SettingsPage extends ConsumerWidget {
             titleFontWeight: FontWeight.w500,
             onTap: () => context.push(AppRoutes.fontSize),
           ),
+          SettingsItemData(
+            title: l10n.settingsCache,
+            icon: CupertinoIcons.tray_full,
+            iconColor: const Color(0xFF5E5CE6),
+            titleFontSize: AppFontSizes.body,
+            titleFontWeight: FontWeight.w500,
+            onTap: () => context.push(AppRoutes.cache),
+          ),
         ],
       ),
       SettingsSectionData(
