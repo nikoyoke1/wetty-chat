@@ -687,6 +687,9 @@ class _ConversationTimelineState extends ConsumerState<ConversationTimeline> {
                         ? null
                         : (emoji) => unawaited(_toggleReaction(message, emoji)),
                     onTapMention: widget.onTapMention,
+                    onRetryFailed: message.isFailed
+                        ? () => unawaited(_retryFailedMessage(message))
+                        : null,
                     showSenderName: showSenderName,
                     showAvatar: showAvatar,
                   ),
@@ -709,6 +712,18 @@ class _ConversationTimelineState extends ConsumerState<ConversationTimeline> {
         };
       },
     );
+  }
+
+  Future<void> _retryFailedMessage(ConversationMessage message) async {
+    try {
+      await ref
+          .read(conversationComposerViewModelProvider(widget.scope).notifier)
+          .retryFailedMessage(message);
+    } catch (error) {
+      if (mounted) {
+        _showErrorDialog('$error');
+      }
+    }
   }
 }
 

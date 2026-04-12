@@ -244,6 +244,7 @@ void main() {
             message: 'reply',
           ),
         );
+        store.applySendAccepted('optimistic-thread-1');
         store.applySendConfirmed(
           _serverMessage(
             scope: threadScope,
@@ -257,6 +258,10 @@ void main() {
         );
 
         expect(store.selectThreadAnchorState(10)?.replyCount, 1);
+        expect(
+          store.messageForServerId(20)?.deliveryState,
+          ConversationDeliveryState.confirmed,
+        );
         expect(
           store
               .selectVisibleWindow(threadScope)
@@ -380,6 +385,25 @@ void main() {
 
       expect(retried.deliveryState, ConversationDeliveryState.sending);
       expect(store.selectThreadAnchorState(10)?.replyCount, 2);
+    });
+
+    test('accepting an optimistic send keeps it local until confirmation', () {
+      final store = MessageDomainStore();
+
+      final optimistic = store.applyOptimisticNormalMessageSend(
+        const MessageDomainDraftMessage(
+          scope: chatScope,
+          clientGeneratedId: 'optimistic-accepted-1',
+          sender: sender,
+          message: 'hello',
+        ),
+      );
+
+      final accepted = store.applySendAccepted('optimistic-accepted-1');
+
+      expect(accepted.localMessageId, optimistic.localMessageId);
+      expect(accepted.serverMessageId, isNull);
+      expect(accepted.deliveryState, ConversationDeliveryState.sent);
     });
   });
 }

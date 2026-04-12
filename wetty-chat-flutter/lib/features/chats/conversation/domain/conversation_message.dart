@@ -5,7 +5,14 @@ import 'conversation_scope.dart';
 
 part 'conversation_message.freezed.dart';
 
-enum ConversationDeliveryState { sending, sent, failed, editing, deleting }
+enum ConversationDeliveryState {
+  sending,
+  sent,
+  confirmed,
+  failed,
+  editing,
+  deleting,
+}
 
 @freezed
 abstract class ConversationMessage with _$ConversationMessage {
@@ -41,6 +48,10 @@ abstract class ConversationMessage with _$ConversationMessage {
   bool get isSystem => messageType == 'system';
   bool get isLocalOnly => serverMessageId == null;
   bool get isPending => deliveryState == ConversationDeliveryState.sending;
+  bool get isSent =>
+      deliveryState == ConversationDeliveryState.sent ||
+      deliveryState == ConversationDeliveryState.confirmed;
+  bool get isConfirmed => deliveryState == ConversationDeliveryState.confirmed;
   bool get isFailed => deliveryState == ConversationDeliveryState.failed;
   bool get isMutating =>
       deliveryState == ConversationDeliveryState.editing ||

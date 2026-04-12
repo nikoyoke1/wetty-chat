@@ -225,12 +225,35 @@ class ComposerEditing extends ConversationComposerMode {
   final ConversationMessage message;
 }
 
+class _ComposerSendRequest {
+  const _ComposerSendRequest({
+    required this.sender,
+    required this.text,
+    required this.messageType,
+    required this.optimisticAttachments,
+    required this.attachmentIds,
+    this.replyToId,
+    this.sticker,
+    this.stickerId,
+  });
+
+  final Sender sender;
+  final String text;
+  final String messageType;
+  final List<AttachmentItem> optimisticAttachments;
+  final List<String> attachmentIds;
+  final int? replyToId;
+  final StickerSummary? sticker;
+  final String? stickerId;
+}
+
 class ConversationComposerState {
   const ConversationComposerState({
     required this.draft,
     required this.mode,
     required this.attachments,
     required this.audioDraft,
+    required this.nextClientGeneratedId,
   });
 
   static const int maxAttachmentsPerMessage = 10;
@@ -239,6 +262,7 @@ class ConversationComposerState {
   final ConversationComposerMode mode;
   final List<ComposerAttachment> attachments;
   final ComposerAudioDraft? audioDraft;
+  final String nextClientGeneratedId;
 
   bool get isEditing => mode is ComposerEditing;
   bool get hasUploadingAttachments =>
@@ -282,6 +306,7 @@ class ConversationComposerState {
     ConversationComposerMode? mode,
     List<ComposerAttachment>? attachments,
     Object? audioDraft = _sentinel,
+    String? nextClientGeneratedId,
   }) {
     return ConversationComposerState(
       draft: draft ?? this.draft,
@@ -290,6 +315,8 @@ class ConversationComposerState {
       audioDraft: audioDraft == _sentinel
           ? this.audioDraft
           : audioDraft as ComposerAudioDraft?,
+      nextClientGeneratedId:
+          nextClientGeneratedId ?? this.nextClientGeneratedId,
     );
   }
 }
@@ -330,6 +357,7 @@ class ConversationComposerViewModel
       mode: const ComposerIdle(),
       attachments: const <ComposerAttachment>[],
       audioDraft: null,
+      nextClientGeneratedId: _newClientGeneratedId(),
     );
   }
 
@@ -441,10 +469,10 @@ class ConversationComposerViewModel
       _repository.beginOptimisticEdit(mode.message.serverMessageId!);
       try {
         await _repository.commitEdit(mode.message.serverMessageId!, trimmed);
-        state = const ConversationComposerState(
+        state = state.copyWith(
           draft: '',
-          mode: ComposerIdle(),
-          attachments: <ComposerAttachment>[],
+          mode: const ComposerIdle(),
+          attachments: const <ComposerAttachment>[],
           audioDraft: null,
         );
         await _draftStore.clearDraft(_scope);
@@ -461,78 +489,39 @@ class ConversationComposerViewModel
         .toList(growable: false);
 
     final currentUserId = ref.read(authSessionProvider).currentUserId;
-    final clientGeneratedId =
-        '${DateTime.now().microsecondsSinceEpoch}-$currentUserId-${_scope.storageKey}';
-    _repository.insertOptimisticSend(
-      sender: Sender(uid: currentUserId, name: 'You'),
-      text: trimmed,
-      messageType: 'text',
-      attachments: optimisticAttachments,
-      clientGeneratedId: clientGeneratedId,
-      replyToId: mode is ComposerReplying ? mode.message.serverMessageId : null,
-    );
-
-    try {
-      await _repository.commitSend(
-        clientGeneratedId: clientGeneratedId,
+    await _sendOptimisticMessage(
+      _ComposerSendRequest(
+        sender: Sender(uid: currentUserId, name: 'You'),
         text: trimmed,
         messageType: 'text',
+        optimisticAttachments: optimisticAttachments,
         attachmentIds: attachmentIds,
         replyToId: mode is ComposerReplying
             ? mode.message.serverMessageId
             : null,
-      );
-      state = const ConversationComposerState(
-        draft: '',
-        mode: ComposerIdle(),
-        attachments: <ComposerAttachment>[],
-        audioDraft: null,
-      );
-      await _draftStore.clearDraft(_scope);
-    } catch (_) {
-      _repository.markSendFailed(clientGeneratedId);
-      rethrow;
-    }
+      ),
+    );
   }
 
   Future<void> sendSticker(StickerSummary sticker) async {
     final stickerId = sticker.id;
     if (stickerId == null) return;
     final currentUserId = ref.read(authSessionProvider).currentUserId;
-    final clientGeneratedId =
-        '${DateTime.now().microsecondsSinceEpoch}-$currentUserId-${_scope.storageKey}';
     final mode = state.mode;
-    final replyToId = mode is ComposerReplying
-        ? mode.message.serverMessageId
-        : null;
-
-    _repository.insertOptimisticSend(
-      sender: Sender(uid: currentUserId, name: 'You'),
-      text: '',
-      messageType: 'sticker',
-      attachments: const [],
-      clientGeneratedId: clientGeneratedId,
-      replyToId: replyToId,
-      sticker: sticker,
-    );
-
-    if (mode is ComposerReplying) {
-      state = state.copyWith(mode: const ComposerIdle());
-    }
-
-    try {
-      await _repository.commitSend(
-        clientGeneratedId: clientGeneratedId,
+    await _sendOptimisticMessage(
+      _ComposerSendRequest(
+        sender: Sender(uid: currentUserId, name: 'You'),
         text: '',
         messageType: 'sticker',
+        optimisticAttachments: const [],
         attachmentIds: const [],
-        replyToId: replyToId,
+        replyToId: mode is ComposerReplying
+            ? mode.message.serverMessageId
+            : null,
+        sticker: sticker,
         stickerId: stickerId,
-      );
-    } catch (_) {
-      _repository.markSendFailed(clientGeneratedId);
-      rethrow;
-    }
+      ),
+    );
   }
 
   /// Draft attachments move through queued -> uploading -> uploaded/failed.
@@ -917,8 +906,6 @@ class ConversationComposerViewModel
     }
 
     final currentUserId = ref.read(authSessionProvider).currentUserId;
-    final clientGeneratedId =
-        '${DateTime.now().microsecondsSinceEpoch}-$currentUserId-${_scope.storageKey}';
     final mode = state.mode;
     await ref
         .read(audioWaveformCacheServiceProvider)
@@ -927,39 +914,67 @@ class ConversationComposerViewModel
           duration: uploadDraft.duration,
           samples: uploadDraft.waveformSamples,
         );
-    _repository.insertOptimisticSend(
-      sender: Sender(uid: currentUserId, name: 'You'),
-      text: '',
-      messageType: 'audio',
-      attachments: [
-        uploadDraft.toAttachmentItem(attachmentId: uploadInfo.attachmentId),
-      ],
-      clientGeneratedId: clientGeneratedId,
-      replyToId: mode is ComposerReplying ? mode.message.serverMessageId : null,
-    );
-    state = state.copyWith(audioDraft: null);
-
-    try {
-      await _repository.commitSend(
-        clientGeneratedId: clientGeneratedId,
+    await _sendOptimisticMessage(
+      _ComposerSendRequest(
+        sender: Sender(uid: currentUserId, name: 'You'),
         text: '',
         messageType: 'audio',
+        optimisticAttachments: [
+          uploadDraft.toAttachmentItem(attachmentId: uploadInfo.attachmentId),
+        ],
         attachmentIds: [uploadInfo.attachmentId],
         replyToId: mode is ComposerReplying
             ? mode.message.serverMessageId
             : null,
+      ),
+    );
+  }
+
+  Future<void> _sendOptimisticMessage(_ComposerSendRequest request) async {
+    final clientGeneratedId = _consumeNextClientGeneratedId();
+    _repository.insertOptimisticSend(
+      sender: request.sender,
+      text: request.text,
+      messageType: request.messageType,
+      attachments: request.optimisticAttachments,
+      clientGeneratedId: clientGeneratedId,
+      replyToId: request.replyToId,
+      sticker: request.sticker,
+    );
+    state = state.copyWith(
+      draft: '',
+      mode: const ComposerIdle(),
+      attachments: const <ComposerAttachment>[],
+      audioDraft: null,
+    );
+    await _draftStore.clearDraft(_scope);
+
+    try {
+      await _repository.commitSend(
+        clientGeneratedId: clientGeneratedId,
+        text: request.text,
+        messageType: request.messageType,
+        attachmentIds: request.attachmentIds,
+        replyToId: request.replyToId,
+        stickerId: request.stickerId,
       );
-      state = const ConversationComposerState(
-        draft: '',
-        mode: ComposerIdle(),
-        attachments: <ComposerAttachment>[],
-        audioDraft: null,
-      );
-      await _draftStore.clearDraft(_scope);
     } catch (_) {
       _repository.markSendFailed(clientGeneratedId);
       rethrow;
     }
+  }
+
+  String _newClientGeneratedId() {
+    final currentUserId = ref.read(authSessionProvider).currentUserId;
+    return '${DateTime.now().microsecondsSinceEpoch}-$currentUserId-${_scope.storageKey}';
+  }
+
+  String _consumeNextClientGeneratedId() {
+    final current = state.nextClientGeneratedId.isNotEmpty
+        ? state.nextClientGeneratedId
+        : _newClientGeneratedId();
+    state = state.copyWith(nextClientGeneratedId: _newClientGeneratedId());
+    return current;
   }
 
   Duration _currentAudioDuration() {

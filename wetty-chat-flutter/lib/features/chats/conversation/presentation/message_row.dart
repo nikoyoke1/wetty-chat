@@ -60,6 +60,7 @@ class MessageRow extends StatefulWidget {
     this.onOpenThread,
     this.onToggleReaction,
     this.onTapMention,
+    this.onRetryFailed,
     this.showSenderName = true,
     this.showAvatar = true,
   });
@@ -74,6 +75,7 @@ class MessageRow extends StatefulWidget {
   final VoidCallback? onOpenThread;
   final ValueChanged<String>? onToggleReaction;
   final void Function(int uid, MentionInfo? mention)? onTapMention;
+  final VoidCallback? onRetryFailed;
   final bool showSenderName;
   final bool showAvatar;
 
@@ -192,6 +194,22 @@ class _MessageRowState extends State<MessageRow> {
     MessageBubblePresentation presentation,
   ) {
     final avatarColumnWidth = _avatarLaneWidth;
+    final failedRetryButton =
+        _isMe && widget.message.isFailed && widget.onRetryFailed != null
+        ? Padding(
+            padding: const EdgeInsets.only(right: 6, bottom: 4),
+            child: CupertinoButton(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(24, 24),
+              onPressed: widget.onRetryFailed,
+              child: Icon(
+                CupertinoIcons.arrow_clockwise_circle_fill,
+                size: 22,
+                color: CupertinoColors.systemRed.resolveFrom(context),
+              ),
+            ),
+          )
+        : null;
     final bubble = _isPureAudioMessage
         ? KeyedSubtree(
             key: _bubbleKey,
@@ -256,7 +274,7 @@ class _MessageRowState extends State<MessageRow> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: _isMe
-                ? [bubble, trailingAvatarColumn]
+                ? [?failedRetryButton, bubble, trailingAvatarColumn]
                 : [leadingAvatarColumn, bubble],
           ),
         ),

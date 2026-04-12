@@ -88,6 +88,24 @@ class MessageDomainStore {
     return message;
   }
 
+  ConversationMessage applySendAccepted(String clientGeneratedId) {
+    final stableKey = _stableKeyByClientGeneratedId[clientGeneratedId];
+    if (stableKey == null) {
+      throw StateError(
+        'Message not found for clientGeneratedId: $clientGeneratedId',
+      );
+    }
+    final current = _messagesByStableKey[stableKey];
+    if (current == null) {
+      throw StateError('Message not found for stableKey: $stableKey');
+    }
+    final accepted = current.copyWith(
+      deliveryState: ConversationDeliveryState.sent,
+    );
+    _messagesByStableKey[stableKey] = accepted;
+    return accepted;
+  }
+
   ConversationMessage applySendConfirmed(ConversationMessage message) {
     final serverMessageId = message.serverMessageId;
     final wasKnownServerMessage =
@@ -99,7 +117,7 @@ class MessageDomainStore {
         _pendingOptimisticThreadReplyClientIds.contains(clientGeneratedId);
 
     final merged = _mergeIncoming(
-      message.copyWith(deliveryState: ConversationDeliveryState.sent),
+      message.copyWith(deliveryState: ConversationDeliveryState.confirmed),
     );
     _ensureInWindow(merged.scope, merged.stableKey);
 
@@ -223,7 +241,7 @@ class MessageDomainStore {
       hasAttachments: false,
       attachments: const <AttachmentItem>[],
       threadInfo: isAnchorDelete ? _threadInfoFromAnchorState(messageId) : null,
-      deliveryState: ConversationDeliveryState.sent,
+      deliveryState: ConversationDeliveryState.confirmed,
     );
     _messagesByStableKey[stableKey] = deleted;
     _applyDeleteVisibility(
@@ -277,7 +295,7 @@ class MessageDomainStore {
 
   void applyWebsocketMessageDeleted(ConversationMessage message) {
     _mergeIncoming(
-      message.copyWith(deliveryState: ConversationDeliveryState.sent),
+      message.copyWith(deliveryState: ConversationDeliveryState.confirmed),
     );
     applyDeleteConfirmed(message.serverMessageId!);
   }
@@ -313,7 +331,7 @@ class MessageDomainStore {
     for (final message in messages) {
       final scoped = message.copyWith(
         scope: _canonicalScopeForFetchedMessage(scope, message),
-        deliveryState: ConversationDeliveryState.sent,
+        deliveryState: ConversationDeliveryState.confirmed,
       );
       final merged = _mergeIncoming(scoped);
       confirmedKeys.add(merged.stableKey);
@@ -370,7 +388,7 @@ class MessageDomainStore {
     for (final message in messages) {
       final scoped = message.copyWith(
         scope: _canonicalScopeForFetchedMessage(scope, message),
-        deliveryState: ConversationDeliveryState.sent,
+        deliveryState: ConversationDeliveryState.confirmed,
       );
       final merged = _mergeIncoming(scoped);
       incomingKeys.add(merged.stableKey);

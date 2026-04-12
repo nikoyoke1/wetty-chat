@@ -20,6 +20,23 @@ void main() {
         store: MessageDomainStore(),
       );
 
+      repository.insertOptimisticSend(
+        sender: const Sender(uid: 7, name: 'Tester'),
+        text: '',
+        messageType: 'audio',
+        attachments: const [
+          AttachmentItem(
+            id: 'att-1',
+            url: '',
+            kind: 'audio/mp4',
+            size: 0,
+            fileName: 'att-1',
+          ),
+        ],
+        clientGeneratedId: 'audio-cg-1',
+        replyToId: 7,
+      );
+
       await repository.commitSend(
         clientGeneratedId: 'audio-cg-1',
         text: '',
@@ -33,6 +50,37 @@ void main() {
       expect(service.lastSendAttachmentIds, const ['att-1']);
       expect(service.lastSendReplyToId, 7);
     });
+
+    test(
+      'commitSend marks optimistic message sent without assigning server id',
+      () async {
+        final service = _FakeMessageApiService(messages: const []);
+        final repository = ConversationRepository(
+          scope: const ConversationScope.chat(chatId: '1'),
+          service: service,
+          store: MessageDomainStore(),
+        );
+
+        final optimistic = repository.insertOptimisticSend(
+          sender: const Sender(uid: 7, name: 'Tester'),
+          text: 'hello',
+          messageType: 'text',
+          attachments: const [],
+          clientGeneratedId: 'pending-http-1',
+        );
+
+        final accepted = await repository.commitSend(
+          clientGeneratedId: 'pending-http-1',
+          text: 'hello',
+          messageType: 'text',
+          attachmentIds: const <String>[],
+        );
+
+        expect(accepted.localMessageId, optimistic.localMessageId);
+        expect(accepted.serverMessageId, isNull);
+        expect(accepted.deliveryState, ConversationDeliveryState.sent);
+      },
+    );
   });
 
   group('ConversationRepository refresh reconciliation', () {
@@ -67,7 +115,10 @@ void main() {
 
         expect(refreshed, hasLength(1));
         expect(refreshed.single.serverMessageId, 2);
-        expect(refreshed.single.deliveryState, ConversationDeliveryState.sent);
+        expect(
+          refreshed.single.deliveryState,
+          ConversationDeliveryState.confirmed,
+        );
         expect(refreshed.single.localMessageId, optimistic.localMessageId);
         expect(
           repository.messageForServerId(2)?.clientGeneratedId,

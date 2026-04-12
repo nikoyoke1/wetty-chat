@@ -64,7 +64,8 @@ abstract final class MessageDomainMessageFactory {
   static ConversationMessage fromMessageItem(
     MessageItem message, {
     ConversationScope? scope,
-    ConversationDeliveryState deliveryState = ConversationDeliveryState.sent,
+    ConversationDeliveryState deliveryState =
+        ConversationDeliveryState.confirmed,
   }) {
     final resolvedScope = scope ?? inferScope(message);
     return ConversationMessage(

@@ -406,7 +406,7 @@ class ConversationRepository {
     int? replyToId,
     String? stickerId,
   }) async {
-    final response = await _service.sendConversationMessage(
+    await _service.sendConversationMessage(
       scope,
       text,
       messageType: messageType,
@@ -415,7 +415,7 @@ class ConversationRepository {
       clientGeneratedId: clientGeneratedId,
       stickerId: stickerId,
     );
-    return _applyServerCreated(_messageFromDto(response));
+    return _store.applySendAccepted(clientGeneratedId);
   }
 
   void markSendFailed(String clientGeneratedId) {
@@ -532,7 +532,7 @@ class ConversationRepository {
       _store.applyWebsocketMessageDeleted(
         _mergeIncomingSnapshot(
           message,
-          deliveryState: ConversationDeliveryState.sent,
+          deliveryState: ConversationDeliveryState.confirmed,
         ),
       );
       return true;
@@ -540,7 +540,7 @@ class ConversationRepository {
 
     final merged = _mergeIncomingSnapshot(
       message,
-      deliveryState: ConversationDeliveryState.sent,
+      deliveryState: ConversationDeliveryState.confirmed,
     );
     switch (_eventTypeFor(payload, deleted: deleted)) {
       case _ConversationRealtimeEventType.created:
@@ -681,17 +681,6 @@ class ConversationRepository {
       messages: messages.map(_messageFromDto).toList(),
       direction: direction,
     );
-  }
-
-  ConversationMessage _applyServerCreated(ConversationMessage incoming) {
-    final message = _store.applySendConfirmed(
-      _mergeIncomingSnapshot(
-        incoming,
-        deliveryState: ConversationDeliveryState.sent,
-      ),
-    );
-    _optimisticSnapshots.remove(message.stableKey);
-    return message;
   }
 
   ConversationMessage _applyServerUpdated(ConversationMessage incoming) {

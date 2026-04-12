@@ -21,7 +21,22 @@ class MessageBubbleMeta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final showDeliveryStatus = isMe && !message.isFailed;
-    final isConfirmed = message.serverMessageId != null;
+    final deliveryIndicator = switch (message.deliveryState) {
+      ConversationDeliveryState.sending => const CupertinoActivityIndicator(
+        radius: MessageBubblePresentation.statusIconSize / 2,
+      ),
+      ConversationDeliveryState.sent => Icon(
+        CupertinoIcons.checkmark_alt_circle,
+        size: MessageBubblePresentation.statusIconSize,
+        color: presentation.metaColor,
+      ),
+      ConversationDeliveryState.confirmed => Icon(
+        CupertinoIcons.checkmark_alt_circle_fill,
+        size: MessageBubblePresentation.statusIconSize,
+        color: presentation.metaColor,
+      ),
+      _ => null,
+    };
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -49,15 +64,9 @@ class MessageBubbleMeta extends StatelessWidget {
             fontWeight: fontWeight,
           ),
         ),
-        if (showDeliveryStatus) ...[
+        if (showDeliveryStatus && deliveryIndicator != null) ...[
           const SizedBox(width: MessageBubblePresentation.statusIconGap),
-          Icon(
-            isConfirmed
-                ? CupertinoIcons.checkmark_alt_circle_fill
-                : CupertinoIcons.checkmark_alt_circle,
-            size: MessageBubblePresentation.statusIconSize,
-            color: presentation.metaColor,
-          ),
+          deliveryIndicator,
         ],
       ],
     );

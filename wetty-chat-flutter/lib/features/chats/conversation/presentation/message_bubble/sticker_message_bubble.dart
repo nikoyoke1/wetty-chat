@@ -145,7 +145,22 @@ class _StickerTimestampChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final showDeliveryStatus = isMe && !message.isFailed;
-    final isConfirmed = message.serverMessageId != null;
+    final deliveryIndicator = switch (message.deliveryState) {
+      ConversationDeliveryState.sending => const CupertinoActivityIndicator(
+        radius: MessageBubblePresentation.statusIconSize / 2,
+      ),
+      ConversationDeliveryState.sent => Icon(
+        CupertinoIcons.checkmark_alt_circle,
+        size: MessageBubblePresentation.statusIconSize,
+        color: CupertinoColors.white,
+      ),
+      ConversationDeliveryState.confirmed => Icon(
+        CupertinoIcons.checkmark_alt_circle_fill,
+        size: MessageBubblePresentation.statusIconSize,
+        color: CupertinoColors.white,
+      ),
+      _ => null,
+    };
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
@@ -162,15 +177,9 @@ class _StickerTimestampChip extends StatelessWidget {
               child: Text('edited', style: _metaStyle(context)),
             ),
           Text(presentation.timeStr, style: _metaStyle(context)),
-          if (showDeliveryStatus) ...[
+          if (showDeliveryStatus && deliveryIndicator != null) ...[
             const SizedBox(width: MessageBubblePresentation.statusIconGap),
-            Icon(
-              isConfirmed
-                  ? CupertinoIcons.checkmark_alt_circle_fill
-                  : CupertinoIcons.checkmark_alt_circle,
-              size: MessageBubblePresentation.statusIconSize,
-              color: CupertinoColors.white.withAlpha(217),
-            ),
+            Opacity(opacity: 0.85, child: deliveryIndicator),
           ],
         ],
       ),
