@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:flutter/widgets.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
@@ -29,6 +31,10 @@ class ImageCacheService {
   final BaseCacheManager _cacheManager;
 
   BaseCacheManager get cacheManager => _cacheManager;
+
+  ImageProvider<Object> providerForUrl(String imageUrl) {
+    return CachedNetworkImageProvider(imageUrl, cacheManager: _cacheManager);
+  }
 
   Future<int> estimateUsageBytes() async {
     final directory = await _cacheDirectory();

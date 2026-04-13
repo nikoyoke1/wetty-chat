@@ -5,6 +5,7 @@ import '../../domain/conversation_message.dart';
 import '../../../../../app/theme/style_config.dart';
 import '../../../models/message_models.dart';
 import '../../../models/message_preview_formatter.dart';
+import '../attachment_viewer_request.dart';
 import '../message_attachment_previews.dart';
 import '../video_popup_player.dart';
 import 'linkified_message_text.dart';
@@ -39,7 +40,7 @@ class MessageBubbleContent extends StatelessWidget {
   final int? currentUserId;
   final VoidCallback? onTapReply;
   final VoidCallback? onOpenThread;
-  final ValueChanged<AttachmentItem>? onOpenAttachment;
+  final ValueChanged<MessageAttachmentOpenRequest>? onOpenAttachment;
   final ValueChanged<String>? onToggleReaction;
   final void Function(int uid, MentionInfo? mention)? onTapMention;
 
@@ -280,6 +281,11 @@ class MessageBubbleContent extends StatelessWidget {
     AttachmentItem attachment, {
     required double maxAttachmentWidth,
   }) {
+    final viewerRequest = buildImageAttachmentViewerRequest(
+      message: message,
+      tappedAttachment: attachment,
+    );
+
     if (attachment.isAudio && message.messageType == 'audio') {
       return VoiceMessageBubble(
         attachment: attachment,
@@ -291,19 +297,29 @@ class MessageBubbleContent extends StatelessWidget {
     if (attachment.isVideo && attachment.url.isNotEmpty) {
       return VideoAttachmentPreview(
         attachment: attachment,
-        onTap: () => onOpenAttachment?.call(attachment),
+        onTap: () => onOpenAttachment?.call(
+          MessageAttachmentOpenRequest(attachment: attachment),
+        ),
       );
     }
     if (attachment.isImage && attachment.url.isNotEmpty) {
       return MessageImageAttachmentPreview(
         attachment: attachment,
-        onTap: () => onOpenAttachment?.call(attachment),
+        onTap: () => onOpenAttachment?.call(
+          MessageAttachmentOpenRequest(
+            attachment: attachment,
+            viewerRequest: viewerRequest,
+          ),
+        ),
         fallback: _buildFileAttachmentTile(context, attachment),
         maxWidth: maxAttachmentWidth,
+        heroTag: viewerRequest?.items[viewerRequest.initialIndex].heroTag,
       );
     }
     return GestureDetector(
-      onTap: () => onOpenAttachment?.call(attachment),
+      onTap: () => onOpenAttachment?.call(
+        MessageAttachmentOpenRequest(attachment: attachment),
+      ),
       child: _buildFileAttachmentTile(context, attachment),
     );
   }

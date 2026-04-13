@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../../domain/conversation_message.dart';
 import '../../../../../app/theme/style_config.dart';
 import '../../../models/message_models.dart';
+import '../attachment_viewer_request.dart';
 import 'message_bubble_content.dart';
 import 'message_bubble_presentation.dart';
 import 'sticker_message_bubble.dart';
@@ -33,7 +34,7 @@ class MessageBubble extends StatelessWidget {
   final VoidCallback? onTapSticker;
   final VoidCallback? onTapReply;
   final VoidCallback? onOpenThread;
-  final ValueChanged<AttachmentItem>? onOpenAttachment;
+  final ValueChanged<MessageAttachmentOpenRequest>? onOpenAttachment;
   final ValueChanged<String>? onToggleReaction;
   final void Function(int uid, MentionInfo? mention)? onTapMention;
 

@@ -6,12 +6,12 @@ import '../../core/session/dev_session_store.dart';
 import '../../features/auth/presentation/auth_login_view.dart';
 import '../../features/auth/presentation/auth_bootstrap_view.dart';
 import '../../features/chats/conversation/presentation/attachment_viewer_page.dart';
+import '../../features/chats/conversation/presentation/attachment_viewer_request.dart';
 import '../../features/chats/conversation/presentation/chat_detail_view.dart';
 import '../../features/chats/conversation/presentation/thread_detail_view.dart';
 import '../../features/chats/conversation/domain/launch_request.dart';
 import '../../features/chats/list/presentation/chat_list_view.dart';
 import '../../features/chats/list/presentation/new_chat_view.dart';
-import '../../features/chats/models/message_models.dart';
 import '../../features/groups/members/presentation/group_members_view.dart';
 import '../../features/groups/settings/presentation/group_settings_view.dart';
 import '../../features/settings/presentation/dev_session_settings_view.dart';
@@ -68,9 +68,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/attachment-viewer',
         pageBuilder: (context, state) {
-          final attachment = state.extra! as AttachmentItem;
-          return CupertinoPage(
-            child: AttachmentViewerPage(attachment: attachment),
+          final request = state.extra! as AttachmentViewerRequest;
+          return CustomTransitionPage<void>(
+            transitionDuration: const Duration(milliseconds: 200),
+            reverseTransitionDuration: const Duration(milliseconds: 180),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
+            child: AttachmentViewerPage(request: request),
           );
         },
       ),

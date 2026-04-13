@@ -9,6 +9,7 @@ import '../../../../app/theme/style_config.dart';
 import '../../../../core/network/api_config.dart';
 import '../../models/message_models.dart';
 import '../domain/conversation_message.dart';
+import 'attachment_viewer_request.dart';
 import 'message_avatar.dart';
 import 'message_bubble/message_bubble.dart';
 import 'message_bubble/message_bubble_presentation.dart';
@@ -145,14 +146,19 @@ class _MessageRowState extends State<MessageRow> {
     );
   }
 
-  Future<void> _openAttachment(AttachmentItem attachment) async {
+  Future<void> _openAttachment(MessageAttachmentOpenRequest request) async {
+    final attachment = request.attachment;
     if (attachment.url.isEmpty) {
       return;
     }
 
     if (attachment.isImage) {
+      final viewerRequest = request.viewerRequest;
+      if (viewerRequest == null) {
+        return;
+      }
       if (!mounted) return;
-      await context.push(AppRoutes.attachmentViewer, extra: attachment);
+      await context.push(AppRoutes.attachmentViewer, extra: viewerRequest);
       return;
     }
 

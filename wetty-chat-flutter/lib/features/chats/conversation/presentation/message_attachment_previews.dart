@@ -46,6 +46,7 @@ class MessageImageAttachmentPreview extends StatelessWidget {
     required this.fallback,
     required this.maxWidth,
     this.maxHeight = 300,
+    this.heroTag,
   });
 
   final AttachmentItem attachment;
@@ -53,6 +54,7 @@ class MessageImageAttachmentPreview extends StatelessWidget {
   final Widget fallback;
   final double maxWidth;
   final double maxHeight;
+  final String? heroTag;
 
   @override
   Widget build(BuildContext context) {
@@ -65,30 +67,32 @@ class MessageImageAttachmentPreview extends StatelessWidget {
     final previewHeight = layout?.height ?? maxHeight.clamp(0, 220).toDouble();
     final cacheWidth = (previewWidth * 2).round();
 
-    return GestureDetector(
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: CupertinoColors.systemGrey5.resolveFrom(context),
-          ),
-          child: SizedBox(
+    Widget preview = ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemGrey5.resolveFrom(context),
+        ),
+        child: SizedBox(
+          width: previewWidth,
+          height: previewHeight,
+          child: AppCachedNetworkImage(
+            imageUrl: attachment.url,
             width: previewWidth,
             height: previewHeight,
-            child: AppCachedNetworkImage(
-              imageUrl: attachment.url,
-              width: previewWidth,
-              height: previewHeight,
-              memCacheWidth: cacheWidth,
-              fit: BoxFit.contain,
-              placeholder: (context, url) =>
-                  const Center(child: CupertinoActivityIndicator()),
-              errorWidget: (context, url, error) => fallback,
-            ),
+            memCacheWidth: cacheWidth,
+            fit: BoxFit.contain,
+            placeholder: (context, url) =>
+                const Center(child: CupertinoActivityIndicator()),
+            errorWidget: (context, url, error) => fallback,
           ),
         ),
       ),
     );
+    if (heroTag != null) {
+      preview = Hero(tag: heroTag!, child: preview);
+    }
+
+    return GestureDetector(onTap: onTap, child: preview);
   }
 }
