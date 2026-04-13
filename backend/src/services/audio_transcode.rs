@@ -1,13 +1,15 @@
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use aws_sdk_s3::primitives::ByteStream;
 use chrono::Utc;
 use dashmap::DashSet;
 use diesel::prelude::*;
 use diesel::PgConnection;
-use tokio::sync::Semaphore;
-use tokio::task::JoinHandle;
+use futures::future::FutureExt;
+use tokio::sync::mpsc;
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use crate::errors::AppError;
@@ -20,43 +22,200 @@ use crate::schema::{attachments, messages};
 use crate::services::media::{build_storage_key, upload_public_object};
 use crate::AppState;
 
-fn inflight() -> &'static DashSet<i64> {
-    static INFLIGHT: OnceLock<DashSet<i64>> = OnceLock::new();
-    INFLIGHT.get_or_init(DashSet::new)
+const CHANNEL_BUFFER: usize = 64;
+const BACKLOG_REFILL_LIMIT: i64 = 200;
+const WORKER_RESTART_DELAY: Duration = Duration::from_secs(1);
+
+#[derive(Debug, Clone, Copy)]
+struct AudioTranscodeJob {
+    message_id: i64,
 }
 
-fn processing_semaphore() -> &'static Semaphore {
-    static PROCESSING_SEMAPHORE: OnceLock<Semaphore> = OnceLock::new();
-    PROCESSING_SEMAPHORE.get_or_init(|| Semaphore::new(4))
+enum EnqueueResult {
+    Queued,
+    AlreadyScheduled,
+    Full,
 }
 
-pub fn start(state: AppState) -> JoinHandle<()> {
-    tokio::spawn(async move { scan_and_enqueue(state.clone()).await })
+pub struct AudioTranscodeService {
+    job_tx: mpsc::Sender<AudioTranscodeJob>,
+    scheduled: DashSet<i64>,
+    processing: Mutex<Option<i64>>,
 }
 
-pub fn enqueue_message(state: AppState, message_id: i64) {
-    if inflight().insert(message_id) {
-        tokio::spawn(async move {
-            let _permit = processing_semaphore()
-                .acquire()
-                .await
-                .expect("audio transcode semaphore should not be closed");
-            tracing::debug!(message_id, "audio transcode processing started");
-            if let Err(err) = process_message(state.clone(), message_id).await {
-                tracing::warn!(message_id, ?err, "audio transcode processing failed");
-            }
-            inflight().remove(&message_id);
-        });
+static SERVICE: OnceLock<Arc<AudioTranscodeService>> = OnceLock::new();
+
+impl AudioTranscodeService {
+    fn new(job_tx: mpsc::Sender<AudioTranscodeJob>) -> Self {
+        Self {
+            job_tx,
+            scheduled: DashSet::new(),
+            processing: Mutex::new(None),
+        }
+    }
+
+    fn enqueue(&self, message_id: i64) -> EnqueueResult {
+        if !self.try_schedule(message_id) {
+            return EnqueueResult::AlreadyScheduled;
+        }
+
+        let job = AudioTranscodeJob { message_id };
+        if let Err(err) = self.job_tx.try_send(job) {
+            self.scheduled.remove(&message_id);
+            warn!(
+                message_id,
+                error = %err,
+                "audio transcode queue full, leaving message pending"
+            );
+            EnqueueResult::Full
+        } else {
+            debug!(message_id, "audio transcode job queued");
+            EnqueueResult::Queued
+        }
+    }
+
+    fn try_schedule(&self, message_id: i64) -> bool {
+        if self.scheduled.contains(&message_id) {
+            return false;
+        }
+        if self
+            .processing
+            .lock()
+            .expect("audio processing mutex poisoned")
+            .as_ref()
+            == Some(&message_id)
+        {
+            return false;
+        }
+        self.scheduled.insert(message_id)
+    }
+
+    fn start_processing(&self, message_id: i64) {
+        *self
+            .processing
+            .lock()
+            .expect("audio processing mutex poisoned") = Some(message_id);
+    }
+
+    fn finish_processing(&self, message_id: i64) {
+        let mut processing = self
+            .processing
+            .lock()
+            .expect("audio processing mutex poisoned");
+        if processing.as_ref() == Some(&message_id) {
+            *processing = None;
+        }
+        self.scheduled.remove(&message_id);
+    }
+
+    fn clear_processing_after_panic(&self) {
+        if let Some(message_id) = self
+            .processing
+            .lock()
+            .expect("audio processing mutex poisoned")
+            .take()
+        {
+            self.scheduled.remove(&message_id);
+        }
     }
 }
 
-async fn scan_and_enqueue(state: AppState) {
+pub fn start(state: AppState) {
+    let (tx, rx) = mpsc::channel(CHANNEL_BUFFER);
+    let service = Arc::new(AudioTranscodeService::new(tx));
+
+    if SERVICE.set(service.clone()).is_err() {
+        warn!("audio transcode service already started");
+        return;
+    }
+
+    tokio::spawn(async move {
+        supervise_worker(rx, service, state).await;
+    });
+}
+
+pub fn enqueue_message(message_id: i64) {
+    match SERVICE.get() {
+        Some(service) => {
+            let _ = service.enqueue(message_id);
+        }
+        None => error!(
+            message_id,
+            "audio transcode service not started; leaving message pending"
+        ),
+    }
+}
+
+async fn supervise_worker(
+    mut rx: mpsc::Receiver<AudioTranscodeJob>,
+    service: Arc<AudioTranscodeService>,
+    state: AppState,
+) {
+    loop {
+        let worker_result = std::panic::AssertUnwindSafe(run_worker(&mut rx, &service, &state))
+            .catch_unwind()
+            .await;
+
+        match worker_result {
+            Ok(()) => {
+                info!("Audio transcode worker stopped (channel closed)");
+                return;
+            }
+            Err(payload) => {
+                service.clear_processing_after_panic();
+                let panic_message = super::push::panic_payload_message(payload.as_ref());
+                error!(
+                    "Audio transcode worker panicked; restarting in {}s: {}",
+                    WORKER_RESTART_DELAY.as_secs(),
+                    panic_message
+                );
+                tokio::time::sleep(WORKER_RESTART_DELAY).await;
+            }
+        }
+    }
+}
+
+async fn run_worker(
+    rx: &mut mpsc::Receiver<AudioTranscodeJob>,
+    service: &Arc<AudioTranscodeService>,
+    state: &AppState,
+) {
+    info!("Audio transcode worker started");
+
+    loop {
+        refill_pending_jobs(service, state);
+
+        let Some(job) = rx.recv().await else {
+            return;
+        };
+
+        service.start_processing(job.message_id);
+        debug!(
+            message_id = job.message_id,
+            "audio transcode processing started"
+        );
+        let started_at = Instant::now();
+
+        if let Err(err) = process_message(state.clone(), job.message_id).await {
+            warn!(
+                message_id = job.message_id,
+                elapsed_ms = started_at.elapsed().as_millis() as u64,
+                ?err,
+                "audio transcode processing failed"
+            );
+        }
+
+        service.finish_processing(job.message_id);
+    }
+}
+
+fn refill_pending_jobs(service: &AudioTranscodeService, state: &AppState) {
     let mut conn = match state.db.get() {
         Ok(conn) => conn,
         Err(err) => {
-            tracing::error!(
+            error!(
                 ?err,
-                "audio transcode scan: failed to acquire db connection"
+                "audio transcode refill: failed to acquire db connection"
             );
             return;
         }
@@ -72,14 +231,14 @@ async fn scan_and_enqueue(state: AppState) {
         .filter(m_dsl::transcode_status.eq(TranscodeStatus::None))
         .order(m_dsl::id.desc())
         .select(m_dsl::id)
-        .limit(200)
+        .limit(BACKLOG_REFILL_LIMIT)
         .load(conn)
     {
         Ok(ids) => ids,
         Err(err) => {
-            tracing::error!(
+            error!(
                 ?err,
-                "audio transcode scan: failed to load legacy audio ids"
+                "audio transcode refill: failed to load legacy audio ids"
             );
             return;
         }
@@ -90,9 +249,9 @@ async fn scan_and_enqueue(state: AppState) {
             .set(m_dsl::transcode_status.eq(TranscodeStatus::Pending))
             .execute(conn)
         {
-            tracing::error!(
+            error!(
                 ?err,
-                "audio transcode scan: failed to mark legacy rows pending"
+                "audio transcode refill: failed to mark legacy rows pending"
             );
             return;
         }
@@ -104,25 +263,23 @@ async fn scan_and_enqueue(state: AppState) {
         .filter(m_dsl::transcode_status.eq(TranscodeStatus::Pending))
         .order(m_dsl::id.desc())
         .select(m_dsl::id)
-        .limit(200)
+        .limit(BACKLOG_REFILL_LIMIT)
         .load(conn)
     {
         Ok(ids) => ids,
         Err(err) => {
-            tracing::error!(
+            error!(
                 ?err,
-                "audio transcode scan: failed to load pending audio ids"
+                "audio transcode refill: failed to load pending audio ids"
             );
             return;
         }
     };
 
     for message_id in pending_ids {
-        tracing::debug!(
-            message_id,
-            "audio transcode startup backlog: queued pending audio message"
-        );
-        enqueue_message(state.clone(), message_id);
+        if matches!(service.enqueue(message_id), EnqueueResult::Full) {
+            break;
+        }
     }
 }
 

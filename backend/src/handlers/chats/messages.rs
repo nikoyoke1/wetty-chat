@@ -431,7 +431,7 @@ async fn post_message(
 
     send_result.side_effects.fire(&state);
     if matches!(send_result.response.message_type, MessageType::Audio) {
-        crate::services::audio_transcode::enqueue_message(state.clone(), send_result.response.id);
+        crate::services::audio_transcode::enqueue_message(send_result.response.id);
     }
 
     Ok((StatusCode::CREATED, Json(send_result.response)))
@@ -584,7 +584,7 @@ pub(super) async fn post_thread_message(
     // Post-commit: fire deferred side effects (new message WS broadcast + push)
     msg_side_effects.fire(&state);
     if matches!(response.message_type, MessageType::Audio) {
-        crate::services::audio_transcode::enqueue_message(state.clone(), response.id);
+        crate::services::audio_transcode::enqueue_message(response.id);
     }
 
     // Post-commit: WS broadcasts (root message update + thread update)
