@@ -770,13 +770,16 @@ class _ConversationComposerBarState
                               ComposerPreviewBar(
                                 composer: composer,
                                 onClearMode: () {
-                                  ref
-                                      .read(
-                                        conversationComposerViewModelProvider(
-                                          widget.scope,
-                                        ).notifier,
-                                      )
-                                      .clearMode();
+                                  final notifier = ref.read(
+                                    conversationComposerViewModelProvider(
+                                      widget.scope,
+                                    ).notifier,
+                                  );
+                                  if (composer.mode is ComposerEditing) {
+                                    unawaited(notifier.cancelEdit());
+                                    return;
+                                  }
+                                  notifier.clearMode();
                                 },
                               ),
                               Row(

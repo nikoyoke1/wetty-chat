@@ -253,6 +253,7 @@ class ConversationComposerState {
     required this.mode,
     required this.attachments,
     required this.audioDraft,
+    required this.savedDraftBeforeEdit,
     required this.nextClientGeneratedId,
   });
 
@@ -262,6 +263,7 @@ class ConversationComposerState {
   final ConversationComposerMode mode;
   final List<ComposerAttachment> attachments;
   final ComposerAudioDraft? audioDraft;
+  final String? savedDraftBeforeEdit;
   final String nextClientGeneratedId;
 
   bool get isEditing => mode is ComposerEditing;
@@ -306,6 +308,7 @@ class ConversationComposerState {
     ConversationComposerMode? mode,
     List<ComposerAttachment>? attachments,
     Object? audioDraft = _sentinel,
+    Object? savedDraftBeforeEdit = _sentinel,
     String? nextClientGeneratedId,
   }) {
     return ConversationComposerState(
@@ -315,6 +318,9 @@ class ConversationComposerState {
       audioDraft: audioDraft == _sentinel
           ? this.audioDraft
           : audioDraft as ComposerAudioDraft?,
+      savedDraftBeforeEdit: savedDraftBeforeEdit == _sentinel
+          ? this.savedDraftBeforeEdit
+          : savedDraftBeforeEdit as String?,
       nextClientGeneratedId:
           nextClientGeneratedId ?? this.nextClientGeneratedId,
     );
@@ -357,6 +363,7 @@ class ConversationComposerViewModel
       mode: const ComposerIdle(),
       attachments: const <ComposerAttachment>[],
       audioDraft: null,
+      savedDraftBeforeEdit: null,
       nextClientGeneratedId: _newClientGeneratedId(),
     );
   }
@@ -371,20 +378,42 @@ class ConversationComposerViewModel
       mode: ComposerReplying(message),
       attachments: const <ComposerAttachment>[],
       audioDraft: null,
+      savedDraftBeforeEdit: null,
     );
   }
 
   void beginEdit(ConversationMessage message) {
+    final savedDraftBeforeEdit = state.isEditing
+        ? state.savedDraftBeforeEdit
+        : state.draft;
     state = state.copyWith(
       mode: ComposerEditing(message),
       draft: message.message ?? '',
       attachments: const <ComposerAttachment>[],
       audioDraft: null,
+      savedDraftBeforeEdit: savedDraftBeforeEdit,
     );
   }
 
   void clearMode() {
-    state = state.copyWith(mode: const ComposerIdle());
+    state = state.copyWith(
+      mode: const ComposerIdle(),
+      savedDraftBeforeEdit: null,
+    );
+  }
+
+  Future<void> cancelEdit() async {
+    final restoredDraft = state.savedDraftBeforeEdit ?? '';
+    state = state.copyWith(
+      draft: restoredDraft,
+      mode: const ComposerIdle(),
+      savedDraftBeforeEdit: null,
+    );
+    if (restoredDraft.trim().isEmpty) {
+      await _draftStore.clearDraft(_scope);
+      return;
+    }
+    await _draftStore.setDraft(_scope, restoredDraft);
   }
 
   Future<String?> pickAndQueueAttachments(
@@ -474,6 +503,7 @@ class ConversationComposerViewModel
           mode: const ComposerIdle(),
           attachments: const <ComposerAttachment>[],
           audioDraft: null,
+          savedDraftBeforeEdit: null,
         );
         await _draftStore.clearDraft(_scope);
       } catch (_) {
@@ -946,6 +976,7 @@ class ConversationComposerViewModel
       mode: const ComposerIdle(),
       attachments: const <ComposerAttachment>[],
       audioDraft: null,
+      savedDraftBeforeEdit: null,
     );
     await _draftStore.clearDraft(_scope);
 
