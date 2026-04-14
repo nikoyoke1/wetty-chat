@@ -12,6 +12,7 @@ import '../../../../core/network/api_config.dart';
 import '../../models/message_models.dart';
 import '../data/media_save_service.dart';
 import 'attachment_viewer_request.dart';
+import 'video_attachment_thumbnail.dart';
 
 class AttachmentViewerPage extends ConsumerStatefulWidget {
   const AttachmentViewerPage({super.key, required this.request});
@@ -31,6 +32,7 @@ class _AttachmentViewerPageState extends ConsumerState<AttachmentViewerPage> {
   static const double _dismissBaseScaleTolerance = 0.02;
   static const double _dismissDistanceFraction = 0.18;
   static const double _dismissMinVelocity = 900;
+  static const double _dismissDirectionBias = 1.2;
 
   late final ExtendedPageController _pageController;
   late final ScrollController _thumbnailScrollController;
@@ -58,9 +60,11 @@ class _AttachmentViewerPageState extends ConsumerState<AttachmentViewerPage> {
               item.isImage ? GlobalKey<ExtendedImageGestureState>() : null,
         )
         .toList(growable: false);
-    _isItemAtBaseScale = widget.request.items
-        .map((item) => !item.isImage)
-        .toList(growable: false);
+    _isItemAtBaseScale = List<bool>.filled(
+      widget.request.items.length,
+      true,
+      growable: false,
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -84,10 +88,9 @@ class _AttachmentViewerPageState extends ConsumerState<AttachmentViewerPage> {
 
   AttachmentViewerItem get _currentItem => widget.request.items[_currentIndex];
 
-  bool get _isCurrentImageAtBaseScale => _isItemAtBaseScale[_currentIndex];
+  bool get _isCurrentItemAtBaseScale => _isItemAtBaseScale[_currentIndex];
 
-  bool get _canScrollCurrentPage =>
-      !_currentItem.isImage || _isCurrentImageAtBaseScale;
+  bool get _canScrollCurrentPage => _isCurrentItemAtBaseScale;
 
   void _toggleChrome() {
     setState(() {
@@ -104,6 +107,20 @@ class _AttachmentViewerPageState extends ConsumerState<AttachmentViewerPage> {
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
     );
+  }
+
+  void _jumpToPagePosition(double page) {
+    if (!_pageController.hasClients) {
+      return;
+    }
+    final position = _pageController.position;
+    final targetPixels = (page * position.viewportDimension)
+        .clamp(
+          position.minScrollExtent,
+          math.max(position.maxScrollExtent, 0).toDouble(),
+        )
+        .toDouble();
+    position.jumpTo(targetPixels);
   }
 
   void _handlePageChanged(int index) {
@@ -129,6 +146,15 @@ class _AttachmentViewerPageState extends ConsumerState<AttachmentViewerPage> {
     final totalScale = details?.totalScale ?? 1.0;
     final isAtBaseScale =
         (totalScale - 1.0).abs() <= _dismissBaseScaleTolerance;
+    if (_isItemAtBaseScale[index] == isAtBaseScale) {
+      return;
+    }
+    setState(() {
+      _isItemAtBaseScale[index] = isAtBaseScale;
+    });
+  }
+
+  void _handleVideoBaseScaleChanged(int index, bool isAtBaseScale) {
     if (_isItemAtBaseScale[index] == isAtBaseScale) {
       return;
     }
@@ -324,6 +350,38 @@ class _AttachmentViewerPageState extends ConsumerState<AttachmentViewerPage> {
                           controller: _thumbnailScrollController,
                           items: widget.request.items,
                           selectedIndex: _currentIndex,
+                          onDragUpdate: (details) {
+                            if (!_pageController.hasClients) {
+                              return;
+                            }
+                            final viewport =
+                                _pageController.position.viewportDimension;
+                            if (viewport <= 0) {
+                              return;
+                            }
+                            final currentPage =
+                                _pageController.page ??
+                                _currentIndex.toDouble();
+                            final targetPage =
+                                (currentPage -
+                                        ((details.primaryDelta ?? 0) /
+                                            viewport))
+                                    .clamp(
+                                      0.0,
+                                      (widget.request.items.length - 1)
+                                          .toDouble(),
+                                    )
+                                    .toDouble();
+                            _jumpToPagePosition(targetPage);
+                          },
+                          onDragEnd: () {
+                            final targetIndex =
+                                (_pageController.page ??
+                                        _currentIndex.toDouble())
+                                    .round()
+                                    .clamp(0, widget.request.items.length - 1);
+                            unawaited(_selectIndex(targetIndex));
+                          },
                           onTap: _selectIndex,
                         ),
                     ],
@@ -395,6 +453,8 @@ class _AttachmentViewerPageState extends ConsumerState<AttachmentViewerPage> {
         shouldInitialize: (index - _currentIndex).abs() <= 1,
         showControls: _isChromeVisible,
         onSurfaceTap: _toggleChrome,
+        onBaseScaleChanged: (isAtBaseScale) =>
+            _handleVideoBaseScaleChanged(index, isAtBaseScale),
         onError: (message) => _showStatus(message, isError: true),
         surfaceKey: ValueKey('attachment-viewer-media-$index'),
       ),
@@ -419,9 +479,7 @@ class _AttachmentViewerPageState extends ConsumerState<AttachmentViewerPage> {
               ExtendedImageSlidePageState? state,
               ScaleEndDetails? details,
             }) {
-              if (_currentItem.isImage &&
-                  !_isCurrentImageAtBaseScale &&
-                  state != null) {
+              if (!_isCurrentItemAtBaseScale && state != null) {
                 return false;
               }
               if (state == null) {
@@ -430,11 +488,14 @@ class _AttachmentViewerPageState extends ConsumerState<AttachmentViewerPage> {
 
               final dismissDistance =
                   state.pageSize.height * _dismissDistanceFraction;
+              final velocityX = details?.velocity.pixelsPerSecond.dx ?? 0;
               final velocityY = details?.velocity.pixelsPerSecond.dy ?? 0;
-              final movedFarEnough = offset.dy >= dismissDistance;
-              final flungDown = velocityY >= _dismissMinVelocity;
+              final movedFarEnough = offset.dy.abs() >= dismissDistance;
+              final flungFarEnough =
+                  velocityY.abs() >= _dismissMinVelocity &&
+                  velocityY.abs() > velocityX.abs() * _dismissDirectionBias;
 
-              return movedFarEnough || flungDown;
+              return movedFarEnough || flungFarEnough;
             },
         onSlidingPage: (state) {
           final nextIsSlidingPage = state.isSliding;
@@ -473,12 +534,16 @@ class _ThumbnailRail extends StatelessWidget {
     required this.controller,
     required this.items,
     required this.selectedIndex,
+    required this.onDragUpdate,
+    required this.onDragEnd,
     required this.onTap,
   });
 
   final ScrollController controller;
   final List<AttachmentViewerItem> items;
   final int selectedIndex;
+  final GestureDragUpdateCallback onDragUpdate;
+  final VoidCallback onDragEnd;
   final ValueChanged<int> onTap;
 
   @override
@@ -495,63 +560,89 @@ class _ThumbnailRail extends StatelessWidget {
 
         return SizedBox(
           height: _AttachmentViewerPageState._thumbnailRailHeight,
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: ListView.separated(
-              key: const Key('attachment-viewer-thumbnails'),
-              controller: controller,
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.fromLTRB(
-                sideInset +
-                    _AttachmentViewerPageState._thumbnailRailHorizontalPadding,
-                12,
-                sideInset +
-                    _AttachmentViewerPageState._thumbnailRailHorizontalPadding,
-                12,
-              ),
-              itemCount: items.length,
-              separatorBuilder: (context, index) => const SizedBox(
-                width: _AttachmentViewerPageState._thumbnailSpacing,
-              ),
-              itemBuilder: (context, index) {
-                final item = items[index];
-                final isSelected = index == selectedIndex;
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onHorizontalDragUpdate: onDragUpdate,
+            onHorizontalDragEnd: (_) => onDragEnd(),
+            onHorizontalDragCancel: onDragEnd,
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: ListView.separated(
+                key: const Key('attachment-viewer-thumbnails'),
+                controller: controller,
+                physics: const NeverScrollableScrollPhysics(),
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.fromLTRB(
+                  sideInset +
+                      _AttachmentViewerPageState
+                          ._thumbnailRailHorizontalPadding,
+                  12,
+                  sideInset +
+                      _AttachmentViewerPageState
+                          ._thumbnailRailHorizontalPadding,
+                  12,
+                ),
+                itemCount: items.length,
+                separatorBuilder: (context, index) => const SizedBox(
+                  width: _AttachmentViewerPageState._thumbnailSpacing,
+                ),
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  final isSelected = index == selectedIndex;
 
-                return GestureDetector(
-                  key: ValueKey('attachment-viewer-thumbnail-$index'),
-                  onTap: () => onTap(index),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    width: _AttachmentViewerPageState._thumbnailExtent,
-                    height: _AttachmentViewerPageState._thumbnailExtent,
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isSelected
-                            ? CupertinoColors.white
-                            : CupertinoColors.white.withAlpha(64),
-                        width: isSelected ? 2 : 1,
+                  return GestureDetector(
+                    key: ValueKey('attachment-viewer-thumbnail-$index'),
+                    onTap: () => onTap(index),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      width: _AttachmentViewerPageState._thumbnailExtent,
+                      height: _AttachmentViewerPageState._thumbnailExtent,
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isSelected
+                              ? CupertinoColors.white
+                              : CupertinoColors.white.withAlpha(64),
+                          width: isSelected ? 2 : 1,
+                        ),
+                        color: CupertinoColors.black.withAlpha(80),
                       ),
-                      color: CupertinoColors.black.withAlpha(80),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(7),
-                      child: item.isImage
-                          ? AppCachedNetworkImage(
-                              imageUrl: item.attachment.url,
-                              fit: BoxFit.cover,
-                              placeholder: (_, _) => const ColoredBox(
-                                color: CupertinoColors.systemGrey,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(7),
+                        child: item.isImage
+                            ? AppCachedNetworkImage(
+                                imageUrl: item.attachment.url,
+                                fit: BoxFit.cover,
+                                placeholder: (_, _) => const ColoredBox(
+                                  color: CupertinoColors.systemGrey,
+                                ),
+                                errorWidget: (_, _, _) =>
+                                    const _ThumbnailErrorTile(),
+                              )
+                            : Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  VideoAttachmentThumbnail(
+                                    attachment: item.attachment,
+                                  ),
+                                  Container(
+                                    color: CupertinoColors.black.withAlpha(42),
+                                  ),
+                                  const Center(
+                                    child: Icon(
+                                      CupertinoIcons.play_fill,
+                                      color: CupertinoColors.white,
+                                      size: 20,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              errorWidget: (_, _, _) =>
-                                  const _ThumbnailErrorTile(),
-                            )
-                          : const _VideoThumbnailTile(),
+                      ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
         );
@@ -571,37 +662,6 @@ class _ThumbnailErrorTile extends StatelessWidget {
         CupertinoIcons.exclamationmark_triangle,
         color: CupertinoColors.white,
       ),
-    );
-  }
-}
-
-class _VideoThumbnailTile extends StatelessWidget {
-  const _VideoThumbnailTile();
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        DecoratedBox(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF272727), Color(0xFF151515)],
-            ),
-          ),
-          child: Container(color: CupertinoColors.black.withAlpha(18)),
-        ),
-        Container(color: CupertinoColors.black.withAlpha(42)),
-        const Center(
-          child: Icon(
-            CupertinoIcons.play_fill,
-            color: CupertinoColors.white,
-            size: 20,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -645,6 +705,7 @@ class _VideoViewerPage extends StatefulWidget {
     required this.shouldInitialize,
     required this.showControls,
     required this.onSurfaceTap,
+    required this.onBaseScaleChanged,
     required this.onError,
     required this.surfaceKey,
   });
@@ -654,6 +715,7 @@ class _VideoViewerPage extends StatefulWidget {
   final bool shouldInitialize;
   final bool showControls;
   final VoidCallback onSurfaceTap;
+  final ValueChanged<bool> onBaseScaleChanged;
   final ValueChanged<String> onError;
   final Key surfaceKey;
 
@@ -662,16 +724,46 @@ class _VideoViewerPage extends StatefulWidget {
 }
 
 class _VideoViewerPageState extends State<_VideoViewerPage> {
+  static const double _videoMaxScale = 4;
+  static const double _videoDoubleTapScale = 2.5;
+  static const double _videoScaleTolerance = 0.02;
+  static const double _dismissGestureMinDelta = 10;
+  static const double _dismissDirectionBias = 1.2;
+
   VideoPlayerController? _controller;
+  ExtendedImageSlidePageState? _slidePageState;
+  late final TransformationController _transformationController;
   Object? _initializationError;
   var _isInitializing = false;
+  TapDownDetails? _doubleTapDetails;
+  var _isAtBaseScale = true;
+  final Set<int> _activePointers = <int>{};
+  final List<_PointerSample> _verticalDismissSamples = <_PointerSample>[];
+  Offset? _verticalDismissStart;
+  Offset? _verticalDismissLastGlobalPosition;
+  bool _isTrackingVerticalDismiss = false;
 
   @override
   void initState() {
     super.initState();
+    _transformationController = TransformationController();
+    _transformationController.addListener(_handleTransformChanged);
     if (widget.shouldInitialize) {
       unawaited(_ensureInitialized());
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      widget.onBaseScaleChanged(true);
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _slidePageState = context
+        .findAncestorStateOfType<ExtendedImageSlidePageState>();
   }
 
   @override
@@ -682,6 +774,7 @@ class _VideoViewerPageState extends State<_VideoViewerPage> {
     }
     if (!widget.isActive && oldWidget.isActive) {
       unawaited(_controller?.pause() ?? Future<void>.value());
+      _resetTransform();
     } else if (widget.isActive && !oldWidget.isActive) {
       unawaited(_playIfReady());
     }
@@ -689,8 +782,162 @@ class _VideoViewerPageState extends State<_VideoViewerPage> {
 
   @override
   void dispose() {
+    _transformationController.removeListener(_handleTransformChanged);
+    _transformationController.dispose();
     _controller?.dispose();
     super.dispose();
+  }
+
+  void _handleTransformChanged() {
+    final nextIsAtBaseScale =
+        (_transformationController.value.getMaxScaleOnAxis() - 1).abs() <=
+        _videoScaleTolerance;
+    if (_isAtBaseScale == nextIsAtBaseScale) {
+      return;
+    }
+    setState(() {
+      _isAtBaseScale = nextIsAtBaseScale;
+    });
+    widget.onBaseScaleChanged(nextIsAtBaseScale);
+  }
+
+  void _handlePointerDown(PointerDownEvent event) {
+    _activePointers.add(event.pointer);
+    if (_activePointers.length > 1) {
+      _cancelVerticalDismissTracking();
+      return;
+    }
+    _verticalDismissSamples
+      ..clear()
+      ..add(_PointerSample(event.timeStamp, event.position));
+    _verticalDismissStart = event.position;
+    _verticalDismissLastGlobalPosition = event.position;
+    _isTrackingVerticalDismiss = false;
+  }
+
+  void _handlePointerMove(PointerMoveEvent event) {
+    if (!_activePointers.contains(event.pointer)) {
+      return;
+    }
+    _verticalDismissSamples.add(
+      _PointerSample(event.timeStamp, event.position),
+    );
+    if (!_isAtBaseScale || _activePointers.length != 1) {
+      return;
+    }
+
+    final slidePageState = _slidePageState;
+    final start = _verticalDismissStart;
+    final lastGlobalPosition = _verticalDismissLastGlobalPosition;
+    if (slidePageState == null || start == null || lastGlobalPosition == null) {
+      return;
+    }
+
+    final totalDelta = event.position - start;
+    if (!_isTrackingVerticalDismiss) {
+      if (totalDelta.distance < _dismissGestureMinDelta) {
+        _verticalDismissLastGlobalPosition = event.position;
+        return;
+      }
+      final verticalDominant =
+          totalDelta.dy.abs() > totalDelta.dx.abs() * _dismissDirectionBias;
+      if (!verticalDominant) {
+        _verticalDismissLastGlobalPosition = event.position;
+        return;
+      }
+      _isTrackingVerticalDismiss = true;
+    }
+
+    slidePageState.slide(Offset(0, event.position.dy - lastGlobalPosition.dy));
+    _verticalDismissLastGlobalPosition = event.position;
+  }
+
+  void _handlePointerUp(PointerUpEvent event) {
+    _verticalDismissSamples.add(
+      _PointerSample(event.timeStamp, event.position),
+    );
+    _finishPointer(event.pointer);
+  }
+
+  void _handlePointerCancel(PointerCancelEvent event) {
+    _finishPointer(event.pointer);
+  }
+
+  void _finishPointer(int pointer) {
+    _activePointers.remove(pointer);
+    if (_activePointers.isNotEmpty) {
+      return;
+    }
+
+    final slidePageState = _slidePageState;
+    if (_isTrackingVerticalDismiss &&
+        slidePageState != null &&
+        slidePageState.isSliding) {
+      slidePageState.endSlide(
+        ScaleEndDetails(velocity: _estimateVerticalDismissVelocity()),
+      );
+    }
+    _cancelVerticalDismissTracking();
+  }
+
+  void _cancelVerticalDismissTracking() {
+    _verticalDismissSamples.clear();
+    _verticalDismissStart = null;
+    _verticalDismissLastGlobalPosition = null;
+    _isTrackingVerticalDismiss = false;
+  }
+
+  Velocity _estimateVerticalDismissVelocity() {
+    if (_verticalDismissSamples.length < 2) {
+      return Velocity.zero;
+    }
+
+    final latest = _verticalDismissSamples.last;
+    _PointerSample earliest = latest;
+
+    for (var i = _verticalDismissSamples.length - 2; i >= 0; i--) {
+      final candidate = _verticalDismissSamples[i];
+      if ((latest.timeStamp - candidate.timeStamp).inMilliseconds > 80) {
+        break;
+      }
+      earliest = candidate;
+    }
+
+    final elapsed = latest.timeStamp - earliest.timeStamp;
+    if (elapsed.inMicroseconds <= 0) {
+      return Velocity.zero;
+    }
+
+    final seconds = elapsed.inMicroseconds / Duration.microsecondsPerSecond;
+    final delta = latest.position - earliest.position;
+    return Velocity(pixelsPerSecond: delta / seconds);
+  }
+
+  void _resetTransform() {
+    _transformationController.value = Matrix4.identity();
+  }
+
+  void _handleDoubleTapDown(TapDownDetails details) {
+    _doubleTapDetails = details;
+  }
+
+  void _handleDoubleTap() {
+    final tapPosition = _doubleTapDetails?.localPosition;
+    if (tapPosition == null) {
+      return;
+    }
+    if (!_isAtBaseScale) {
+      _resetTransform();
+      return;
+    }
+    _transformationController.value = Matrix4.identity()
+      ..translateByDouble(
+        -tapPosition.dx * (_videoDoubleTapScale - 1),
+        -tapPosition.dy * (_videoDoubleTapScale - 1),
+        0,
+        1,
+      )
+      ..scaleByDouble(_videoDoubleTapScale, _videoDoubleTapScale, 1, 1);
   }
 
   Future<void> _ensureInitialized() async {
@@ -779,6 +1026,7 @@ class _VideoViewerPageState extends State<_VideoViewerPage> {
       _controller = null;
       _initializationError = null;
     });
+    _resetTransform();
     await _ensureInitialized();
     if (_initializationError != null) {
       widget.onError('Failed to load video.');
@@ -794,101 +1042,139 @@ class _VideoViewerPageState extends State<_VideoViewerPage> {
       child = const Center(child: CupertinoActivityIndicator());
     } else {
       final controller = _controller!;
+      final aspectRatio = controller.value.isInitialized
+          ? controller.value.aspectRatio
+          : _preferredAspectRatio(widget.attachment);
       child = Center(
-        child: AspectRatio(
-          aspectRatio: controller.value.isInitialized
-              ? controller.value.aspectRatio
-              : _preferredAspectRatio(widget.attachment),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              ColoredBox(
-                color: CupertinoColors.black,
-                child: FittedBox(
-                  fit: BoxFit.contain,
-                  child: SizedBox(
-                    width: controller.value.size.width,
-                    height: controller.value.size.height,
-                    child: VideoPlayer(controller),
-                  ),
-                ),
-              ),
-              Positioned.fill(
-                child: ValueListenableBuilder<VideoPlayerValue>(
-                  valueListenable: controller,
-                  builder: (context, value, child) {
-                    return Stack(
-                      children: [
-                        if (widget.showControls)
-                          Center(
-                            child: CupertinoButton(
-                              padding: EdgeInsets.zero,
-                              onPressed: _togglePlayback,
-                              child: Container(
-                                width: 68,
-                                height: 68,
-                                decoration: BoxDecoration(
-                                  color: CupertinoColors.black.withAlpha(130),
-                                  shape: BoxShape.circle,
-                                ),
-                                alignment: Alignment.center,
-                                child: Icon(
-                                  value.isPlaying
-                                      ? CupertinoIcons.pause_fill
-                                      : CupertinoIcons.play_fill,
-                                  color: CupertinoColors.white,
-                                  size: 34,
-                                ),
-                              ),
+        child: Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: _handlePointerDown,
+          onPointerMove: _handlePointerMove,
+          onPointerUp: _handlePointerUp,
+          onPointerCancel: _handlePointerCancel,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final fittedSize = _fittedVideoSize(
+                viewportSize: Size(constraints.maxWidth, constraints.maxHeight),
+                aspectRatio: aspectRatio,
+              );
+
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRect(
+                    child: InteractiveViewer(
+                      transformationController: _transformationController,
+                      panEnabled: !_isAtBaseScale,
+                      scaleEnabled: true,
+                      minScale: 1,
+                      maxScale: _videoMaxScale,
+                      constrained: false,
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none,
+                      child: SizedBox(
+                        width: fittedSize.width,
+                        height: fittedSize.height,
+                        child: ColoredBox(
+                          color: CupertinoColors.black,
+                          child: FittedBox(
+                            fit: BoxFit.fill,
+                            child: SizedBox(
+                              width: controller.value.size.width,
+                              height: controller.value.size.height,
+                              child: VideoPlayer(controller),
                             ),
                           ),
-                        Align(
-                          alignment: Alignment.bottomCenter,
-                          child: AnimatedOpacity(
-                            key: const Key('attachment-viewer-video-progress'),
-                            duration: const Duration(milliseconds: 180),
-                            opacity: widget.showControls ? 1 : 0,
-                            child: IgnorePointer(
-                              ignoring: !widget.showControls,
-                              child: Container(
-                                color: CupertinoColors.black.withAlpha(68),
-                                padding: const EdgeInsets.fromLTRB(
-                                  12,
-                                  8,
-                                  12,
-                                  12,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: widget.onSurfaceTap,
+                      onDoubleTapDown: _handleDoubleTapDown,
+                      onDoubleTap: _handleDoubleTap,
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: ValueListenableBuilder<VideoPlayerValue>(
+                      valueListenable: controller,
+                      builder: (context, value, child) {
+                        return Stack(
+                          children: [
+                            if (widget.showControls)
+                              Center(
+                                child: CupertinoButton(
+                                  padding: EdgeInsets.zero,
+                                  onPressed: _togglePlayback,
+                                  child: Container(
+                                    width: 68,
+                                    height: 68,
+                                    decoration: BoxDecoration(
+                                      color: CupertinoColors.black.withAlpha(
+                                        130,
+                                      ),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Icon(
+                                      value.isPlaying
+                                          ? CupertinoIcons.pause_fill
+                                          : CupertinoIcons.play_fill,
+                                      color: CupertinoColors.white,
+                                      size: 34,
+                                    ),
+                                  ),
                                 ),
-                                child: VideoProgressIndicator(
-                                  controller,
-                                  allowScrubbing: true,
-                                  colors: VideoProgressColors(
-                                    playedColor: CupertinoColors.white,
-                                    bufferedColor: CupertinoColors.systemGrey,
-                                    backgroundColor:
-                                        CupertinoColors.systemGrey4,
+                              ),
+                            Align(
+                              alignment: Alignment.bottomCenter,
+                              child: AnimatedOpacity(
+                                key: const Key(
+                                  'attachment-viewer-video-progress',
+                                ),
+                                duration: const Duration(milliseconds: 180),
+                                opacity: widget.showControls ? 1 : 0,
+                                child: IgnorePointer(
+                                  ignoring: !widget.showControls,
+                                  child: Container(
+                                    color: CupertinoColors.black.withAlpha(68),
+                                    padding: const EdgeInsets.fromLTRB(
+                                      12,
+                                      8,
+                                      12,
+                                      12,
+                                    ),
+                                    child: VideoProgressIndicator(
+                                      controller,
+                                      allowScrubbing: true,
+                                      colors: VideoProgressColors(
+                                        playedColor: CupertinoColors.white,
+                                        bufferedColor:
+                                            CupertinoColors.systemGrey,
+                                        backgroundColor:
+                                            CupertinoColors.systemGrey4,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ],
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       );
     }
 
-    return GestureDetector(
-      key: widget.surfaceKey,
-      behavior: HitTestBehavior.opaque,
-      onTap: widget.onSurfaceTap,
-      child: child,
-    );
+    return KeyedSubtree(key: widget.surfaceKey, child: child);
   }
 }
 
@@ -970,6 +1256,13 @@ class _VideoLoadError extends StatelessWidget {
   }
 }
 
+class _PointerSample {
+  const _PointerSample(this.timeStamp, this.position);
+
+  final Duration timeStamp;
+  final Offset position;
+}
+
 double _preferredAspectRatio(AttachmentItem attachment) {
   final width = attachment.width;
   final height = attachment.height;
@@ -977,4 +1270,25 @@ double _preferredAspectRatio(AttachmentItem attachment) {
     return width / height;
   }
   return 16 / 9;
+}
+
+Size _fittedVideoSize({
+  required Size viewportSize,
+  required double aspectRatio,
+}) {
+  if (viewportSize.width <= 0 || viewportSize.height <= 0) {
+    return Size.zero;
+  }
+  if (aspectRatio <= 0) {
+    return viewportSize;
+  }
+
+  final viewportAspectRatio = viewportSize.width / viewportSize.height;
+  if (viewportAspectRatio > aspectRatio) {
+    final height = viewportSize.height;
+    return Size(height * aspectRatio, height);
+  }
+
+  final width = viewportSize.width;
+  return Size(width, width / aspectRatio);
 }

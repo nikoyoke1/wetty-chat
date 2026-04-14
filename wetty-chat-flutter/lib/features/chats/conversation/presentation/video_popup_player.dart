@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../../../../app/theme/style_config.dart';
 import '../../models/message_models.dart';
 import 'message_attachment_previews.dart';
+import 'video_attachment_thumbnail.dart';
 
 class VideoAttachmentPreview extends StatelessWidget {
   const VideoAttachmentPreview({
@@ -38,8 +39,31 @@ class VideoAttachmentPreview extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              VideoAttachmentPlaceholder(attachment: attachment),
+              VideoAttachmentThumbnail(attachment: attachment),
               Container(color: CupertinoColors.black.withAlpha(36)),
+              if (attachment.duration case final duration?)
+                Positioned(
+                  left: 12,
+                  bottom: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: CupertinoColors.black.withAlpha(96),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      _formatDuration(duration),
+                      style: appOnDarkTextStyle(
+                        context,
+                        fontSize: AppFontSizes.meta,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
               Center(
                 child: Container(
                   width: 52,
@@ -61,61 +85,6 @@ class VideoAttachmentPreview extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class VideoAttachmentPlaceholder extends StatelessWidget {
-  const VideoAttachmentPlaceholder({super.key, required this.attachment});
-
-  final AttachmentItem attachment;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF272727), Color(0xFF151515)],
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Spacer(),
-            if (attachment.duration case final duration?)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: CupertinoColors.black.withAlpha(96),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  _formatDuration(duration),
-                  style: appOnDarkTextStyle(
-                    context,
-                    fontSize: AppFontSizes.meta,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            const Spacer(),
-            Text(
-              attachment.fileName.isEmpty ? 'Video' : attachment.fileName,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: appOnDarkTextStyle(
-                context,
-                fontSize: AppFontSizes.meta,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
         ),
       ),
     );

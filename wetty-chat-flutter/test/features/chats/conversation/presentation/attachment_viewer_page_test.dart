@@ -2,9 +2,12 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:chahua/core/cache/image_cache_service.dart';
+import 'package:chahua/core/cache/media_cache_service.dart';
+import 'package:chahua/features/chats/conversation/data/video_thumbnail_service.dart';
 import 'package:chahua/features/chats/conversation/presentation/attachment_viewer_page.dart';
 import 'package:chahua/features/chats/conversation/presentation/attachment_viewer_request.dart';
 import 'package:chahua/features/chats/models/message_models.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show Colors;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -75,6 +78,11 @@ void main() {
       ),
     );
 
+    expect(
+      find.byKey(const ValueKey('video-thumbnail-image-video-0')),
+      findsOneWidget,
+    );
+
     await tester.drag(
       find.byKey(const ValueKey('attachment-viewer-media-0')),
       const Offset(-420, 0),
@@ -103,46 +111,50 @@ void main() {
     );
   });
 
-  testWidgets('video tap hides and re-shows fullscreen chrome and scrubber', (
-    WidgetTester tester,
-  ) async {
-    await _pumpViewer(
-      tester,
-      request: AttachmentViewerRequest(
-        items: [_videoViewerItem('video-0')],
-        initialIndex: 0,
-      ),
-    );
+  testWidgets(
+    'dragging the rail changes media selection and keeps it centered',
+    (WidgetTester tester) async {
+      await _pumpViewer(
+        tester,
+        request: AttachmentViewerRequest(
+          items: [
+            _videoViewerItem('video-0'),
+            _videoViewerItem('video-1'),
+            _videoViewerItem('video-2'),
+          ],
+          initialIndex: 0,
+        ),
+      );
 
-    await _pumpUntilVisible(
-      tester,
-      find.byKey(const Key('attachment-viewer-video-progress')),
-    );
+      await tester.drag(
+        find.byKey(const Key('attachment-viewer-thumbnails')),
+        const Offset(-420, 0),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
-    expect(
-      find.byKey(const ValueKey('attachment-viewer-chrome')),
-      findsOneWidget,
-    );
-    expect(_videoProgressOpacity(tester), 1);
+      expect(find.text('2/3'), findsOneWidget);
+      _expectThumbnailCentered(
+        tester,
+        railKey: const Key('attachment-viewer-thumbnails'),
+        thumbnailKey: const ValueKey('attachment-viewer-thumbnail-1'),
+      );
 
-    await _tapMediaSurface(tester, const ValueKey('attachment-viewer-media-0'));
-    await _settleChromeToggle(tester);
+      await tester.drag(
+        find.byKey(const Key('attachment-viewer-thumbnails')),
+        const Offset(-420, 0),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
-    expect(
-      find.byKey(const ValueKey('attachment-viewer-chrome')),
-      findsNothing,
-    );
-    expect(_videoProgressOpacity(tester), 0);
-
-    await _tapMediaSurface(tester, const ValueKey('attachment-viewer-media-0'));
-    await _settleChromeToggle(tester);
-
-    expect(
-      find.byKey(const ValueKey('attachment-viewer-chrome')),
-      findsOneWidget,
-    );
-    expect(_videoProgressOpacity(tester), 1);
-  });
+      expect(find.text('3/3'), findsOneWidget);
+      _expectThumbnailCentered(
+        tester,
+        railKey: const Key('attachment-viewer-thumbnails'),
+        thumbnailKey: const ValueKey('attachment-viewer-thumbnail-2'),
+      );
+    },
+  );
 }
 
 Future<void> _pumpViewer(
@@ -157,6 +169,9 @@ Future<void> _pumpViewer(
     ProviderScope(
       overrides: [
         imageCacheServiceProvider.overrideWithValue(_FakeImageCacheService()),
+        videoThumbnailServiceProvider.overrideWithValue(
+          _FakeVideoThumbnailService(),
+        ),
       ],
       child: CupertinoApp(home: AttachmentViewerPage(request: request)),
     ),
@@ -170,25 +185,6 @@ Future<void> _settleChromeToggle(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 220));
 }
 
-Future<void> _tapMediaSurface(WidgetTester tester, Key mediaKey) async {
-  final center = tester.getCenter(find.byKey(mediaKey));
-  await tester.tapAt(Offset(center.dx, center.dy - 160));
-}
-
-Future<void> _pumpUntilVisible(
-  WidgetTester tester,
-  Finder finder, {
-  int maxTries = 10,
-}) async {
-  for (var attempt = 0; attempt < maxTries; attempt++) {
-    await tester.pump(const Duration(milliseconds: 50));
-    if (finder.evaluate().isNotEmpty) {
-      return;
-    }
-  }
-  expect(finder, findsOneWidget);
-}
-
 void _expectThumbnailCentered(
   WidgetTester tester, {
   required Key railKey,
@@ -197,14 +193,6 @@ void _expectThumbnailCentered(
   final railCenter = tester.getCenter(find.byKey(railKey));
   final thumbnailCenter = tester.getCenter(find.byKey(thumbnailKey));
   expect((thumbnailCenter.dx - railCenter.dx).abs(), lessThanOrEqualTo(2));
-}
-
-double _videoProgressOpacity(WidgetTester tester) {
-  return tester
-      .widget<AnimatedOpacity>(
-        find.byKey(const Key('attachment-viewer-video-progress')),
-      )
-      .opacity;
 }
 
 AttachmentViewerItem _imageViewerItem(String id) {
@@ -336,6 +324,15 @@ class _FakeVideoPlayerPlatform extends VideoPlayerPlatform {
         child: Text('video-$playerId', textDirection: TextDirection.ltr),
       ),
     );
+  }
+}
+
+class _FakeVideoThumbnailService extends VideoThumbnailService {
+  _FakeVideoThumbnailService() : super(MediaCacheService(), Dio());
+
+  @override
+  Future<Uint8List?> getThumbnailBytes(AttachmentItem attachment) async {
+    return Uint8List.fromList(_transparentImage);
   }
 }
 
