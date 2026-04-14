@@ -26,6 +26,14 @@ import '../../features/stickers/presentation/sticker_pack_list_page.dart';
 import '../presentation/home_root_view.dart';
 import 'route_names.dart';
 
+final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'root',
+);
+final GlobalKey<NavigatorState> _chatsBranchNavigatorKey =
+    GlobalKey<NavigatorState>(debugLabel: 'chats-branch');
+final GlobalKey<NavigatorState> _settingsBranchNavigatorKey =
+    GlobalKey<NavigatorState>(debugLabel: 'settings-branch');
+
 final appRouterProvider = Provider<GoRouter>((ref) {
   final sessionNotifier = ValueNotifier(ref.read(authSessionProvider));
   ref.listen<AuthSessionState>(authSessionProvider, (_, next) {
@@ -34,6 +42,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   ref.onDispose(() => sessionNotifier.dispose());
 
   return GoRouter(
+    navigatorKey: _rootNavigatorKey,
     initialLocation: AppRoutes.bootstrap,
     refreshListenable: sessionNotifier,
     redirect: (context, state) {
@@ -102,6 +111,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         branches: [
           // ── Branch 0: Chats ──
           StatefulShellBranch(
+            navigatorKey: _chatsBranchNavigatorKey,
             routes: [
               GoRoute(
                 path: AppRoutes.chats,
@@ -109,6 +119,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                     CupertinoPage(key: state.pageKey, child: const ChatPage()),
                 routes: [
                   GoRoute(
+                    parentNavigatorKey: _rootNavigatorKey,
                     path: 'chat/:chatId',
                     pageBuilder: (context, state) {
                       final chatId = state.pathParameters['chatId']!;
@@ -125,6 +136,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                     },
                     routes: [
                       GoRoute(
+                        parentNavigatorKey: _rootNavigatorKey,
                         path: 'members',
                         pageBuilder: (context, state) {
                           final chatId = state.pathParameters['chatId']!;
@@ -135,6 +147,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                         },
                       ),
                       GoRoute(
+                        parentNavigatorKey: _rootNavigatorKey,
                         path: 'settings',
                         pageBuilder: (context, state) {
                           final chatId = state.pathParameters['chatId']!;
@@ -145,6 +158,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                         },
                       ),
                       GoRoute(
+                        parentNavigatorKey: _rootNavigatorKey,
                         path: 'thread/:threadId',
                         pageBuilder: (context, state) {
                           final chatId = state.pathParameters['chatId']!;
@@ -165,6 +179,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                     ],
                   ),
                   GoRoute(
+                    parentNavigatorKey: _rootNavigatorKey,
                     path: 'thread/:chatId/:threadId',
                     pageBuilder: (context, state) {
                       final chatId = state.pathParameters['chatId']!;
@@ -189,6 +204,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
           // ── Branch 1: Settings ──
           StatefulShellBranch(
+            navigatorKey: _settingsBranchNavigatorKey,
             routes: [
               GoRoute(
                 path: '/settings',
