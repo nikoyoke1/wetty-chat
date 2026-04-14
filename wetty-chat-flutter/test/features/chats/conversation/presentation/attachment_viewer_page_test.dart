@@ -157,7 +157,7 @@ void main() {
   );
 
   testWidgets(
-    'video uses reserved viewport lane and shows elapsed and remaining labels',
+    'video stays centered, keeps full fit, and shows overlays above the rail',
     (WidgetTester tester) async {
       await _pumpViewer(
         tester,
@@ -189,12 +189,73 @@ void main() {
       final viewportRect = tester.getRect(
         find.byKey(const Key('attachment-viewer-video-viewport')),
       );
-      final fullScreenRect = tester.getRect(find.byType(CupertinoPageScaffold));
+      final contentRect = tester.getRect(
+        find.byKey(const Key('attachment-viewer-video-content')),
+      );
+      final railRect = tester.getRect(
+        find.byKey(const Key('attachment-viewer-thumbnails')),
+      );
+      final progressRect = tester.getRect(
+        find.byKey(const Key('attachment-viewer-video-progress')),
+      );
+      final topGap = contentRect.top - viewportRect.top;
+      final bottomGap = viewportRect.bottom - contentRect.bottom;
 
-      expect(viewportRect.top, greaterThan(40));
-      expect(viewportRect.bottom, lessThan(fullScreenRect.bottom - 120));
+      expect(viewportRect.top, 0);
+      expect(viewportRect.bottom, 932);
+      expect(contentRect.width, viewportRect.width);
+      expect((topGap - bottomGap).abs(), lessThanOrEqualTo(1));
+      expect(progressRect.bottom, lessThanOrEqualTo(railRect.top));
     },
   );
+
+  testWidgets('video media rect does not change when chrome toggles', (
+    WidgetTester tester,
+  ) async {
+    await _pumpViewer(
+      tester,
+      request: AttachmentViewerRequest(
+        items: [_videoViewerItem('video-0')],
+        initialIndex: 0,
+      ),
+    );
+
+    final beforeRect = tester.getRect(
+      find.byKey(const Key('attachment-viewer-video-content')),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('attachment-viewer-media-0')));
+    await _settleChromeToggle(tester);
+
+    final afterRect = tester.getRect(
+      find.byKey(const Key('attachment-viewer-video-content')),
+    );
+
+    expect(afterRect, beforeRect);
+  });
+
+  testWidgets('portrait video stays centered and aspect-fits the viewport', (
+    WidgetTester tester,
+  ) async {
+    await _pumpViewer(
+      tester,
+      request: AttachmentViewerRequest(
+        items: [_videoViewerItem('video-portrait', width: 720, height: 1280)],
+        initialIndex: 0,
+      ),
+    );
+
+    final viewportRect = tester.getRect(
+      find.byKey(const Key('attachment-viewer-video-viewport')),
+    );
+    final contentRect = tester.getRect(
+      find.byKey(const Key('attachment-viewer-video-content')),
+    );
+
+    expect(contentRect.width, viewportRect.width);
+    expect(contentRect.center.dx, closeTo(viewportRect.center.dx, 1));
+    expect(contentRect.center.dy, closeTo(viewportRect.center.dy, 1));
+  });
 }
 
 Future<void> _pumpViewer(
@@ -251,7 +312,11 @@ AttachmentViewerItem _imageViewerItem(String id) {
   );
 }
 
-AttachmentViewerItem _videoViewerItem(String id) {
+AttachmentViewerItem _videoViewerItem(
+  String id, {
+  int width = 1280,
+  int height = 720,
+}) {
   return AttachmentViewerItem(
     attachment: AttachmentItem(
       id: id,
@@ -259,8 +324,8 @@ AttachmentViewerItem _videoViewerItem(String id) {
       kind: 'video/mp4',
       size: 1024,
       fileName: '$id.mp4',
-      width: 1280,
-      height: 720,
+      width: width,
+      height: height,
       durationMs: 4000,
     ),
     heroTag: 'hero-$id',
@@ -278,6 +343,7 @@ class _FakeImageCacheService extends ImageCacheService {
 class _FakeVideoPlayerPlatform extends VideoPlayerPlatform {
   final Map<int, StreamController<VideoEvent>> _eventControllers = {};
   final Map<int, Duration> _positions = {};
+  final Map<int, Size> _sizes = {};
   var _nextPlayerId = 1;
 
   @override
@@ -287,6 +353,9 @@ class _FakeVideoPlayerPlatform extends VideoPlayerPlatform {
   Future<int?> create(DataSource dataSource) async {
     final playerId = _nextPlayerId++;
     _positions[playerId] = Duration.zero;
+    _sizes[playerId] = dataSource.uri?.contains('video-portrait') == true
+        ? const Size(720, 1280)
+        : const Size(1280, 720);
     late final StreamController<VideoEvent> controller;
     controller = StreamController<VideoEvent>.broadcast(
       onListen: () {
@@ -294,7 +363,7 @@ class _FakeVideoPlayerPlatform extends VideoPlayerPlatform {
           VideoEvent(
             eventType: VideoEventType.initialized,
             duration: const Duration(seconds: 4),
-            size: const Size(1280, 720),
+            size: _sizes[playerId],
           ),
         );
       },
@@ -306,6 +375,7 @@ class _FakeVideoPlayerPlatform extends VideoPlayerPlatform {
   @override
   Future<void> dispose(int playerId) async {
     _positions.remove(playerId);
+    _sizes.remove(playerId);
     await _eventControllers.remove(playerId)?.close();
   }
 

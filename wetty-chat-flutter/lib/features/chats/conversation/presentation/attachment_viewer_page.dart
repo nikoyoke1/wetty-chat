@@ -400,45 +400,49 @@ class _AttachmentViewerPageState extends ConsumerState<AttachmentViewerPage> {
     final cacheService = ref.watch(imageCacheServiceProvider);
     final provider = cacheService.providerForUrl(item.attachment.url);
     final gestureKey = _gestureKeys[index];
+    final mediaPadding = MediaQuery.paddingOf(context);
 
     return SizedBox.expand(
       child: GestureDetector(
         key: ValueKey('attachment-viewer-media-$index'),
         behavior: HitTestBehavior.opaque,
         onTap: _toggleChrome,
-        child: Hero(
-          tag: item.heroTag,
-          child: ExtendedImage(
-            image: provider,
-            fit: BoxFit.contain,
-            mode: ExtendedImageMode.gesture,
-            enableLoadState: true,
-            enableSlideOutPage: true,
-            extendedImageGestureKey: gestureKey,
-            initGestureConfigHandler: (state) => GestureConfig(
-              minScale: 1.0,
-              maxScale: 4.0,
-              animationMinScale: 0.95,
-              animationMaxScale: 4.5,
-              speed: 1.0,
-              inertialSpeed: 100.0,
-              initialScale: 1.0,
-              inPageView: true,
-              initialAlignment: InitialAlignment.center,
-              gestureDetailsIsChanged: (details) =>
-                  _handleGestureDetailsChanged(index, details),
+        child: Padding(
+          padding: mediaPadding,
+          child: Hero(
+            tag: item.heroTag,
+            child: ExtendedImage(
+              image: provider,
+              fit: BoxFit.contain,
+              mode: ExtendedImageMode.gesture,
+              enableLoadState: true,
+              enableSlideOutPage: true,
+              extendedImageGestureKey: gestureKey,
+              initGestureConfigHandler: (state) => GestureConfig(
+                minScale: 1.0,
+                maxScale: 4.0,
+                animationMinScale: 0.95,
+                animationMaxScale: 4.5,
+                speed: 1.0,
+                inertialSpeed: 100.0,
+                initialScale: 1.0,
+                inPageView: true,
+                initialAlignment: InitialAlignment.center,
+                gestureDetailsIsChanged: (details) =>
+                    _handleGestureDetailsChanged(index, details),
+              ),
+              onDoubleTap: _handleDoubleTap,
+              loadStateChanged: (state) {
+                switch (state.extendedImageLoadState) {
+                  case LoadState.loading:
+                    return const Center(child: CupertinoActivityIndicator());
+                  case LoadState.completed:
+                    return null;
+                  case LoadState.failed:
+                    return _ImageLoadError(onRetry: state.reLoadImage);
+                }
+              },
             ),
-            onDoubleTap: _handleDoubleTap,
-            loadStateChanged: (state) {
-              switch (state.extendedImageLoadState) {
-                case LoadState.loading:
-                  return const Center(child: CupertinoActivityIndicator());
-                case LoadState.completed:
-                  return null;
-                case LoadState.failed:
-                  return _ImageLoadError(onRetry: state.reLoadImage);
-              }
-            },
           ),
         ),
       ),
@@ -731,8 +735,6 @@ class _VideoViewerPageState extends State<_VideoViewerPage> {
   static const double _videoDoubleTapScale = 2.5;
   static const double _videoScaleTolerance = 0.02;
   static const double _videoPanBoundaryMargin = 100000;
-  static const double _reservedTopChromeHeight = 60;
-  static const double _reservedBottomVideoControlsHeight = 52;
   static const double _reservedBottomGap = 12;
   static const double _dismissGestureMinDelta = 10;
   static const double _dismissDirectionBias = 1.2;
@@ -1058,10 +1060,9 @@ class _VideoViewerPageState extends State<_VideoViewerPage> {
       child = LayoutBuilder(
         builder: (context, constraints) {
           final mediaPadding = MediaQuery.paddingOf(context);
-          final mediaViewportRect = _videoViewportRect(
+          final mediaViewportRect = _safeMediaViewportRect(
             availableSize: Size(constraints.maxWidth, constraints.maxHeight),
             mediaPadding: mediaPadding,
-            hasThumbnailRail: widget.hasThumbnailRail,
           );
           _mediaViewportRect = mediaViewportRect;
           final fittedSize = _fittedVideoSize(
@@ -1095,17 +1096,23 @@ class _VideoViewerPageState extends State<_VideoViewerPage> {
                       ),
                       clipBehavior: Clip.hardEdge,
                       child: SizedBox(
-                        key: const Key('attachment-viewer-video-content'),
-                        width: fittedSize.width,
-                        height: fittedSize.height,
-                        child: ColoredBox(
-                          color: CupertinoColors.black,
-                          child: FittedBox(
-                            fit: BoxFit.fill,
-                            child: SizedBox(
-                              width: controller.value.size.width,
-                              height: controller.value.size.height,
-                              child: VideoPlayer(controller),
+                        width: mediaViewportRect.width,
+                        height: mediaViewportRect.height,
+                        child: Center(
+                          child: SizedBox(
+                            key: const Key('attachment-viewer-video-content'),
+                            width: fittedSize.width,
+                            height: fittedSize.height,
+                            child: ColoredBox(
+                              color: CupertinoColors.black,
+                              child: FittedBox(
+                                fit: BoxFit.fill,
+                                child: SizedBox(
+                                  width: controller.value.size.width,
+                                  height: controller.value.size.height,
+                                  child: VideoPlayer(controller),
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -1355,23 +1362,17 @@ Size _fittedVideoSize({
   return Size(width, width / aspectRatio);
 }
 
-Rect _videoViewportRect({
+Rect _safeMediaViewportRect({
   required Size availableSize,
   required EdgeInsets mediaPadding,
-  required bool hasThumbnailRail,
 }) {
-  final topInset =
-      mediaPadding.top + _VideoViewerPageState._reservedTopChromeHeight;
-  final bottomInset =
-      _videoBottomControlsInset(
-        mediaPadding: mediaPadding,
-        hasThumbnailRail: hasThumbnailRail,
-      ) +
-      _VideoViewerPageState._reservedBottomVideoControlsHeight;
-  final height = math
-      .max(availableSize.height - topInset - bottomInset, 0.0)
+  final width = math
+      .max(availableSize.width - mediaPadding.left - mediaPadding.right, 0.0)
       .toDouble();
-  return Rect.fromLTWH(0, topInset, availableSize.width, height);
+  final height = math
+      .max(availableSize.height - mediaPadding.top - mediaPadding.bottom, 0.0)
+      .toDouble();
+  return Rect.fromLTWH(mediaPadding.left, mediaPadding.top, width, height);
 }
 
 double _videoBottomControlsInset({
