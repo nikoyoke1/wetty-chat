@@ -67,6 +67,31 @@ impl AuthorizationService {
         action: Action,
         resource: Resource,
     ) -> Result<bool, AppError> {
+        let actions = self.load_cached_actions(conn, uid, resource)?;
+        Ok(actions.contains(action.as_str()))
+    }
+
+    pub fn list_permissions(
+        &self,
+        conn: &mut PgConnection,
+        uid: i32,
+        resource: Resource,
+    ) -> Result<Vec<String>, AppError> {
+        let mut actions = self
+            .load_cached_actions(conn, uid, resource)?
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        actions.sort();
+        Ok(actions)
+    }
+
+    fn load_cached_actions(
+        &self,
+        conn: &mut PgConnection,
+        uid: i32,
+        resource: Resource,
+    ) -> Result<Arc<HashSet<String>>, AppError> {
         let discuz_group_id = self.lookup_discuz_group_id(conn, uid)?;
         let cache_key = CacheKey {
             uid,
@@ -77,7 +102,7 @@ impl AuthorizationService {
 
         if let Some(entry) = self.cache.get(&cache_key) {
             if entry.cached_at.elapsed() <= CACHE_TTL {
-                return Ok(entry.actions.contains(action.as_str()));
+                return Ok(entry.actions.clone());
             }
         }
 
@@ -94,7 +119,7 @@ impl AuthorizationService {
 
         self.prune_stale_entries();
 
-        Ok(actions.contains(action.as_str()))
+        Ok(actions)
     }
 
     pub fn require_permission(
@@ -160,10 +185,17 @@ impl AuthorizationService {
             return Ok(HashSet::new());
         }
 
-        let actions = policy_permissions::table
+        let mut query = policy_permissions::table
             .filter(pp_dsl::policy_id.eq_any(policy_ids))
             .filter(pp_dsl::resource_type.eq(resource.resource_type()))
-            .filter(pp_dsl::resource_id.eq(resource.resource_id()))
+            .into_boxed();
+
+        query = match resource {
+            Resource::Global => query.filter(pp_dsl::resource_id.is_null()),
+            Resource::Chat(chat_id) => query.filter(pp_dsl::resource_id.eq(Some(chat_id))),
+        };
+
+        let actions = query
             .select(pp_dsl::action)
             .distinct()
             .load::<String>(conn)?;

@@ -155,6 +155,7 @@ pub struct MeResponse {
     pub avatar_url: Option<String>,
     pub gender: i16,
     pub sticker_pack_order: Vec<StickerPackOrderItem>,
+    pub permissions: Vec<String>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -199,6 +200,11 @@ async fn get_me(
             serde_json::from_value::<Vec<StickerPackOrderItem>>(e.sticker_pack_order).ok()
         })
         .unwrap_or_default();
+    let permissions = state.authz_service.list_permissions(
+        conn,
+        uid,
+        crate::services::authz::Resource::Global,
+    )?;
 
     Ok(Json(MeResponse {
         uid,
@@ -206,6 +212,7 @@ async fn get_me(
         avatar_url,
         gender: profile.map(|profile| profile.gender).unwrap_or(0),
         sticker_pack_order,
+        permissions,
     }))
 }
 

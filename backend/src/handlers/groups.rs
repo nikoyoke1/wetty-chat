@@ -608,11 +608,16 @@ async fn patch_group(
         description: body.description,
         visibility: body.visibility,
     };
+    let has_metadata_changes = changeset.name.is_some()
+        || changeset.description.is_some()
+        || changeset.visibility.is_some();
 
     conn.transaction::<_, diesel::result::Error, _>(|conn| {
-        diesel::update(groups::table.filter(groups_dsl::id.eq(chat_id)))
-            .set(&changeset)
-            .execute(conn)?;
+        if has_metadata_changes {
+            diesel::update(groups::table.filter(groups_dsl::id.eq(chat_id)))
+                .set(&changeset)
+                .execute(conn)?;
+        }
 
         if let Some(next_avatar_image_id) = body.avatar_image_id {
             diesel::update(groups::table.filter(groups_dsl::id.eq(chat_id)))

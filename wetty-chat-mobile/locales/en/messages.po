@@ -103,8 +103,8 @@ msgstr "Add to Favorites"
 msgid "Alex"
 msgstr "Alex"
 
-#: src/components/chat/ChatListSegment.tsx
-#: src/components/chat/ReactionDetailsModal.tsx
+#: src/components/chat/lists/ChatListSegment.tsx
+#: src/components/chat/reactions/ReactionDetailsModal.tsx
 msgid "All"
 msgstr "All"
 
@@ -133,7 +133,7 @@ msgstr "Are you sure you want to leave this group?"
 msgid "Ask first"
 msgstr "Ask first"
 
-#: src/components/chat/MessageComposeBar.tsx
+#: src/components/chat/compose/MessageComposeBar.tsx
 msgid "Attach image"
 msgstr "Attach image"
 
@@ -142,11 +142,11 @@ msgstr "Attach image"
 msgid "Attachment"
 msgstr "Attachment"
 
-#: src/components/chat/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Attachment large view"
 msgstr "Attachment large view"
 
-#: src/components/chat/UploadPreview.tsx
+#: src/components/chat/compose/UploadPreview.tsx
 msgid "Attachment preview tray"
 msgstr "Attachment preview tray"
 
@@ -169,6 +169,7 @@ msgstr "Avatar uploaded"
 
 #: src/components/chat/settings/ShareInviteModal.tsx
 #: src/pages/settings/general.tsx
+#: src/pages/settings/language.tsx
 #: src/pages/settings/sticker-pack-detail.tsx
 #: src/pages/settings/sticker-pack-detail.tsx
 #: src/pages/settings/stickers.tsx
@@ -185,8 +186,8 @@ msgstr "Blocked"
 
 #: src/components/chat/compose/AddStickerModal.tsx
 #: src/components/chat/compose/StickerPicker.tsx
-#: src/components/chat/PinBanner.tsx
-#: src/components/chat/PinListModal.tsx
+#: src/components/chat/pins/PinBanner.tsx
+#: src/components/chat/pins/PinListModal.tsx
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 #: src/components/chat/settings/ShareInviteModal.tsx
 #: src/pages/chat-thread/chat-members.tsx
@@ -212,9 +213,17 @@ msgstr "Cancel edit"
 msgid "Cancel reply"
 msgstr "Cancel reply"
 
-#: src/components/chat/MessageOverlay.tsx
+#: src/components/chat/messages/MessageOverlay.tsx
 msgid "Cannot add more than {MAX_DISTINCT_REACTIONS_PER_MESSAGE} different reactions"
 msgstr "Cannot add more than {MAX_DISTINCT_REACTIONS_PER_MESSAGE} different reactions"
+
+#: src/components/chat/profiles/GroupProfile.tsx
+msgid "Change"
+msgstr "Change"
+
+#: src/components/chat/profiles/GroupProfile.tsx
+msgid "Change group photo"
+msgstr "Change group photo"
 
 #: src/utils/chatDisplay.ts
 msgid "Chat {chatId}"
@@ -239,8 +248,8 @@ msgid "Choose a destination group"
 msgstr "Choose a destination group"
 
 #: src/pages/chat-thread/ChatAdminSettings.tsx
-msgid "Choose a new image to replace the current avatar."
-msgstr "Choose a new image to replace the current avatar."
+#~ msgid "Choose a new image to replace the current avatar."
+#~ msgstr "Choose a new image to replace the current avatar."
 
 #: src/components/shared/EmojiInput.tsx
 #~ msgid "Choose Emoji"
@@ -267,12 +276,12 @@ msgstr "Choose the member group first"
 msgid "Clipboard is not available on this device"
 msgstr "Clipboard is not available on this device"
 
-#: src/components/chat/ImageViewer.tsx
-#: src/components/chat/ReactionDetailsModal.tsx
+#: src/components/chat/compose/StickerPreviewModal.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
+#: src/components/chat/profiles/UserProfileModal.tsx
+#: src/components/chat/reactions/ReactionDetailsModal.tsx
 #: src/components/chat/settings/ShareInviteGroupSelectorModal.tsx
 #: src/components/chat/settings/ShareInviteModal.tsx
-#: src/components/chat/StickerPreviewModal.tsx
-#: src/components/chat/UserProfileModal.tsx
 #: src/components/invites/InviteMessageModal.tsx
 msgid "Close"
 msgstr "Close"
@@ -281,7 +290,7 @@ msgstr "Close"
 #~ msgid "Close emoji picker"
 #~ msgstr "Close emoji picker"
 
-#: src/components/chat/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Close viewer"
 msgstr "Close viewer"
 
@@ -411,23 +420,31 @@ msgstr "Description"
 msgid "Destination Group"
 msgstr "Destination Group"
 
+#: src/pages/chat-thread/chat-settings.tsx
+msgid "Discard"
+msgstr "Discard"
+
+#: src/pages/chat-thread/chat-settings.tsx
+msgid "Discard changes?"
+msgstr "Discard changes?"
+
 #: src/App.tsx
 msgid "Dismiss"
 msgstr "Dismiss"
 
-#: src/components/chat/PinListModal.tsx
+#: src/components/chat/pins/PinListModal.tsx
 msgid "Done"
 msgstr "Done"
 
-#: src/components/chat/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Download"
 msgstr "Download"
 
-#: src/components/chat/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Download image"
 msgstr "Download image"
 
-#: src/components/chat/MessageComposeBar.tsx
+#: src/components/chat/compose/MessageComposeBar.tsx
 msgid "Drop images or videos"
 msgstr "Drop images or videos"
 
@@ -435,7 +452,7 @@ msgstr "Drop images or videos"
 msgid "e.g. 😊"
 msgstr "e.g. 😊"
 
-#: src/components/chat/ChatVirtualScroll.tsx
+#: src/components/chat/virtualScroll/ChatVirtualScroll.tsx
 msgid "Earlier messages"
 msgstr "Earlier messages"
 
@@ -466,8 +483,8 @@ msgstr "Emojis & Stickers"
 msgid "Enter an invite code"
 msgstr "Enter an invite code"
 
-#: src/components/chat/ImageViewer.tsx
-#: src/components/chat/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Enter fullscreen"
 msgstr "Enter fullscreen"
 
@@ -483,12 +500,12 @@ msgstr "Enter group name"
 msgid "Enter user ID to add:"
 msgstr "Enter user ID to add:"
 
-#: src/components/chat/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
 msgid "Error"
 msgstr "Error"
 
-#: src/components/chat/ImageViewer.tsx
-#: src/components/chat/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Exit fullscreen"
 msgstr "Exit fullscreen"
 
@@ -546,7 +563,7 @@ msgstr "Failed to leave group"
 msgid "Failed to load chat details"
 msgstr "Failed to load chat details"
 
-#: src/components/chat/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
 msgid "Failed to load chats"
 msgstr "Failed to load chats"
 
@@ -602,7 +619,7 @@ msgstr "Failed to open link"
 msgid "Failed to pin message"
 msgstr "Failed to pin message"
 
-#: src/components/chat/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
 msgid "Failed to refresh chats"
 msgstr "Failed to refresh chats"
 
@@ -694,8 +711,12 @@ msgid "Group"
 msgstr "Group"
 
 #: src/pages/chat-thread/ChatAdminSettings.tsx
-msgid "Group Avatar"
-msgstr "Group Avatar"
+#~ msgid "Group Avatar"
+#~ msgstr "Group Avatar"
+
+#: src/pages/chat-thread/chat-settings.tsx
+msgid "Group details saved"
+msgstr "Group details saved"
 
 #: src/components/chat/messages/InviteMessageCard.tsx
 msgid "Group invite"
@@ -713,7 +734,7 @@ msgstr "Group Name"
 msgid "Group Settings"
 msgstr "Group Settings"
 
-#: src/components/chat/ChatListSegment.tsx
+#: src/components/chat/lists/ChatListSegment.tsx
 msgid "Groups"
 msgstr "Groups"
 
@@ -814,13 +835,17 @@ msgid "Large"
 msgstr "Large"
 
 #: src/pages/chat-thread/chat-settings.tsx
-#: src/pages/chat-thread/chat-settings.tsx
 msgid "Leave"
 msgstr "Leave"
 
 #: src/pages/chat-thread/chat-settings.tsx
+#: src/pages/chat-thread/chat-settings.tsx
 msgid "Leave Group"
 msgstr "Leave Group"
+
+#: src/pages/chat-thread/chat-settings.tsx
+msgid "Leaving..."
+msgstr "Leaving..."
 
 #: src/pages/chat-thread/chat-settings.tsx
 msgid "Left group"
@@ -830,24 +855,24 @@ msgstr "Left group"
 msgid "Loading invite…"
 msgstr "Loading invite…"
 
-#: src/components/chat/ReactionDetailsModal.tsx
-#: src/components/chat/ReactionDetailsModal.tsx
-#: src/components/chat/StickerPreviewModal.tsx
+#: src/components/chat/compose/StickerPreviewModal.tsx
+#: src/components/chat/reactions/ReactionDetailsModal.tsx
+#: src/components/chat/reactions/ReactionDetailsModal.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/settings/sticker-pack-detail.tsx
 msgid "Loading..."
 msgstr "Loading..."
 
-#: src/components/chat/ChatList.tsx
-#: src/components/chat/ChatVirtualScroll.tsx
-#: src/components/chat/ChatVirtualScroll.tsx
-#: src/components/chat/ChatVirtualScroll.tsx
+#: src/components/chat/lists/ChatList.tsx
+#: src/components/chat/virtualScroll/ChatVirtualScroll.tsx
+#: src/components/chat/virtualScroll/ChatVirtualScroll.tsx
+#: src/components/chat/virtualScroll/ChatVirtualScroll.tsx
 #: src/pages/join-chat.tsx
 #: src/pages/join-chat.tsx
 msgid "Loading…"
 msgstr "Loading…"
 
-#: src/components/chat/StickerPreviewModal.tsx
+#: src/components/chat/compose/StickerPreviewModal.tsx
 msgid "Manage"
 msgstr "Manage"
 
@@ -894,8 +919,8 @@ msgid "Mention suggestions"
 msgstr "Mention suggestions"
 
 #: src/components/chat/compose/ComposeInput.tsx
-#: src/components/chat/PinBanner.tsx
-#: src/components/chat/PinListModal.tsx
+#: src/components/chat/pins/PinBanner.tsx
+#: src/components/chat/pins/PinListModal.tsx
 msgid "Message"
 msgstr "Message"
 
@@ -919,7 +944,7 @@ msgstr "Messages Font Size"
 msgid "Microphone access was denied."
 msgstr "Microphone access was denied."
 
-#: src/components/chat/ReactionDetailsModal.tsx
+#: src/components/chat/reactions/ReactionDetailsModal.tsx
 msgid "More"
 msgstr "More"
 
@@ -953,7 +978,7 @@ msgstr "Name"
 msgid "Never"
 msgstr "Never"
 
-#: src/components/chat/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
 msgid "New message"
 msgstr "New message"
 
@@ -962,11 +987,11 @@ msgstr "New message"
 msgid "New Sticker Pack"
 msgstr "New Sticker Pack"
 
-#: src/components/chat/ChatVirtualScroll.tsx
+#: src/components/chat/virtualScroll/ChatVirtualScroll.tsx
 msgid "Newer messages"
 msgstr "Newer messages"
 
-#: src/components/chat/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Next image"
 msgstr "Next image"
 
@@ -974,12 +999,12 @@ msgstr "Next image"
 msgid "No active invite links created by you."
 msgstr "No active invite links created by you."
 
-#: src/components/chat/ChatList.tsx
-#: src/components/chat/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
 msgid "No chats yet"
 msgstr "No chats yet"
 
-#: src/components/chat/GroupProfile.tsx
+#: src/components/chat/profiles/GroupProfile.tsx
 msgid "No group description yet."
 msgstr "No group description yet."
 
@@ -1003,8 +1028,8 @@ msgstr "No matching members found."
 msgid "No members found."
 msgstr "No members found."
 
-#: src/components/chat/ChatList.tsx
-#: src/components/chat/ChatVirtualScroll.tsx
+#: src/components/chat/lists/ChatList.tsx
+#: src/components/chat/virtualScroll/ChatVirtualScroll.tsx
 msgid "No messages yet"
 msgstr "No messages yet"
 
@@ -1012,7 +1037,7 @@ msgstr "No messages yet"
 #~ msgid "No new replies"
 #~ msgstr "No new replies"
 
-#: src/components/chat/PinListModal.tsx
+#: src/components/chat/pins/PinListModal.tsx
 msgid "No pinned messages"
 msgstr "No pinned messages"
 
@@ -1073,7 +1098,7 @@ msgstr "Open emoji picker"
 msgid "Open this invite to view the group and join."
 msgstr "Open this invite to view the group and join."
 
-#: src/components/chat/PinBanner.tsx
+#: src/components/chat/pins/PinBanner.tsx
 msgid "Open thread"
 msgstr "Open thread"
 
@@ -1119,11 +1144,11 @@ msgstr "Pin Message"
 msgid "Pin this message in the group?"
 msgstr "Pin this message in the group?"
 
-#: src/components/chat/PinBanner.tsx
+#: src/components/chat/pins/PinBanner.tsx
 msgid "Pinned message"
 msgstr "Pinned message"
 
-#: src/components/chat/PinListModal.tsx
+#: src/components/chat/pins/PinListModal.tsx
 msgid "Pinned Messages"
 msgstr "Pinned Messages"
 
@@ -1144,7 +1169,7 @@ msgstr "Please choose at least one emoji"
 msgid "Please try again in a moment."
 msgstr "Please try again in a moment."
 
-#: src/components/chat/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Previous image"
 msgstr "Previous image"
 
@@ -1207,7 +1232,7 @@ msgstr "Push notifications turned off"
 msgid "Reaction Details"
 msgstr "Reaction Details"
 
-#: src/components/chat/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
 msgid "Read"
 msgstr "Read"
 
@@ -1233,7 +1258,7 @@ msgid "Remove"
 msgstr "Remove"
 
 #. placeholder {0}: item.name
-#: src/components/chat/UploadPreview.tsx
+#: src/components/chat/compose/UploadPreview.tsx
 msgid "Remove {0}"
 msgstr "Remove {0}"
 
@@ -1294,7 +1319,7 @@ msgstr "Replying to {0}"
 msgid "Restricted To"
 msgstr "Restricted To"
 
-#: src/components/chat/UploadPreview.tsx
+#: src/components/chat/compose/UploadPreview.tsx
 msgid "Retry"
 msgstr "Retry"
 
@@ -1356,11 +1381,11 @@ msgstr "Semi-Private"
 msgid "Send invite"
 msgstr "Send invite"
 
-#: src/components/chat/MessageComposeBar.tsx
+#: src/components/chat/compose/MessageComposeBar.tsx
 msgid "Send message"
 msgstr "Send message"
 
-#: src/components/chat/MessageComposeBar.tsx
+#: src/components/chat/compose/MessageComposeBar.tsx
 msgid "Send voice message"
 msgstr "Send voice message"
 
@@ -1370,8 +1395,8 @@ msgid "Settings"
 msgstr "Settings"
 
 #: src/pages/chat-thread/chat-settings.tsx
-msgid "Settings saved"
-msgstr "Settings saved"
+#~ msgid "Settings saved"
+#~ msgstr "Settings saved"
 
 #: src/pages/chat-thread/manage-invites.tsx
 msgid "Share"
@@ -1397,6 +1422,10 @@ msgstr "Start Thread"
 msgid "Status"
 msgstr "Status"
 
+#: src/pages/chat-thread/chat-settings.tsx
+msgid "Stay"
+msgstr "Stay"
+
 #: src/components/chat/compose/ComposeInput.tsx
 #: src/components/chat/messages/StickerBubble.tsx
 msgid "Sticker"
@@ -1411,11 +1440,11 @@ msgid "Sticker packs"
 msgstr "Sticker packs"
 
 #: src/components/chat/compose/AddStickerModal.tsx
-#: src/components/chat/StickerPreviewModal.tsx
+#: src/components/chat/compose/StickerPreviewModal.tsx
 msgid "Sticker preview"
 msgstr "Sticker preview"
 
-#: src/components/chat/StickerPreviewModal.tsx
+#: src/components/chat/compose/StickerPreviewModal.tsx
 #: src/pages/settings/stickers.tsx
 msgid "stickers"
 msgstr "stickers"
@@ -1425,7 +1454,7 @@ msgstr "stickers"
 #~ msgid "Stickers"
 #~ msgstr "Stickers"
 
-#: src/components/chat/StickerPreviewModal.tsx
+#: src/components/chat/compose/StickerPreviewModal.tsx
 msgid "Subscribe"
 msgstr "Subscribe"
 
@@ -1481,7 +1510,7 @@ msgstr "Thread"
 #~ msgid "Thread in {0}"
 #~ msgstr "Thread in {0}"
 
-#: src/components/chat/ChatListSegment.tsx
+#: src/components/chat/lists/ChatListSegment.tsx
 #: src/pages/threads.tsx
 msgid "Threads"
 msgstr "Threads"
@@ -1491,7 +1520,7 @@ msgid "Threads you create or reply to will appear here"
 msgstr "Threads you create or reply to will appear here"
 
 #. placeholder {0}: index + 1
-#: src/components/chat/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Thumbnail {0}"
 msgstr "Thumbnail {0}"
 
@@ -1507,26 +1536,26 @@ msgstr "Turn Off Push Notifications"
 msgid "Turn On Push Notifications"
 msgstr "Turn On Push Notifications"
 
-#: src/components/chat/PinBanner.tsx
-#: src/components/chat/PinBanner.tsx
-#: src/components/chat/PinListModal.tsx
-#: src/components/chat/PinListModal.tsx
+#: src/components/chat/pins/PinBanner.tsx
+#: src/components/chat/pins/PinBanner.tsx
+#: src/components/chat/pins/PinListModal.tsx
+#: src/components/chat/pins/PinListModal.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 msgid "Unpin"
 msgstr "Unpin"
 
-#: src/components/chat/PinBanner.tsx
-#: src/components/chat/PinListModal.tsx
+#: src/components/chat/pins/PinBanner.tsx
+#: src/components/chat/pins/PinListModal.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 msgid "Unpin Message"
 msgstr "Unpin Message"
 
-#: src/components/chat/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
 msgid "Unread"
 msgstr "Unread"
 
-#: src/components/chat/StickerPreviewModal.tsx
+#: src/components/chat/compose/StickerPreviewModal.tsx
 #: src/pages/settings/sticker-pack-detail.tsx
 #: src/pages/settings/sticker-pack-detail.tsx
 #: src/pages/settings/sticker-pack-detail.tsx
@@ -1550,19 +1579,19 @@ msgid "Update Now"
 msgstr "Update Now"
 
 #: src/pages/chat-thread/ChatAdminSettings.tsx
-msgid "Upload an image for this group."
-msgstr "Upload an image for this group."
+#~ msgid "Upload an image for this group."
+#~ msgstr "Upload an image for this group."
 
 #: src/pages/chat-thread/ChatAdminSettings.tsx
-msgid "Upload Avatar"
-msgstr "Upload Avatar"
+#~ msgid "Upload Avatar"
+#~ msgstr "Upload Avatar"
 
+#: src/components/chat/compose/UploadPreview.tsx
 #: src/components/chat/compose/useComposeAttachments.ts
-#: src/components/chat/UploadPreview.tsx
 msgid "Upload failed"
 msgstr "Upload failed"
 
-#: src/components/chat/UploadPreview.tsx
+#: src/components/chat/compose/UploadPreview.tsx
 msgid "Uploading"
 msgstr "Uploading"
 
@@ -1572,8 +1601,12 @@ msgid "Uploading {0}%"
 msgstr "Uploading {0}%"
 
 #: src/pages/chat-thread/ChatAdminSettings.tsx
-msgid "Uploading avatar..."
-msgstr "Uploading avatar..."
+#~ msgid "Uploading avatar..."
+#~ msgstr "Uploading avatar..."
+
+#: src/components/chat/profiles/GroupProfile.tsx
+msgid "Uploading..."
+msgstr "Uploading..."
 
 #. placeholder {0}: member.uid
 #: src/components/chat-members/ChatMemberRow.tsx
@@ -1582,16 +1615,20 @@ msgstr "Uploading avatar..."
 msgid "User {0}"
 msgstr "User {0}"
 
+#: src/components/settings/SettingsProfileHero.tsx
+msgid "User {uid}"
+msgstr "User {uid}"
+
 #: src/pages/chat-thread/chat-members.tsx
 msgid "User ID"
 msgstr "User ID"
 
-#: src/components/chat/PinBanner.tsx
+#: src/components/chat/pins/PinBanner.tsx
 msgid "View all pinned messages"
 msgstr "View all pinned messages"
 
 #. placeholder {0}: index + 1
-#: src/components/chat/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
 msgid "View image {0}"
 msgstr "View image {0}"
 
@@ -1604,6 +1641,7 @@ msgid "Voice message"
 msgstr "Voice message"
 
 #: src/components/chat/compose/useVoiceRecorder.ts
+#: src/components/chat/compose/useVoiceRecorder.ts
 msgid "Voice recording is not supported on this device."
 msgstr "Voice recording is not supported on this device."
 
@@ -1615,8 +1653,8 @@ msgstr "Waiting for microphone…"
 msgid "We could not join this chat right now."
 msgstr "We could not join this chat right now."
 
-#: src/components/chat/PinBanner.tsx
-#: src/components/chat/PinListModal.tsx
+#: src/components/chat/pins/PinBanner.tsx
+#: src/components/chat/pins/PinListModal.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 msgid "Would you like to unpin this message?"
 msgstr "Would you like to unpin this message?"
@@ -1645,6 +1683,14 @@ msgstr "You can only upload up to {maxAttachments} media files at once."
 #~ msgid "You can review the chat before joining. Nothing changes until you tap Join chat."
 #~ msgstr "You can review the chat before joining. Nothing changes until you tap Join chat."
 
+#: src/pages/chat-thread/chat-settings.tsx
+msgid "You have unsaved group detail changes. Leave without saving?"
+msgstr "You have unsaved group detail changes. Leave without saving?"
+
 #: src/components/invites/InvitePreviewCard.tsx
 msgid "You’ve been invited"
 msgstr "You’ve been invited"
+
+#: src/components/settings/SettingsProfileHero.tsx
+msgid "Your account"
+msgstr "Your account"

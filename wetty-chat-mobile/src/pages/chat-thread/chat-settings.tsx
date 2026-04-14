@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import {
   useIonAlert,
   IonButtons,
   IonContent,
   IonHeader,
+  IonIcon,
+  IonItem,
+  IonLabel,
+  IonList,
   IonPage,
   IonSpinner,
   IonTitle,
@@ -31,7 +35,6 @@ import { ChatRoleGate } from '@/components/chat/permissions/ChatRoleGate';
 import { ChatMuteSettingItem } from '@/components/chat/settings/ChatMuteSettingItem';
 import type { BackAction } from '@/types/back-action';
 import styles from './ChatSettings.module.scss';
-import { FeatureGate } from '@/components/FeatureGate';
 import { ChatAdminSettings } from './ChatAdminSettings';
 import { ShareInviteModal } from '@/components/chat/settings/ShareInviteModal';
 import { GroupSettingsActionButton } from '@/components/chat/settings/GroupSettingsActionButton';
@@ -76,6 +79,7 @@ interface ChatSettingsContentProps {
   saving: boolean;
   leavingGroup: boolean;
   uploadingAvatar: boolean;
+  saveDisabled: boolean;
   onNameChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onVisibilityChange: (value: 'public' | 'private') => void;
@@ -92,6 +96,7 @@ function ChatSettingsContent({
   saving,
   leavingGroup,
   uploadingAvatar,
+  saveDisabled,
   onNameChange,
   onDescriptionChange,
   onVisibilityChange,
@@ -100,6 +105,26 @@ function ChatSettingsContent({
   onSave,
 }: ChatSettingsContentProps) {
   const [shareModalOpen, setShareModalOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const canEditAvatar = myRole === 'admin';
+
+  const handlePickAvatar = () => {
+    if (!canEditAvatar || uploadingAvatar || saving) {
+      return;
+    }
+
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) {
+      return;
+    }
+
+    await onUploadAvatar(file);
+  };
 
   return (
     <>
@@ -108,6 +133,16 @@ function ChatSettingsContent({
         name={formState.name}
         description={formState.description}
         avatarUrl={formState.avatarUrl}
+        avatarEditable={canEditAvatar}
+        avatarUploading={uploadingAvatar}
+        onAvatarClick={handlePickAvatar}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className={styles.hiddenFileInput}
+        onChange={handleFileChange}
       />
 
       <div className={styles.shareActions}>
@@ -118,27 +153,28 @@ function ChatSettingsContent({
             <Trans>Invite</Trans>
           </GroupSettingsActionButton>
         </ChatRoleGate>
-
-        <GroupSettingsActionButton icon={exitOutline} tone="danger" disabled={leavingGroup} onClick={onLeaveGroup}>
-          <Trans>Leave</Trans>
-        </GroupSettingsActionButton>
       </div>
 
-      <FeatureGate>
+      <ChatRoleGate chatId={chatId} allow="admin" role={myRole}>
         <ChatAdminSettings
           name={formState.name}
           description={formState.description}
           visibility={formState.visibility}
-          avatarUrl={formState.avatarUrl}
           saving={saving}
-          uploadingAvatar={uploadingAvatar}
+          saveDisabled={saveDisabled}
           onNameChange={onNameChange}
           onDescriptionChange={onDescriptionChange}
           onVisibilityChange={onVisibilityChange}
-          onUploadAvatar={onUploadAvatar}
           onSave={onSave}
         />
-      </FeatureGate>
+      </ChatRoleGate>
+
+      <IonList inset>
+        <IonItem button detail={false} disabled={leavingGroup} onClick={onLeaveGroup}>
+          <IonIcon aria-hidden="true" icon={exitOutline} slot="start" color="danger" />
+          <IonLabel color="danger">{leavingGroup ? <Trans>Leaving...</Trans> : <Trans>Leave Group</Trans>}</IonLabel>
+        </IonItem>
+      </IonList>
 
       {myRole === 'admin' ? (
         <ShareInviteModal isOpen={shareModalOpen} chatId={chatId} onDismiss={() => setShareModalOpen(false)} />
@@ -149,6 +185,14 @@ function ChatSettingsContent({
 
 function hasLoadedChatSettingsMeta(cachedMeta?: { visibility?: string; myRole?: GroupRole | null }): boolean {
   return !!cachedMeta?.visibility && cachedMeta.myRole !== undefined;
+}
+
+function getMetadataSnapshot(state: Pick<ChatSettingsFormState, 'name' | 'description' | 'visibility'>) {
+  return {
+    name: state.name.trim(),
+    description: state.description.trim(),
+    visibility: state.visibility,
+  };
 }
 
 function ChatSettingsSession({ chatId, backAction }: { chatId: string; backAction?: BackAction }) {
@@ -164,6 +208,18 @@ function ChatSettingsSession({ chatId, backAction }: { chatId: string; backActio
   const [saving, setSaving] = useState(false);
   const [leavingGroup, setLeavingGroup] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [savedMetadataState, setSavedMetadataState] = useState(() =>
+    getMetadataSnapshot(getInitialFormState(cachedMeta)),
+  );
+  const unblockRef = useRef<null | (() => void)>(null);
+  const shouldBypassPromptRef = useRef(false);
+
+  const metadataSnapshot = useMemo(() => getMetadataSnapshot(formState), [formState]);
+  const hasUnsavedMetadataChanges =
+    metadataSnapshot.name !== savedMetadataState.name ||
+    metadataSnapshot.description !== savedMetadataState.description ||
+    metadataSnapshot.visibility !== savedMetadataState.visibility;
+  const saveDisabled = saving || uploadingAvatar || !hasUnsavedMetadataChanges;
 
   useEffect(() => {
     if (hasLoadedChatSettingsMeta(cachedMeta)) {
@@ -176,7 +232,9 @@ function ChatSettingsSession({ chatId, backAction }: { chatId: string; backActio
         void id;
         dispatch(setChatMeta({ chatId, meta }));
         dispatch(setChatMutedUntil({ chatId, mutedUntil: mutedUntil ?? null }));
-        setFormState(getInitialFormState(meta));
+        const nextFormState = getInitialFormState(meta);
+        setFormState(nextFormState);
+        setSavedMetadataState(getMetadataSnapshot(nextFormState));
       })
       .catch((err: Error) => {
         presentToast({ message: err.message || t`Failed to load chat details`, duration: 3000 });
@@ -245,20 +303,127 @@ function ChatSettingsSession({ chatId, backAction }: { chatId: string; backActio
     }
   };
 
+  const runBackAction = () => {
+    if (!backAction) {
+      return;
+    }
+
+    if (backAction.type === 'back') {
+      if (history.length > 1) {
+        history.goBack();
+      } else {
+        history.replace(backAction.defaultHref);
+      }
+      return;
+    }
+
+    if (backAction.type === 'callback') {
+      backAction.onBack();
+      return;
+    }
+
+    backAction.onClose();
+  };
+
+  const confirmDiscardChanges = useCallback(
+    (onDiscard: () => void) => {
+      presentAlert({
+        header: t`Discard changes?`,
+        message: t`You have unsaved group detail changes. Leave without saving?`,
+        buttons: [
+          { text: t`Stay`, role: 'cancel' },
+          {
+            text: t`Discard`,
+            role: 'destructive',
+            handler: () => {
+              shouldBypassPromptRef.current = true;
+              onDiscard();
+            },
+          },
+        ],
+      });
+    },
+    [presentAlert],
+  );
+
+  useEffect(() => {
+    if (!hasUnsavedMetadataChanges) {
+      shouldBypassPromptRef.current = false;
+      unblockRef.current?.();
+      unblockRef.current = null;
+      return;
+    }
+
+    const unblock = history.block((nextLocation, action) => {
+      if (shouldBypassPromptRef.current) {
+        return;
+      }
+
+      confirmDiscardChanges(() => {
+        unblock();
+        unblockRef.current = null;
+        if (action === 'REPLACE') {
+          history.replace(nextLocation);
+          return;
+        }
+        if (action === 'PUSH') {
+          history.push(nextLocation);
+          return;
+        }
+        history.goBack();
+      });
+
+      return false;
+    });
+
+    unblockRef.current = unblock;
+
+    return () => {
+      unblock();
+      if (unblockRef.current === unblock) {
+        unblockRef.current = null;
+      }
+    };
+  }, [confirmDiscardChanges, hasUnsavedMetadataChanges, history]);
+
+  useEffect(() => {
+    if (!hasUnsavedMetadataChanges) {
+      return;
+    }
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedMetadataChanges]);
+
+  const handleBack = () => {
+    if (!hasUnsavedMetadataChanges) {
+      runBackAction();
+      return;
+    }
+
+    confirmDiscardChanges(() => {
+      unblockRef.current?.();
+      unblockRef.current = null;
+      runBackAction();
+    });
+  };
+
   const handleSave = () => {
-    if (uploadingAvatar) {
+    if (saveDisabled) {
       return;
     }
     setSaving(true);
 
-    const name = formState.name.trim();
-    const description = formState.description.trim();
-
     updateGroupInfo(chatId, {
-      name: name || undefined,
-      description: description || undefined,
+      name: metadataSnapshot.name || undefined,
+      description: metadataSnapshot.description || undefined,
       avatarImageId: formState.avatarImageId,
-      visibility: formState.visibility,
+      visibility: metadataSnapshot.visibility,
     })
       .then((res) => {
         const { id, ...meta } = res.data;
@@ -269,9 +434,10 @@ function ChatSettingsSession({ chatId, backAction }: { chatId: string; backActio
             meta,
           }),
         );
-        setFormState(getInitialFormState(meta));
-        presentToast({ message: t`Settings saved`, duration: 2000 });
-        history.goBack();
+        const nextFormState = getInitialFormState(meta);
+        setFormState(nextFormState);
+        setSavedMetadataState(getMetadataSnapshot(nextFormState));
+        presentToast({ message: t`Group details saved`, duration: 2000 });
       })
       .catch((err: Error) => {
         presentToast({ message: err.message || t`Failed to save settings`, duration: 3000 });
@@ -318,7 +484,9 @@ function ChatSettingsSession({ chatId, backAction }: { chatId: string; backActio
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonButtons slot="start">{backAction && <BackButton action={backAction} />}</IonButtons>
+          <IonButtons slot="start">
+            {backAction && <BackButton action={{ type: 'callback', onBack: handleBack }} />}
+          </IonButtons>
           <IonTitle>
             <Trans>Group Settings</Trans>
           </IonTitle>
@@ -338,6 +506,7 @@ function ChatSettingsSession({ chatId, backAction }: { chatId: string; backActio
             saving={saving}
             leavingGroup={leavingGroup}
             uploadingAvatar={uploadingAvatar}
+            saveDisabled={saveDisabled}
             onNameChange={(value) => updateFormState('name', value)}
             onDescriptionChange={(value) => updateFormState('description', value)}
             onVisibilityChange={(value) => updateFormState('visibility', value)}

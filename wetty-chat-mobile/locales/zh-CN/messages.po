@@ -79,8 +79,8 @@ msgstr "添加到收藏"
 msgid "Alex"
 msgstr "风纪委员"
 
-#: src/components/chat/ChatListSegment.tsx
-#: src/components/chat/ReactionDetailsModal.tsx
+#: src/components/chat/lists/ChatListSegment.tsx
+#: src/components/chat/reactions/ReactionDetailsModal.tsx
 msgid "All"
 msgstr "全部"
 
@@ -109,7 +109,7 @@ msgstr "确定要退出这个群组吗？"
 msgid "Ask first"
 msgstr "先询问"
 
-#: src/components/chat/MessageComposeBar.tsx
+#: src/components/chat/compose/MessageComposeBar.tsx
 msgid "Attach image"
 msgstr "添加图片"
 
@@ -118,11 +118,11 @@ msgstr "添加图片"
 msgid "Attachment"
 msgstr "附件"
 
-#: src/components/chat/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Attachment large view"
 msgstr "附件大图预览"
 
-#: src/components/chat/UploadPreview.tsx
+#: src/components/chat/compose/UploadPreview.tsx
 msgid "Attachment preview tray"
 msgstr "附件预览栏"
 
@@ -144,6 +144,7 @@ msgstr "头像已上传"
 
 #: src/components/chat/settings/ShareInviteModal.tsx
 #: src/pages/settings/general.tsx
+#: src/pages/settings/language.tsx
 #: src/pages/settings/sticker-pack-detail.tsx
 #: src/pages/settings/sticker-pack-detail.tsx
 #: src/pages/settings/stickers.tsx
@@ -160,8 +161,8 @@ msgstr "已阻止"
 
 #: src/components/chat/compose/AddStickerModal.tsx
 #: src/components/chat/compose/StickerPicker.tsx
-#: src/components/chat/PinBanner.tsx
-#: src/components/chat/PinListModal.tsx
+#: src/components/chat/pins/PinBanner.tsx
+#: src/components/chat/pins/PinListModal.tsx
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 #: src/components/chat/settings/ShareInviteModal.tsx
 #: src/pages/chat-thread/chat-members.tsx
@@ -187,9 +188,17 @@ msgstr "取消编辑"
 msgid "Cancel reply"
 msgstr "取消回复"
 
-#: src/components/chat/MessageOverlay.tsx
+#: src/components/chat/messages/MessageOverlay.tsx
 msgid "Cannot add more than {MAX_DISTINCT_REACTIONS_PER_MESSAGE} different reactions"
 msgstr "每条消息最多只能添加 {MAX_DISTINCT_REACTIONS_PER_MESSAGE} 种不同的表态"
+
+#: src/components/chat/profiles/GroupProfile.tsx
+msgid "Change"
+msgstr "更换"
+
+#: src/components/chat/profiles/GroupProfile.tsx
+msgid "Change group photo"
+msgstr "更换群组头像"
 
 #: src/utils/chatDisplay.ts
 msgid "Chat {chatId}"
@@ -214,8 +223,8 @@ msgid "Choose a destination group"
 msgstr "选择目标群组"
 
 #: src/pages/chat-thread/ChatAdminSettings.tsx
-msgid "Choose a new image to replace the current avatar."
-msgstr "选择一张新图片以替换当前头像。"
+#~ msgid "Choose a new image to replace the current avatar."
+#~ msgstr "选择一张新图片以替换当前头像。"
 
 #: src/components/chat/settings/ShareInviteModal.tsx
 msgid "Choose the member group first"
@@ -226,17 +235,17 @@ msgstr "请先选择成员群组"
 msgid "Clipboard is not available on this device"
 msgstr "此设备不支持剪贴板"
 
-#: src/components/chat/ImageViewer.tsx
-#: src/components/chat/ReactionDetailsModal.tsx
+#: src/components/chat/compose/StickerPreviewModal.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
+#: src/components/chat/profiles/UserProfileModal.tsx
+#: src/components/chat/reactions/ReactionDetailsModal.tsx
 #: src/components/chat/settings/ShareInviteGroupSelectorModal.tsx
 #: src/components/chat/settings/ShareInviteModal.tsx
-#: src/components/chat/StickerPreviewModal.tsx
-#: src/components/chat/UserProfileModal.tsx
 #: src/components/invites/InviteMessageModal.tsx
 msgid "Close"
 msgstr "关闭"
 
-#: src/components/chat/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Close viewer"
 msgstr "关闭查看器"
 
@@ -366,23 +375,31 @@ msgstr "描述"
 msgid "Destination Group"
 msgstr "目标群组"
 
+#: src/pages/chat-thread/chat-settings.tsx
+msgid "Discard"
+msgstr "放弃"
+
+#: src/pages/chat-thread/chat-settings.tsx
+msgid "Discard changes?"
+msgstr "放弃更改？"
+
 #: src/App.tsx
 msgid "Dismiss"
 msgstr "忽略"
 
-#: src/components/chat/PinListModal.tsx
+#: src/components/chat/pins/PinListModal.tsx
 msgid "Done"
 msgstr "完成"
 
-#: src/components/chat/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Download"
 msgstr "下载"
 
-#: src/components/chat/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Download image"
 msgstr "下载图片"
 
-#: src/components/chat/MessageComposeBar.tsx
+#: src/components/chat/compose/MessageComposeBar.tsx
 msgid "Drop images or videos"
 msgstr "拖放图片或视频"
 
@@ -390,7 +407,7 @@ msgstr "拖放图片或视频"
 msgid "e.g. 😊"
 msgstr "例如 😊"
 
-#: src/components/chat/ChatVirtualScroll.tsx
+#: src/components/chat/virtualScroll/ChatVirtualScroll.tsx
 msgid "Earlier messages"
 msgstr "更早的消息"
 
@@ -421,8 +438,8 @@ msgstr "表情和贴纸"
 msgid "Enter an invite code"
 msgstr "输入邀请码"
 
-#: src/components/chat/ImageViewer.tsx
-#: src/components/chat/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Enter fullscreen"
 msgstr "进入全屏"
 
@@ -438,12 +455,12 @@ msgstr "输入群组名称"
 msgid "Enter user ID to add:"
 msgstr "输入要添加的用户 ID："
 
-#: src/components/chat/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
 msgid "Error"
 msgstr "错误"
 
-#: src/components/chat/ImageViewer.tsx
-#: src/components/chat/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Exit fullscreen"
 msgstr "退出全屏"
 
@@ -501,7 +518,7 @@ msgstr "退出群组失败"
 msgid "Failed to load chat details"
 msgstr "加载聊天详情失败"
 
-#: src/components/chat/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
 msgid "Failed to load chats"
 msgstr "加载聊天失败"
 
@@ -557,7 +574,7 @@ msgstr "打开链接失败"
 msgid "Failed to pin message"
 msgstr "置顶消息失败"
 
-#: src/components/chat/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
 msgid "Failed to refresh chats"
 msgstr "刷新聊天失败"
 
@@ -649,8 +666,12 @@ msgid "Group"
 msgstr "群组"
 
 #: src/pages/chat-thread/ChatAdminSettings.tsx
-msgid "Group Avatar"
-msgstr "群组头像"
+#~ msgid "Group Avatar"
+#~ msgstr "群组头像"
+
+#: src/pages/chat-thread/chat-settings.tsx
+msgid "Group details saved"
+msgstr "群组资料已保存"
 
 #: src/components/chat/messages/InviteMessageCard.tsx
 msgid "Group invite"
@@ -668,7 +689,7 @@ msgstr "群组名称"
 msgid "Group Settings"
 msgstr "群组设置"
 
-#: src/components/chat/ChatListSegment.tsx
+#: src/components/chat/lists/ChatListSegment.tsx
 msgid "Groups"
 msgstr "群组"
 
@@ -764,13 +785,17 @@ msgid "Large"
 msgstr "大"
 
 #: src/pages/chat-thread/chat-settings.tsx
-#: src/pages/chat-thread/chat-settings.tsx
 msgid "Leave"
 msgstr "退出"
 
 #: src/pages/chat-thread/chat-settings.tsx
+#: src/pages/chat-thread/chat-settings.tsx
 msgid "Leave Group"
 msgstr "退出群组"
+
+#: src/pages/chat-thread/chat-settings.tsx
+msgid "Leaving..."
+msgstr "正在退出..."
 
 #: src/pages/chat-thread/chat-settings.tsx
 msgid "Left group"
@@ -780,24 +805,24 @@ msgstr "已退出群组"
 msgid "Loading invite…"
 msgstr "正在加载邀请…"
 
-#: src/components/chat/ReactionDetailsModal.tsx
-#: src/components/chat/ReactionDetailsModal.tsx
-#: src/components/chat/StickerPreviewModal.tsx
+#: src/components/chat/compose/StickerPreviewModal.tsx
+#: src/components/chat/reactions/ReactionDetailsModal.tsx
+#: src/components/chat/reactions/ReactionDetailsModal.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/settings/sticker-pack-detail.tsx
 msgid "Loading..."
 msgstr "正在加载..."
 
-#: src/components/chat/ChatList.tsx
-#: src/components/chat/ChatVirtualScroll.tsx
-#: src/components/chat/ChatVirtualScroll.tsx
-#: src/components/chat/ChatVirtualScroll.tsx
+#: src/components/chat/lists/ChatList.tsx
+#: src/components/chat/virtualScroll/ChatVirtualScroll.tsx
+#: src/components/chat/virtualScroll/ChatVirtualScroll.tsx
+#: src/components/chat/virtualScroll/ChatVirtualScroll.tsx
 #: src/pages/join-chat.tsx
 #: src/pages/join-chat.tsx
 msgid "Loading…"
 msgstr "正在加载…"
 
-#: src/components/chat/StickerPreviewModal.tsx
+#: src/components/chat/compose/StickerPreviewModal.tsx
 msgid "Manage"
 msgstr "管理"
 
@@ -844,8 +869,8 @@ msgid "Mention suggestions"
 msgstr "提及建议"
 
 #: src/components/chat/compose/ComposeInput.tsx
-#: src/components/chat/PinBanner.tsx
-#: src/components/chat/PinListModal.tsx
+#: src/components/chat/pins/PinBanner.tsx
+#: src/components/chat/pins/PinListModal.tsx
 msgid "Message"
 msgstr "消息"
 
@@ -869,9 +894,9 @@ msgstr "消息字体大小"
 msgid "Microphone access was denied."
 msgstr "麦克风访问被拒绝。"
 
-#: src/components/chat/ReactionDetailsModal.tsx
+#: src/components/chat/reactions/ReactionDetailsModal.tsx
 msgid "More"
-msgstr ""
+msgstr "更多"
 
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 msgid "Mute"
@@ -895,7 +920,7 @@ msgstr "名称"
 msgid "Never"
 msgstr "永不"
 
-#: src/components/chat/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
 msgid "New message"
 msgstr "新消息"
 
@@ -904,11 +929,11 @@ msgstr "新消息"
 msgid "New Sticker Pack"
 msgstr "新贴纸包"
 
-#: src/components/chat/ChatVirtualScroll.tsx
+#: src/components/chat/virtualScroll/ChatVirtualScroll.tsx
 msgid "Newer messages"
 msgstr "较新的消息"
 
-#: src/components/chat/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Next image"
 msgstr "下一张图片"
 
@@ -916,12 +941,12 @@ msgstr "下一张图片"
 msgid "No active invite links created by you."
 msgstr "你创建的有效邀请链接为空。"
 
-#: src/components/chat/ChatList.tsx
-#: src/components/chat/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
 msgid "No chats yet"
 msgstr "暂无聊天"
 
-#: src/components/chat/GroupProfile.tsx
+#: src/components/chat/profiles/GroupProfile.tsx
 msgid "No group description yet."
 msgstr "暂无群组描述。"
 
@@ -945,12 +970,12 @@ msgstr "未找到匹配的成员。"
 msgid "No members found."
 msgstr "未找到成员。"
 
-#: src/components/chat/ChatList.tsx
-#: src/components/chat/ChatVirtualScroll.tsx
+#: src/components/chat/lists/ChatList.tsx
+#: src/components/chat/virtualScroll/ChatVirtualScroll.tsx
 msgid "No messages yet"
 msgstr "暂无消息"
 
-#: src/components/chat/PinListModal.tsx
+#: src/components/chat/pins/PinListModal.tsx
 msgid "No pinned messages"
 msgstr "暂无置顶消息"
 
@@ -1011,7 +1036,7 @@ msgstr "打开表情选择器"
 msgid "Open this invite to view the group and join."
 msgstr "打开此邀请以查看群组并加入。"
 
-#: src/components/chat/PinBanner.tsx
+#: src/components/chat/pins/PinBanner.tsx
 msgid "Open thread"
 msgstr "打开话题"
 
@@ -1057,11 +1082,11 @@ msgstr "置顶消息"
 msgid "Pin this message in the group?"
 msgstr "确定要置顶此消息吗？"
 
-#: src/components/chat/PinBanner.tsx
+#: src/components/chat/pins/PinBanner.tsx
 msgid "Pinned message"
 msgstr "已置顶的消息"
 
-#: src/components/chat/PinListModal.tsx
+#: src/components/chat/pins/PinListModal.tsx
 msgid "Pinned Messages"
 msgstr "置顶消息"
 
@@ -1082,7 +1107,7 @@ msgstr "请至少选择一个表情"
 msgid "Please try again in a moment."
 msgstr "请稍后再试。"
 
-#: src/components/chat/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Previous image"
 msgstr "上一张图片"
 
@@ -1145,7 +1170,7 @@ msgstr "推送通知已关闭"
 msgid "Reaction Details"
 msgstr "表情回应详情"
 
-#: src/components/chat/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
 msgid "Read"
 msgstr "标记已读"
 
@@ -1171,7 +1196,7 @@ msgid "Remove"
 msgstr "移除"
 
 #. placeholder {0}: item.name
-#: src/components/chat/UploadPreview.tsx
+#: src/components/chat/compose/UploadPreview.tsx
 msgid "Remove {0}"
 msgstr "移除 {0}"
 
@@ -1228,7 +1253,7 @@ msgstr "正在回复 {0}"
 msgid "Restricted To"
 msgstr "限制为"
 
-#: src/components/chat/UploadPreview.tsx
+#: src/components/chat/compose/UploadPreview.tsx
 msgid "Retry"
 msgstr "重试"
 
@@ -1290,11 +1315,11 @@ msgstr "半私密"
 msgid "Send invite"
 msgstr "发送邀请"
 
-#: src/components/chat/MessageComposeBar.tsx
+#: src/components/chat/compose/MessageComposeBar.tsx
 msgid "Send message"
 msgstr "发送消息"
 
-#: src/components/chat/MessageComposeBar.tsx
+#: src/components/chat/compose/MessageComposeBar.tsx
 msgid "Send voice message"
 msgstr "发送语音消息"
 
@@ -1304,8 +1329,8 @@ msgid "Settings"
 msgstr "设置"
 
 #: src/pages/chat-thread/chat-settings.tsx
-msgid "Settings saved"
-msgstr "设置已保存"
+#~ msgid "Settings saved"
+#~ msgstr "设置已保存"
 
 #: src/pages/chat-thread/manage-invites.tsx
 msgid "Share"
@@ -1331,6 +1356,10 @@ msgstr "创建话题"
 msgid "Status"
 msgstr "状态"
 
+#: src/pages/chat-thread/chat-settings.tsx
+msgid "Stay"
+msgstr "留在此页"
+
 #: src/components/chat/compose/ComposeInput.tsx
 #: src/components/chat/messages/StickerBubble.tsx
 msgid "Sticker"
@@ -1345,11 +1374,11 @@ msgid "Sticker packs"
 msgstr "贴纸包"
 
 #: src/components/chat/compose/AddStickerModal.tsx
-#: src/components/chat/StickerPreviewModal.tsx
+#: src/components/chat/compose/StickerPreviewModal.tsx
 msgid "Sticker preview"
 msgstr "贴纸预览"
 
-#: src/components/chat/StickerPreviewModal.tsx
+#: src/components/chat/compose/StickerPreviewModal.tsx
 #: src/pages/settings/stickers.tsx
 msgid "stickers"
 msgstr "个贴纸"
@@ -1359,7 +1388,7 @@ msgstr "个贴纸"
 #~ msgid "Stickers"
 #~ msgstr "贴纸"
 
-#: src/components/chat/StickerPreviewModal.tsx
+#: src/components/chat/compose/StickerPreviewModal.tsx
 msgid "Subscribe"
 msgstr "订阅"
 
@@ -1407,7 +1436,7 @@ msgstr "这是你的消息在聊天中的显示效果。"
 msgid "Thread"
 msgstr "话题"
 
-#: src/components/chat/ChatListSegment.tsx
+#: src/components/chat/lists/ChatListSegment.tsx
 #: src/pages/threads.tsx
 msgid "Threads"
 msgstr "话题"
@@ -1417,7 +1446,7 @@ msgid "Threads you create or reply to will appear here"
 msgstr "你创建或回复的话题会显示在这里"
 
 #. placeholder {0}: index + 1
-#: src/components/chat/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Thumbnail {0}"
 msgstr "缩略图 {0}"
 
@@ -1433,26 +1462,26 @@ msgstr "关闭推送通知"
 msgid "Turn On Push Notifications"
 msgstr "开启推送通知"
 
-#: src/components/chat/PinBanner.tsx
-#: src/components/chat/PinBanner.tsx
-#: src/components/chat/PinListModal.tsx
-#: src/components/chat/PinListModal.tsx
+#: src/components/chat/pins/PinBanner.tsx
+#: src/components/chat/pins/PinBanner.tsx
+#: src/components/chat/pins/PinListModal.tsx
+#: src/components/chat/pins/PinListModal.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 msgid "Unpin"
 msgstr "取消置顶"
 
-#: src/components/chat/PinBanner.tsx
-#: src/components/chat/PinListModal.tsx
+#: src/components/chat/pins/PinBanner.tsx
+#: src/components/chat/pins/PinListModal.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 msgid "Unpin Message"
 msgstr "取消置顶消息"
 
-#: src/components/chat/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
 msgid "Unread"
 msgstr "标记未读"
 
-#: src/components/chat/StickerPreviewModal.tsx
+#: src/components/chat/compose/StickerPreviewModal.tsx
 #: src/pages/settings/sticker-pack-detail.tsx
 #: src/pages/settings/sticker-pack-detail.tsx
 #: src/pages/settings/sticker-pack-detail.tsx
@@ -1476,19 +1505,19 @@ msgid "Update Now"
 msgstr "立即更新"
 
 #: src/pages/chat-thread/ChatAdminSettings.tsx
-msgid "Upload an image for this group."
-msgstr "为此群组上传一张图片。"
+#~ msgid "Upload an image for this group."
+#~ msgstr "为此群组上传一张图片。"
 
 #: src/pages/chat-thread/ChatAdminSettings.tsx
-msgid "Upload Avatar"
-msgstr "上传头像"
+#~ msgid "Upload Avatar"
+#~ msgstr "上传头像"
 
+#: src/components/chat/compose/UploadPreview.tsx
 #: src/components/chat/compose/useComposeAttachments.ts
-#: src/components/chat/UploadPreview.tsx
 msgid "Upload failed"
 msgstr "上传失败"
 
-#: src/components/chat/UploadPreview.tsx
+#: src/components/chat/compose/UploadPreview.tsx
 msgid "Uploading"
 msgstr "上传中"
 
@@ -1498,8 +1527,12 @@ msgid "Uploading {0}%"
 msgstr "正在上传 {0}%"
 
 #: src/pages/chat-thread/ChatAdminSettings.tsx
-msgid "Uploading avatar..."
-msgstr "正在上传头像..."
+#~ msgid "Uploading avatar..."
+#~ msgstr "正在上传头像..."
+
+#: src/components/chat/profiles/GroupProfile.tsx
+msgid "Uploading..."
+msgstr "上传中..."
 
 #. placeholder {0}: member.uid
 #: src/components/chat-members/ChatMemberRow.tsx
@@ -1508,16 +1541,20 @@ msgstr "正在上传头像..."
 msgid "User {0}"
 msgstr "用户 {0}"
 
+#: src/components/settings/SettingsProfileHero.tsx
+msgid "User {uid}"
+msgstr "用户 {uid}"
+
 #: src/pages/chat-thread/chat-members.tsx
 msgid "User ID"
 msgstr "用户 ID"
 
-#: src/components/chat/PinBanner.tsx
+#: src/components/chat/pins/PinBanner.tsx
 msgid "View all pinned messages"
 msgstr "查看全部置顶消息"
 
 #. placeholder {0}: index + 1
-#: src/components/chat/ImageViewer.tsx
+#: src/components/chat/messages/media/ImageViewer.tsx
 msgid "View image {0}"
 msgstr "查看图片 {0}"
 
@@ -1530,6 +1567,7 @@ msgid "Voice message"
 msgstr "语音消息"
 
 #: src/components/chat/compose/useVoiceRecorder.ts
+#: src/components/chat/compose/useVoiceRecorder.ts
 msgid "Voice recording is not supported on this device."
 msgstr "此设备不支持语音录制。"
 
@@ -1541,8 +1579,8 @@ msgstr "正在等待麦克风…"
 msgid "We could not join this chat right now."
 msgstr "我们现在无法让你加入此聊天。"
 
-#: src/components/chat/PinBanner.tsx
-#: src/components/chat/PinListModal.tsx
+#: src/components/chat/pins/PinBanner.tsx
+#: src/components/chat/pins/PinListModal.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 msgid "Would you like to unpin this message?"
 msgstr "确定要取消置顶此消息吗？"
@@ -1565,8 +1603,16 @@ msgstr "您最多只能添加 {MAX_REACTIONS_PER_USER_PER_MESSAGE} 个表态"
 
 #: src/components/chat/compose/useComposeAttachments.ts
 msgid "You can only upload up to {maxAttachments} media files at once."
-msgstr ""
+msgstr "你一次最多只能上传 {maxAttachments} 个媒体文件。"
+
+#: src/pages/chat-thread/chat-settings.tsx
+msgid "You have unsaved group detail changes. Leave without saving?"
+msgstr "你有未保存的群组资料更改。要不保存就离开吗？"
 
 #: src/components/invites/InvitePreviewCard.tsx
 msgid "You’ve been invited"
 msgstr "你已收到邀请"
+
+#: src/components/settings/SettingsProfileHero.tsx
+msgid "Your account"
+msgstr "你的账户"

@@ -13,9 +13,10 @@ import {
   IonToolbar,
   useIonAlert,
 } from '@ionic/react';
-import { useHistory } from 'react-router-dom';
+import { Redirect, useHistory } from 'react-router-dom';
 import { createChat } from '@/api/chats';
 import { BackButton } from '@/components/BackButton';
+import { PermissionGate } from '@/components/permissions/PermissionGate';
 import type { BackAction } from '@/types/back-action';
 
 interface CreateChatCoreProps {
@@ -48,35 +49,37 @@ export default function CreateChatCore({ backAction }: CreateChatCoreProps) {
   };
 
   return (
-    <div className="ion-page">
-      <IonHeader>
-        <IonToolbar>
-          <IonButtons slot="start">{backAction && <BackButton action={backAction} />}</IonButtons>
-          <IonTitle>New Chat</IonTitle>
-        </IonToolbar>
-      </IonHeader>
-      <IonContent>
-        <div style={{ padding: '16px' }}>
-          <IonList>
-            <IonItem>
-              <IonLabel position="stacked">Chat name</IonLabel>
-              <IonInput
-                type="text"
-                placeholder="Optional"
-                value={name}
-                onIonInput={(e) => setName(e.detail.value ?? '')}
-                clearInput
-              />
-            </IonItem>
-          </IonList>
-          <div style={{ marginTop: '16px' }}>
-            <IonButton expand="block" disabled={submitting} onClick={handleSubmit}>
-              {submitting ? 'Creating...' : 'Create'}
-            </IonButton>
+    <PermissionGate allow="chat.create" fallback={<Redirect to="/chats" />}>
+      <div className="ion-page">
+        <IonHeader>
+          <IonToolbar>
+            <IonButtons slot="start">{backAction && <BackButton action={backAction} />}</IonButtons>
+            <IonTitle>New Chat</IonTitle>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent>
+          <div style={{ padding: '16px' }}>
+            <IonList>
+              <IonItem>
+                <IonLabel position="stacked">Chat name</IonLabel>
+                <IonInput
+                  type="text"
+                  placeholder="Optional"
+                  value={name}
+                  onIonInput={(e) => setName(e.detail.value ?? '')}
+                  clearInput
+                />
+              </IonItem>
+            </IonList>
+            <div style={{ marginTop: '16px' }}>
+              <IonButton expand="block" disabled={submitting} onClick={handleSubmit}>
+                {submitting ? 'Creating...' : 'Create'}
+              </IonButton>
+            </div>
           </div>
-        </div>
-      </IonContent>
-    </div>
+        </IonContent>
+      </div>
+    </PermissionGate>
   );
 }
 

@@ -17,6 +17,7 @@ export interface User {
   avatarUrl?: string | null;
   gender: number;
   stickerPackOrder?: StickerPackOrderItem[];
+  permissions?: string[];
 }
 
 export const usersApi = {
