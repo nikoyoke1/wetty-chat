@@ -48,6 +48,7 @@ import {
 } from '@/api/messages';
 import {
   selectChatLastReadMessageId,
+  selectChatMeta,
   selectChatName,
   selectIsChatMuted,
   setChatLastReadMessageId,
@@ -87,7 +88,7 @@ import { UserProfileModal } from '@/components/chat/profiles/UserProfileModal';
 import { MessageOverlay, type MessageOverlayAction } from '@/components/chat/messages/MessageOverlay';
 import { ReactionDetailsModal } from '@/components/chat/reactions/ReactionDetailsModal';
 import { StickerPreviewModal } from '@/components/chat/compose/StickerPreviewModal';
-import { getGroupInfo } from '@/api/group';
+import { getGroupInfo, type GroupRole } from '@/api/group';
 import { BackButton } from '@/components/BackButton';
 import type { BackAction } from '@/types/back-action';
 import { requestUploadUrl, uploadFileToS3 } from '@/api/upload';
@@ -185,6 +186,10 @@ interface EditSession extends EditingMessage {
   originalMessage: MessageResponse;
 }
 
+function hasLoadedThreadChatMeta(cachedMeta?: { name?: string | null; myRole?: GroupRole | null }) {
+  return cachedMeta?.name != null && cachedMeta.myRole !== undefined;
+}
+
 function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
   const storeChatId = threadId ? `${chatId}_thread_${threadId}` : chatId;
   const history = useHistory();
@@ -198,6 +203,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
   const wsConnected = useSelector((state: RootState) => state.connection.wsConnected);
   const isDesktop = useIsDesktop();
   const hasPointerDevice = useMouseDetected();
+  const cachedMeta = useSelector((state: RootState) => selectChatMeta(state, chatId));
   const { role: myRole } = useChatRole(chatId);
   const isAdmin = myRole === 'admin';
   const storedName = useSelector((state: RootState) => selectChatName(state, chatId));
@@ -214,7 +220,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
   const chatName = threadId ? t`Thread` : (storedName ?? t`Loading...`);
 
   useEffect(() => {
-    if (!chatId || (storedName != null && myRole !== undefined)) return;
+    if (!chatId || hasLoadedThreadChatMeta(cachedMeta)) return;
     getGroupInfo(chatId)
       .then((res) => {
         const { id, mutedUntil, ...meta } = res.data;
@@ -223,7 +229,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         dispatch(setChatMutedUntil({ chatId, mutedUntil: mutedUntil ?? null }));
       })
       .catch(() => {});
-  }, [chatId, storedName, myRole, dispatch]);
+  }, [chatId, cachedMeta, dispatch]);
   const messages = useSelector((state: RootState) => selectMessagesForChat(state, storeChatId));
   const messageLookup = useMemo(() => new Map(messages.map((message) => [message.id, message])), [messages]);
 
