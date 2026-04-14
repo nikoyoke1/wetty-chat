@@ -57,7 +57,6 @@ class UnreadBadgeNotifier extends Notifier<UnreadBadgeState> {
   Timer? _reconcileTimer;
   bool _isDisposed = false;
   bool _isWritingNativeBadge = false;
-  int? _lastSyncedNativeBadgeCount;
 
   ChatApiService get _chatApi => ref.read(chatApiServiceProvider);
   ThreadApiService get _threadApi => ref.read(threadApiServiceProvider);
@@ -71,6 +70,7 @@ class UnreadBadgeNotifier extends Notifier<UnreadBadgeState> {
       if (!next.isAuthenticated) {
         _reconcileTimer?.cancel();
         _replaceState(const UnreadBadgeState());
+        unawaited(_syncNativeBadge(0));
         return;
       }
       if (previous?.isAuthenticated != true) {
@@ -106,13 +106,13 @@ class UnreadBadgeNotifier extends Notifier<UnreadBadgeState> {
       if (_isDisposed) {
         return;
       }
-      _replaceState(
-        state.copyWith(
-          chatUnreadTotal: chatResult.unreadCount,
-          threadUnreadTotal: threadResult.unreadThreadCount,
-          isRefreshing: false,
-        ),
+      final nextState = state.copyWith(
+        chatUnreadTotal: chatResult.unreadCount,
+        threadUnreadTotal: threadResult.unreadThreadCount,
+        isRefreshing: false,
       );
+      _replaceState(nextState);
+      await _syncNativeBadge(nextState.combinedUnreadTotal);
     } catch (error, stackTrace) {
       developer.log(
         'Failed to refresh unread badge totals: $error',
@@ -176,8 +176,7 @@ class UnreadBadgeNotifier extends Notifier<UnreadBadgeState> {
   Future<void> _syncNativeBadge(int count) async {
     if (!ref.read(authSessionProvider).isAuthenticated ||
         !_supportsNativeBadge ||
-        _isWritingNativeBadge ||
-        _lastSyncedNativeBadgeCount == count) {
+        _isWritingNativeBadge) {
       return;
     }
 
@@ -188,7 +187,6 @@ class UnreadBadgeNotifier extends Notifier<UnreadBadgeState> {
       } else {
         await _apns.setBadge(count);
       }
-      _lastSyncedNativeBadgeCount = count;
     } catch (error, stackTrace) {
       developer.log(
         'Failed to sync native badge: $error',
