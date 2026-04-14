@@ -205,6 +205,14 @@ msgstr "更換群組頭像"
 msgid "Chat {chatId}"
 msgstr "聊天 {chatId}"
 
+#: src/pages/create-chat.tsx
+msgid "Chat Details"
+msgstr "聊天詳細資料"
+
+#: src/pages/create-chat.tsx
+msgid "Chat name is required."
+msgstr "聊天名稱為必填。"
+
 #: src/layouts/DesktopSplitLayout.tsx
 #: src/layouts/MobileLayout.tsx
 #: src/pages/chats.tsx
@@ -230,14 +238,6 @@ msgstr "選擇目標群組"
 #: src/components/chat/settings/ShareInviteModal.tsx
 msgid "Choose the member group first"
 msgstr "請先選擇成員群組"
-
-#: src/pages/settings/stickers.tsx
-#~ msgid "Choose up to 5 default pinned emojis for quick reactions"
-#~ msgstr "最多選擇 5 個默認置頂表情以用於快速表態"
-
-#: src/pages/settings/stickers.tsx
-#~ msgid "Choose up to 5 emojis"
-#~ msgstr ""
 
 #: src/components/chat/settings/ShareInviteModal.tsx
 #: src/pages/chat-thread/manage-invites.tsx
@@ -301,6 +301,8 @@ msgid "Could not validate invite code"
 msgstr "無法驗證邀請碼"
 
 #: src/components/chat/compose/StickerPicker.tsx
+#: src/pages/create-chat.tsx
+#: src/pages/create-chat.tsx
 #: src/pages/settings/stickers.tsx
 msgid "Create"
 msgstr "建立"
@@ -321,6 +323,11 @@ msgstr "建立新表情包"
 #: src/components/chat/compose/StickerPicker.tsx
 msgid "Create new sticker pack"
 msgstr "建立新的表情包"
+
+#: src/pages/create-chat.tsx
+#: src/pages/create-chat.tsx
+msgid "Creating…"
+msgstr "建立中…"
 
 #: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/chat-thread.tsx
@@ -447,6 +454,10 @@ msgstr "表情和貼紙"
 msgid "Enter an invite code"
 msgstr "輸入邀請碼"
 
+#: src/pages/create-chat.tsx
+msgid "Enter chat name"
+msgstr "輸入聊天名稱"
+
 #: src/components/chat/messages/media/ImageViewer.tsx
 #: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Enter fullscreen"
@@ -465,6 +476,7 @@ msgid "Enter user ID to add:"
 msgstr "輸入要新增的使用者 ID："
 
 #: src/components/chat/lists/ChatList.tsx
+#: src/pages/create-chat.tsx
 msgid "Error"
 msgstr "錯誤"
 
@@ -493,6 +505,10 @@ msgstr "新增表情失敗"
 #: src/pages/chat-thread/manage-invites.tsx
 msgid "Failed to copy invite code"
 msgstr "複製邀請碼失敗"
+
+#: src/pages/create-chat.tsx
+msgid "Failed to create chat"
+msgstr "建立聊天失敗"
 
 #: src/components/chat/settings/ShareInviteModal.tsx
 msgid "Failed to create invite"
@@ -920,6 +936,7 @@ msgstr "靜音通知"
 #~ msgstr "我的表情包"
 
 #: src/components/chat/compose/AddStickerModal.tsx
+#: src/pages/create-chat.tsx
 msgid "Name"
 msgstr "名稱"
 
@@ -928,6 +945,10 @@ msgstr "名稱"
 #: src/pages/chat-thread/manage-invites.tsx
 msgid "Never"
 msgstr "永不"
+
+#: src/pages/create-chat.tsx
+msgid "New Chat"
+msgstr "新增聊天"
 
 #: src/components/chat/lists/ChatList.tsx
 msgid "New message"
@@ -1024,6 +1045,10 @@ msgstr "通知已靜音"
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 msgid "Notifications unmuted"
 msgstr "通知已取消靜音"
+
+#: src/pages/create-chat.tsx
+msgid "OK"
+msgstr "確定"
 
 #: src/components/chat/settings/shareInviteHelpers.ts
 msgid "Only members of a selected group can use this invite link to join."

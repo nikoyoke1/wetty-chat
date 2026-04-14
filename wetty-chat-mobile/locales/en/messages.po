@@ -229,6 +229,14 @@ msgstr "Change group photo"
 msgid "Chat {chatId}"
 msgstr "Chat {chatId}"
 
+#: src/pages/create-chat.tsx
+msgid "Chat Details"
+msgstr "Chat Details"
+
+#: src/pages/create-chat.tsx
+msgid "Chat name is required."
+msgstr "Chat name is required."
+
 #: src/layouts/DesktopSplitLayout.tsx
 #: src/layouts/MobileLayout.tsx
 #: src/pages/chats.tsx
@@ -337,6 +345,8 @@ msgid "Could not validate invite code"
 msgstr "Could not validate invite code"
 
 #: src/components/chat/compose/StickerPicker.tsx
+#: src/pages/create-chat.tsx
+#: src/pages/create-chat.tsx
 #: src/pages/settings/stickers.tsx
 msgid "Create"
 msgstr "Create"
@@ -357,6 +367,11 @@ msgstr "Create New Pack"
 #: src/components/chat/compose/StickerPicker.tsx
 msgid "Create new sticker pack"
 msgstr "Create new sticker pack"
+
+#: src/pages/create-chat.tsx
+#: src/pages/create-chat.tsx
+msgid "Creating…"
+msgstr "Creating…"
 
 #: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/chat-thread.tsx
@@ -483,6 +498,10 @@ msgstr "Emojis & Stickers"
 msgid "Enter an invite code"
 msgstr "Enter an invite code"
 
+#: src/pages/create-chat.tsx
+msgid "Enter chat name"
+msgstr "Enter chat name"
+
 #: src/components/chat/messages/media/ImageViewer.tsx
 #: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Enter fullscreen"
@@ -501,6 +520,7 @@ msgid "Enter user ID to add:"
 msgstr "Enter user ID to add:"
 
 #: src/components/chat/lists/ChatList.tsx
+#: src/pages/create-chat.tsx
 msgid "Error"
 msgstr "Error"
 
@@ -529,6 +549,10 @@ msgstr "Failed to add sticker"
 #: src/pages/chat-thread/manage-invites.tsx
 msgid "Failed to copy invite code"
 msgstr "Failed to copy invite code"
+
+#: src/pages/create-chat.tsx
+msgid "Failed to create chat"
+msgstr "Failed to create chat"
 
 #: src/components/chat/settings/ShareInviteModal.tsx
 msgid "Failed to create invite"
@@ -969,6 +993,7 @@ msgstr "Mute notifications"
 #~ msgstr "My Packs"
 
 #: src/components/chat/compose/AddStickerModal.tsx
+#: src/pages/create-chat.tsx
 msgid "Name"
 msgstr "Name"
 
@@ -977,6 +1002,10 @@ msgstr "Name"
 #: src/pages/chat-thread/manage-invites.tsx
 msgid "Never"
 msgstr "Never"
+
+#: src/pages/create-chat.tsx
+msgid "New Chat"
+msgstr "New Chat"
 
 #: src/components/chat/lists/ChatList.tsx
 msgid "New message"
@@ -1077,6 +1106,10 @@ msgstr "Notifications muted"
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 msgid "Notifications unmuted"
 msgstr "Notifications unmuted"
+
+#: src/pages/create-chat.tsx
+msgid "OK"
+msgstr "OK"
 
 #: src/components/chat/settings/shareInviteHelpers.ts
 msgid "Only members of a selected group can use this invite link to join."

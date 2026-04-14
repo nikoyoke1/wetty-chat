@@ -204,6 +204,14 @@ msgstr "更换群组头像"
 msgid "Chat {chatId}"
 msgstr "聊天 {chatId}"
 
+#: src/pages/create-chat.tsx
+msgid "Chat Details"
+msgstr "聊天详情"
+
+#: src/pages/create-chat.tsx
+msgid "Chat name is required."
+msgstr "聊天名称为必填项。"
+
 #: src/layouts/DesktopSplitLayout.tsx
 #: src/layouts/MobileLayout.tsx
 #: src/pages/chats.tsx
@@ -292,6 +300,8 @@ msgid "Could not validate invite code"
 msgstr "无法验证邀请码"
 
 #: src/components/chat/compose/StickerPicker.tsx
+#: src/pages/create-chat.tsx
+#: src/pages/create-chat.tsx
 #: src/pages/settings/stickers.tsx
 msgid "Create"
 msgstr "创建"
@@ -312,6 +322,11 @@ msgstr "创建新贴纸包"
 #: src/components/chat/compose/StickerPicker.tsx
 msgid "Create new sticker pack"
 msgstr "创建新的贴纸包"
+
+#: src/pages/create-chat.tsx
+#: src/pages/create-chat.tsx
+msgid "Creating…"
+msgstr "创建中…"
 
 #: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/chat-thread.tsx
@@ -438,6 +453,10 @@ msgstr "表情和贴纸"
 msgid "Enter an invite code"
 msgstr "输入邀请码"
 
+#: src/pages/create-chat.tsx
+msgid "Enter chat name"
+msgstr "输入聊天名称"
+
 #: src/components/chat/messages/media/ImageViewer.tsx
 #: src/components/chat/messages/media/ImageViewer.tsx
 msgid "Enter fullscreen"
@@ -456,6 +475,7 @@ msgid "Enter user ID to add:"
 msgstr "输入要添加的用户 ID："
 
 #: src/components/chat/lists/ChatList.tsx
+#: src/pages/create-chat.tsx
 msgid "Error"
 msgstr "错误"
 
@@ -484,6 +504,10 @@ msgstr "添加表情失败"
 #: src/pages/chat-thread/manage-invites.tsx
 msgid "Failed to copy invite code"
 msgstr "复制邀请码失败"
+
+#: src/pages/create-chat.tsx
+msgid "Failed to create chat"
+msgstr "创建聊天失败"
 
 #: src/components/chat/settings/ShareInviteModal.tsx
 msgid "Failed to create invite"
@@ -911,6 +935,7 @@ msgstr "静音通知"
 #~ msgstr "我的表情包"
 
 #: src/components/chat/compose/AddStickerModal.tsx
+#: src/pages/create-chat.tsx
 msgid "Name"
 msgstr "名称"
 
@@ -919,6 +944,10 @@ msgstr "名称"
 #: src/pages/chat-thread/manage-invites.tsx
 msgid "Never"
 msgstr "永不"
+
+#: src/pages/create-chat.tsx
+msgid "New Chat"
+msgstr "新建聊天"
 
 #: src/components/chat/lists/ChatList.tsx
 msgid "New message"
@@ -1015,6 +1044,10 @@ msgstr "通知已静音"
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 msgid "Notifications unmuted"
 msgstr "通知已取消静音"
+
+#: src/pages/create-chat.tsx
+msgid "OK"
+msgstr "确定"
 
 #: src/components/chat/settings/shareInviteHelpers.ts
 msgid "Only members of a selected group can use this invite link to join."
