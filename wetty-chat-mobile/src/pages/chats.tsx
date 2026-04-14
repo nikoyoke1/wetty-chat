@@ -6,10 +6,8 @@ import { ChatList } from '@/components/chat/lists/ChatList';
 import { HeaderActionMenu } from '@/components/HeaderActionMenu';
 import { useHasGlobalPermission } from '@/hooks/useHasGlobalPermission';
 import { TitleWithConnectionStatus } from '@/components/TitleWithConnectionStatus';
-import { useFeatureGate } from '@/hooks/useFeatureGate';
 
 export default function Chats() {
-  const isFeatureGateEnabled = useFeatureGate();
   const canCreateChat = useHasGlobalPermission('chat.create');
   const history = useHistory();
   const menuActions = [
@@ -18,7 +16,7 @@ export default function Chats() {
       label: <Trans>Join via Code</Trans>,
       onSelect: () => history.push('/chats/join'),
     },
-    ...(isFeatureGateEnabled && canCreateChat
+    ...(canCreateChat
       ? [
           {
             id: 'create-chat',

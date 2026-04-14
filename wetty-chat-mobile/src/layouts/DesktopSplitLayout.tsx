@@ -20,7 +20,6 @@ import type { BackAction } from '@/types/back-action';
 import type { ChatThreadRouteState } from '@/types/chatThreadNavigation';
 import styles from './DesktopSplitLayout.module.scss';
 import { HeaderActionMenu, type HeaderActionMenuItem } from '@/components/HeaderActionMenu';
-import { useFeatureGate } from '@/hooks/useFeatureGate';
 import { useHasGlobalPermission } from '@/hooks/useHasGlobalPermission';
 
 type DesktopRouteState = ChatThreadRouteState;
@@ -163,11 +162,10 @@ function ChatModal({
 export function DesktopSplitLayout() {
   const history = useHistory();
   const location = useLocation<DesktopRouteState | undefined>();
-  const isFeatureGateEnabled = useFeatureGate();
   const canCreateChat = useHasGlobalPermission('chat.create');
   const skipNextGlobalSettingsDismiss = useRef(false);
   const headerActions: HeaderActionMenuItem[] = [
-    ...(isFeatureGateEnabled && canCreateChat
+    ...(canCreateChat
       ? [
           {
             id: 'create-chat',
