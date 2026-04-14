@@ -19,6 +19,7 @@ use crate::models::{
     NewMedia, UpdateGroup,
 };
 use crate::schema::{group_membership, groups, media};
+use crate::services::authz::{Action as AuthzAction, Resource as AuthzResource};
 use crate::services::media::{build_public_object_url, build_storage_key, presign_public_upload};
 use crate::utils::ids;
 use crate::utils::{auth::CurrentUid, pagination::validate_limit};
@@ -290,6 +291,13 @@ async fn post_group(
     Json(body): Json<CreateChatBody>,
 ) -> Result<impl IntoResponse, AppError> {
     let conn = &mut *conn;
+
+    state.authz_service.require_permission(
+        conn,
+        uid,
+        AuthzAction::ChatCreate,
+        AuthzResource::Global,
+    )?;
 
     let id = ids::next_gid(state.id_gen.as_ref()).await.map_err(|e| {
         tracing::error!("ferroid next_gid: {:?}", e);

@@ -182,6 +182,26 @@ pub enum PushEnvironment {
     Production,
 }
 
+#[derive(
+    diesel_derive_enum::DbEnum, Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash,
+)]
+#[ExistingTypePath = "crate::schema::sql_types::PolicySubjectType"]
+#[serde(rename_all = "snake_case")]
+pub enum PolicySubjectType {
+    User,
+    DiscuzGroup,
+}
+
+#[derive(
+    diesel_derive_enum::DbEnum, Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash,
+)]
+#[ExistingTypePath = "crate::schema::sql_types::PermissionResourceType"]
+#[serde(rename_all = "snake_case")]
+pub enum PermissionResourceType {
+    Global,
+    Chat,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct WebPushSubscriptionData {
     pub p256dh: String,
@@ -235,6 +255,70 @@ pub struct NewGroup {
     pub avatar_image_id: Option<i64>,
     pub created_at: DateTime<Utc>,
     pub visibility: GroupVisibility,
+}
+
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]
+#[diesel(table_name = schema::policies)]
+pub struct Policy {
+    pub id: i64,
+    pub name: String,
+    pub metadata: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = schema::policies)]
+pub struct NewPolicy {
+    pub id: i64,
+    pub name: String,
+    pub metadata: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]
+#[diesel(table_name = schema::policy_permissions)]
+pub struct PolicyPermission {
+    pub id: i64,
+    pub policy_id: i64,
+    pub action: String,
+    pub resource_type: PermissionResourceType,
+    pub resource_id: Option<i64>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = schema::policy_permissions)]
+pub struct NewPolicyPermission {
+    pub id: i64,
+    pub policy_id: i64,
+    pub action: String,
+    pub resource_type: PermissionResourceType,
+    pub resource_id: Option<i64>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]
+#[diesel(table_name = schema::policy_assignments)]
+pub struct PolicyAssignment {
+    pub id: i64,
+    pub subject_type: PolicySubjectType,
+    pub subject_id: i64,
+    pub policy_id: i64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = schema::policy_assignments)]
+pub struct NewPolicyAssignment {
+    pub id: i64,
+    pub subject_type: PolicySubjectType,
+    pub subject_id: i64,
+    pub policy_id: i64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Queryable, Selectable, Serialize, Insertable)]

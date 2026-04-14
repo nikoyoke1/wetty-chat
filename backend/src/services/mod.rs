@@ -1,4 +1,5 @@
 pub mod audio_transcode;
+pub mod authz;
 pub mod background;
 pub mod chat;
 pub mod client_tracking;

@@ -26,6 +26,14 @@ pub mod sql_types {
     pub struct MessageType;
 
     #[derive(diesel::query_builder::QueryId, diesel::sql_types::SqlType)]
+    #[diesel(postgres_type(name = "permission_resource_type"))]
+    pub struct PermissionResourceType;
+
+    #[derive(diesel::query_builder::QueryId, diesel::sql_types::SqlType)]
+    #[diesel(postgres_type(name = "policy_subject_type"))]
+    pub struct PolicySubjectType;
+
+    #[derive(diesel::query_builder::QueryId, diesel::sql_types::SqlType)]
     #[diesel(postgres_type(name = "push_environment"))]
     pub struct PushEnvironment;
 
@@ -204,6 +212,44 @@ diesel::table! {
 }
 
 diesel::table! {
+    policies (id) {
+        id -> Int8,
+        name -> Text,
+        metadata -> Jsonb,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::PolicySubjectType;
+
+    policy_assignments (id) {
+        id -> Int8,
+        subject_type -> PolicySubjectType,
+        subject_id -> Int8,
+        policy_id -> Int8,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::PermissionResourceType;
+
+    policy_permissions (id) {
+        id -> Int8,
+        policy_id -> Int8,
+        action -> Text,
+        resource_type -> PermissionResourceType,
+        resource_id -> Nullable<Int8>,
+        created_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
     use diesel::sql_types::*;
     use super::sql_types::PushProvider;
     use super::sql_types::PushEnvironment;
@@ -316,6 +362,8 @@ diesel::joinable!(message_reactions -> messages (message_id));
 diesel::joinable!(messages -> stickers (sticker_id));
 diesel::joinable!(pinned_messages -> groups (chat_id));
 diesel::joinable!(pinned_messages -> messages (message_id));
+diesel::joinable!(policy_assignments -> policies (policy_id));
+diesel::joinable!(policy_permissions -> policies (policy_id));
 diesel::joinable!(sticker_pack_stickers -> sticker_packs (pack_id));
 diesel::joinable!(sticker_pack_stickers -> stickers (sticker_id));
 diesel::joinable!(stickers -> media (media_id));
@@ -337,6 +385,9 @@ diesel::allow_tables_to_appear_in_same_query!(
     message_reactions,
     messages,
     pinned_messages,
+    policies,
+    policy_assignments,
+    policy_permissions,
     push_subscriptions,
     sticker_pack_stickers,
     sticker_packs,

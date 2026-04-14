@@ -66,6 +66,7 @@ pub(crate) struct AppState {
     db: Pool<ConnectionManager<PgConnection>>,
     id_gen: Arc<utils::ids::IdGen>,
     metrics: Arc<metrics::Metrics>,
+    authz_service: Arc<services::authz::AuthorizationService>,
     ws_registry: Arc<services::ws_registry::ConnectionRegistry>,
     push_service: Arc<services::push::PushService>,
     client_tracking: Arc<services::client_tracking::ClientTrackingService>,
@@ -110,6 +111,7 @@ async fn main() {
     }
 
     let metrics = Arc::new(metrics::Metrics::new());
+    let authz_service = services::authz::AuthorizationService::start();
     let ws_registry = Arc::new(services::ws_registry::ConnectionRegistry::new(
         metrics.clone(),
     ));
@@ -165,6 +167,7 @@ async fn main() {
         db: pool.clone(),
         id_gen: Arc::new(utils::ids::new_generator()),
         metrics: metrics.clone(),
+        authz_service,
         ws_registry: ws_registry.clone(),
         push_service: services::push::PushService::start(
             pool.clone(),
