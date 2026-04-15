@@ -199,7 +199,7 @@ function ChatSettingsSession({ chatId, backAction }: { chatId: string; backActio
   const history = useHistory();
   const dispatch = useDispatch();
   const [presentToast] = useIonToast();
-  const [presentAlert] = useIonAlert();
+  const [presentAlert, dismissAlert] = useIonAlert();
   const cachedMeta = useSelector((state: RootState) => selectChatMeta(state, chatId));
   const mutedUntil = useSelector((state: RootState) => selectChatMutedUntil(state, chatId));
   const currentUserId = useSelector((state: RootState) => state.user.uid);
@@ -211,6 +211,8 @@ function ChatSettingsSession({ chatId, backAction }: { chatId: string; backActio
   const [savedMetadataState, setSavedMetadataState] = useState(() =>
     getMetadataSnapshot(getInitialFormState(cachedMeta)),
   );
+  const alertHistoryStateRef = useRef(false);
+  const alertClosedByHistoryRef = useRef(false);
   const unblockRef = useRef<null | (() => void)>(null);
   const shouldBypassPromptRef = useRef(false);
 
@@ -450,15 +452,34 @@ function ChatSettingsSession({ chatId, backAction }: { chatId: string; backActio
       return;
     }
 
+    if (!alertHistoryStateRef.current) {
+      window.history.pushState({ alertOpen: true }, '', window.location.href);
+      alertHistoryStateRef.current = true;
+    }
+
+    const handlePopState = () => {
+      if (!alertHistoryStateRef.current) {
+        return;
+      }
+
+      alertClosedByHistoryRef.current = true;
+      alertHistoryStateRef.current = false;
+      void dismissAlert();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
     presentAlert({
       header: t`Leave Group`,
       message: t`Are you sure you want to leave this group?`,
+      backdropDismiss: true,
       buttons: [
         { text: t`Cancel`, role: 'cancel' },
         {
           text: t`Leave`,
           role: 'destructive',
           handler: () => {
+            alertHistoryStateRef.current = false;
             setLeavingGroup(true);
             leaveGroup(chatId, currentUserId)
               .then(() => {
@@ -473,6 +494,19 @@ function ChatSettingsSession({ chatId, backAction }: { chatId: string; backActio
           },
         },
       ],
+      onDidDismiss: () => {
+        window.removeEventListener('popstate', handlePopState);
+
+        if (alertClosedByHistoryRef.current) {
+          alertClosedByHistoryRef.current = false;
+          return;
+        }
+
+        if (alertHistoryStateRef.current) {
+          alertHistoryStateRef.current = false;
+          window.history.back();
+        }
+      },
     });
   };
 
