@@ -347,15 +347,33 @@ async fn delete_remove_member(
         check_membership(conn, chat_id, uid)?;
     }
 
-    // Check if target is a member
+    // Check if target is a member and whether deleting it would remove the final admin.
     use crate::schema::group_membership::dsl as gm_dsl;
-    let is_member = group_membership::table
+    let target_role: Option<GroupRole> = group_membership::table
         .filter(gm_dsl::chat_id.eq(chat_id).and(gm_dsl::uid.eq(target_uid)))
-        .count()
-        .get_result::<i64>(conn)?;
+        .select(gm_dsl::role)
+        .first(conn)
+        .optional()?;
 
-    if is_member == 0 {
+    let Some(target_role) = target_role else {
         return Err(AppError::NotFound("Member not found"));
+    };
+
+    if matches!(target_role, GroupRole::Admin) {
+        let admin_count = group_membership::table
+            .filter(
+                gm_dsl::chat_id
+                    .eq(chat_id)
+                    .and(gm_dsl::role.eq(GroupRole::Admin)),
+            )
+            .count()
+            .get_result::<i64>(conn)?;
+
+        if admin_count <= 1 {
+            return Err(AppError::BadRequest(
+                "Cannot remove the last admin from the group",
+            ));
+        }
     }
 
     diesel::delete(
