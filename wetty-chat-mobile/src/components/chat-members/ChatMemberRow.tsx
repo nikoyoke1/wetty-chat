@@ -20,18 +20,10 @@ interface ChatMemberRowProps<TMember extends ChatMemberRowMember = ChatMemberRow
   role?: string | null;
 }
 
-export function ChatMemberRow<TMember extends ChatMemberRowMember>({
-  member,
-  isAdmin = false,
-  isCurrentUser = false,
-  subtitle = null,
-  endLabel = null,
-  disabled = false,
-  onSelect,
-  role = null,
-}: ChatMemberRowProps<TMember>) {
+export function ChatMemberRow<TMember extends ChatMemberRowMember>(props: ChatMemberRowProps<TMember>) {
+  const { member, subtitle = null, endLabel = null, disabled = false, onSelect, role = null } = props;
   const displayName = member.username || t`User ${member.uid}`;
-  const isClickable = !disabled && !!onSelect && isAdmin && !isCurrentUser;
+  const isClickable = !disabled && !!onSelect;
   const showRoleChip = !!role;
 
   return (

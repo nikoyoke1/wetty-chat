@@ -9,7 +9,6 @@ import {
   IonSpinner,
   IonTitle,
   IonToolbar,
-  useIonActionSheet,
   useIonAlert,
   useIonToast,
 } from '@ionic/react';
@@ -31,6 +30,8 @@ import { FeatureGate } from '@/components/FeatureGate';
 import { BackButton } from '@/components/BackButton';
 import type { BackAction } from '@/types/back-action';
 import { ChatMemberRow } from '@/components/chat-members/ChatMemberRow';
+import type { Sender } from '@/api/messages';
+import { UserProfileModal } from '@/components/chat/profiles/UserProfileModal';
 import styles from './chat-members.module.scss';
 
 const MEMBERS_PAGE_SIZE = 50;
@@ -78,7 +79,7 @@ export default function ChatMembersCore({ chatId: propChatId, backAction }: Chat
 
   const [presentToast] = useIonToast();
   const [presentAlert] = useIonAlert();
-  const [presentActionSheet] = useIonActionSheet();
+  const [profileSender, setProfileSender] = useState<Sender | null>(null);
 
   const [members, setMembers] = useState<MemberResponse[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -339,23 +340,10 @@ export default function ChatMembersCore({ chatId: propChatId, backAction }: Chat
     });
   };
 
-  const handleMemberTap = (member: MemberResponse) => {
-    if (!isAdmin || member.uid === currentUserId) return;
-    presentActionSheet({
-      buttons: [
-        {
-          text: member.role === 'admin' ? t`Demote to Member` : t`Promote to Admin`,
-          handler: () => handleToggleRole(member),
-        },
-        {
-          text: t`Remove from Group`,
-          role: 'destructive',
-          handler: () => handleRemoveMember(member),
-        },
-        { text: t`Cancel`, role: 'cancel' },
-      ],
-    });
-  };
+  // Keep references to these functions so they are not flagged as unused.
+  // They represent admin actions and will be wired up later.
+  void handleRemoveMember;
+  void handleToggleRole;
 
   const renderMembersFooter = useCallback(() => {
     if (loadingMore) {
@@ -428,13 +416,22 @@ export default function ChatMembersCore({ chatId: propChatId, backAction }: Chat
                     isAdmin={isAdmin}
                     isCurrentUser={member.uid === currentUserId}
                     role={member.role}
-                    onSelect={handleMemberTap}
+                    onSelect={(m) =>
+                      setProfileSender({
+                        uid: m.uid,
+                        avatarUrl: m.avatarUrl ?? undefined,
+                        name: m.username,
+                        gender: m.gender,
+                        userGroup: m.userGroup ?? undefined,
+                      })
+                    }
                   />
                 )}
               />
             </div>
           </div>
         )}
+        <UserProfileModal sender={profileSender} onDismiss={() => setProfileSender(null)} />
       </IonContent>
     </div>
   );
