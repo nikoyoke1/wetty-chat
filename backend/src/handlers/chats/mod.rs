@@ -1377,9 +1377,12 @@ async fn mark_as_read(
 #[derive(serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MarkAsUnreadBody {
-    #[serde(deserialize_with = "crate::serde_i64_string::deserialize")]
-    #[schema(value_type = String)]
-    message_id: i64,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde_i64_string::opt::deserialize"
+    )]
+    #[schema(value_type = Option<String>)]
+    message_id: Option<i64>,
 }
 
 /// POST /chats/:chat_id/unread — Mark a chat as unread by rewinding the read pointer.
@@ -1406,7 +1409,7 @@ async fn mark_as_unread(
 
     check_membership(conn, chat_id, uid)?;
 
-    let explicit_id = body.map(|Json(b)| b.message_id);
+    let explicit_id = body.map(|Json(b)| b.message_id).flatten();
 
     let (new_read_id, unread_count) = if let Some(message_id) = explicit_id {
         use crate::schema::group_membership::dsl as gm_dsl;
