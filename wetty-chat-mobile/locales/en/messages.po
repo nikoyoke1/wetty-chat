@@ -120,6 +120,17 @@ msgstr "Already in this chat"
 msgid "Anyone with this invite link can use it until it expires or is revoked."
 msgstr "Anyone with this invite link can use it until it expires or is revoked."
 
+#: src/components/chat/lists/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
+msgid "Archive"
+msgstr "Archive"
+
+#: src/components/chat/lists/ChatList.tsx
+#: src/layouts/DesktopSplitLayout.tsx
+#: src/pages/archived.tsx
+msgid "Archived"
+msgstr "Archived"
+
 #. placeholder {0}: msg.sender.name ?? 'this user'
 #: src/pages/chat-thread/chat-thread.tsx
 msgid "Are you sure you want to delete this message from {0}?"
@@ -193,12 +204,14 @@ msgstr "Blocked"
 #: src/components/chat/pins/PinBanner.tsx
 #: src/components/chat/pins/PinListModal.tsx
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
+#: src/components/chat/settings/ChatMuteSettingItem.tsx
 #: src/components/chat/settings/ShareInviteModal.tsx
 #: src/pages/chat-thread/chat-members.tsx
 #: src/pages/chat-thread/chat-members.tsx
 #: src/pages/chat-thread/chat-members.tsx
 #: src/pages/chat-thread/chat-members.tsx
 #: src/pages/chat-thread/chat-settings.tsx
+#: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/manage-invites.tsx
@@ -315,6 +328,8 @@ msgstr "Close viewer"
 msgid "Code"
 msgstr "Code"
 
+#: src/components/chat/settings/ChatMuteSettingItem.tsx
+#: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/join-chat.tsx
 #: src/pages/join-chat.tsx
 msgid "Continue"
@@ -710,6 +725,7 @@ msgid "Failed to turn on push notifications"
 msgstr "Failed to turn on push notifications"
 
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
+#: src/components/chat/settings/ChatMuteSettingItem.tsx
 msgid "Failed to unmute"
 msgstr "Failed to unmute"
 
@@ -1054,6 +1070,18 @@ msgid "No active invite links created by you."
 msgstr "No active invite links created by you."
 
 #: src/components/chat/lists/ChatList.tsx
+msgid "No archived chats"
+msgstr "No archived chats"
+
+#: src/components/chat/lists/ChatList.tsx
+msgid "No archived conversations"
+msgstr "No archived conversations"
+
+#: src/components/chat/lists/ChatList.tsx
+msgid "No archived threads"
+msgstr "No archived threads"
+
+#: src/components/chat/lists/ChatList.tsx
 #: src/components/chat/lists/ChatList.tsx
 msgid "No chats yet"
 msgstr "No chats yet"
@@ -1111,6 +1139,8 @@ msgstr "No stickers"
 #~ msgid "No subscribed packs"
 #~ msgstr "No subscribed packs"
 
+#: src/components/chat/lists/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
 #: src/pages/threads.tsx
 msgid "No threads yet"
 msgstr "No threads yet"
@@ -1132,6 +1162,7 @@ msgstr "Notification permission was not granted"
 msgid "Notifications muted"
 msgstr "Notifications muted"
 
+#: src/components/chat/settings/ChatMuteSettingItem.tsx
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 msgid "Notifications unmuted"
 msgstr "Notifications unmuted"
@@ -1584,6 +1615,10 @@ msgid "This is how your messages will look in chat."
 msgstr "This is how your messages will look in chat."
 
 #: src/pages/chat-thread/chat-thread.tsx
+msgid "This thread will move back to Threads. Continue?"
+msgstr "This thread will move back to Threads. Continue?"
+
+#: src/pages/chat-thread/chat-thread.tsx
 msgid "Thread"
 msgstr "Thread"
 
@@ -1626,6 +1661,23 @@ msgstr "Turn On Push Notifications"
 #: src/components/member-selector/MemberSelector.tsx
 msgid "UID {0}"
 msgstr "UID {0}"
+
+#: src/components/chat/lists/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
+msgid "Unarchive"
+msgstr "Unarchive"
+
+#: src/components/chat/settings/ChatMuteSettingItem.tsx
+msgid "Unarchive chat?"
+msgstr "Unarchive chat?"
+
+#: src/pages/chat-thread/chat-thread.tsx
+msgid "Unarchive thread?"
+msgstr "Unarchive thread?"
+
+#: src/components/chat/settings/ChatMuteSettingItem.tsx
+msgid "Unmuting will unarchive this chat. Continue?"
+msgstr "Unmuting will unarchive this chat. Continue?"
 
 #: src/components/chat/pins/PinBanner.tsx
 #: src/components/chat/pins/PinBanner.tsx
@@ -1721,6 +1773,10 @@ msgstr "User ID"
 #: src/components/chat/pins/PinBanner.tsx
 msgid "View all pinned messages"
 msgstr "View all pinned messages"
+
+#: src/components/chat/lists/ChatList.tsx
+msgid "View archived chats and threads"
+msgstr "View archived chats and threads"
 
 #. placeholder {0}: index + 1
 #: src/components/chat/messages/media/ImageViewer.tsx

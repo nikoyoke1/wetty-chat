@@ -90,11 +90,22 @@ msgstr "已允許"
 
 #: src/components/member-selector/MemberSelector.tsx
 msgid "Already in this chat"
-msgstr ""
+msgstr "已在此聊天中"
 
 #: src/components/chat/settings/shareInviteHelpers.ts
 msgid "Anyone with this invite link can use it until it expires or is revoked."
 msgstr "任何持有此邀請連結的人都可以在連結到期或被撤銷前使用它。"
+
+#: src/components/chat/lists/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
+msgid "Archive"
+msgstr "封存"
+
+#: src/components/chat/lists/ChatList.tsx
+#: src/layouts/DesktopSplitLayout.tsx
+#: src/pages/archived.tsx
+msgid "Archived"
+msgstr "已封存"
 
 #. placeholder {0}: msg.sender.name ?? 'this user'
 #: src/pages/chat-thread/chat-thread.tsx
@@ -169,12 +180,14 @@ msgstr "已封鎖"
 #: src/components/chat/pins/PinBanner.tsx
 #: src/components/chat/pins/PinListModal.tsx
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
+#: src/components/chat/settings/ChatMuteSettingItem.tsx
 #: src/components/chat/settings/ShareInviteModal.tsx
 #: src/pages/chat-thread/chat-members.tsx
 #: src/pages/chat-thread/chat-members.tsx
 #: src/pages/chat-thread/chat-members.tsx
 #: src/pages/chat-thread/chat-members.tsx
 #: src/pages/chat-thread/chat-settings.tsx
+#: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/chat-thread/manage-invites.tsx
@@ -271,6 +284,8 @@ msgstr "關閉檢視器"
 msgid "Code"
 msgstr "邀請碼"
 
+#: src/components/chat/settings/ChatMuteSettingItem.tsx
+#: src/pages/chat-thread/chat-thread.tsx
 #: src/pages/join-chat.tsx
 #: src/pages/join-chat.tsx
 msgid "Continue"
@@ -666,6 +681,7 @@ msgid "Failed to turn on push notifications"
 msgstr "開啟推播通知失敗"
 
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
+#: src/components/chat/settings/ChatMuteSettingItem.tsx
 msgid "Failed to unmute"
 msgstr "取消靜音失敗"
 
@@ -997,6 +1013,18 @@ msgid "No active invite links created by you."
 msgstr "你建立的有效邀請連結為空。"
 
 #: src/components/chat/lists/ChatList.tsx
+msgid "No archived chats"
+msgstr "沒有已封存聊天"
+
+#: src/components/chat/lists/ChatList.tsx
+msgid "No archived conversations"
+msgstr "沒有已封存對話"
+
+#: src/components/chat/lists/ChatList.tsx
+msgid "No archived threads"
+msgstr "沒有已封存話題"
+
+#: src/components/chat/lists/ChatList.tsx
 #: src/components/chat/lists/ChatList.tsx
 msgid "No chats yet"
 msgstr "暫無聊天"
@@ -1050,6 +1078,8 @@ msgstr "沒有貼紙"
 #~ msgid "No subscribed packs"
 #~ msgstr "沒有已訂閱的表情包"
 
+#: src/components/chat/lists/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
 #: src/pages/threads.tsx
 msgid "No threads yet"
 msgstr "尚無話題"
@@ -1071,6 +1101,7 @@ msgstr "未授予通知權限"
 msgid "Notifications muted"
 msgstr "通知已靜音"
 
+#: src/components/chat/settings/ChatMuteSettingItem.tsx
 #: src/components/chat/settings/ChatMuteSettingItem.tsx
 msgid "Notifications unmuted"
 msgstr "通知已取消靜音"
@@ -1519,6 +1550,10 @@ msgid "This is how your messages will look in chat."
 msgstr "這是你的訊息在聊天中的顯示效果。"
 
 #: src/pages/chat-thread/chat-thread.tsx
+msgid "This thread will move back to Threads. Continue?"
+msgstr "此話題將移回話題列表。要繼續嗎？"
+
+#: src/pages/chat-thread/chat-thread.tsx
 msgid "Thread"
 msgstr "話題"
 
@@ -1553,6 +1588,23 @@ msgstr "開啟推播通知"
 #: src/components/member-selector/MemberSelector.tsx
 msgid "UID {0}"
 msgstr "UID {0}"
+
+#: src/components/chat/lists/ChatList.tsx
+#: src/components/chat/lists/ChatList.tsx
+msgid "Unarchive"
+msgstr "取消封存"
+
+#: src/components/chat/settings/ChatMuteSettingItem.tsx
+msgid "Unarchive chat?"
+msgstr "取消封存聊天？"
+
+#: src/pages/chat-thread/chat-thread.tsx
+msgid "Unarchive thread?"
+msgstr "取消封存話題？"
+
+#: src/components/chat/settings/ChatMuteSettingItem.tsx
+msgid "Unmuting will unarchive this chat. Continue?"
+msgstr "取消靜音將同時取消封存此聊天。要繼續嗎？"
 
 #: src/components/chat/pins/PinBanner.tsx
 #: src/components/chat/pins/PinBanner.tsx
@@ -1648,6 +1700,10 @@ msgstr "使用者 ID"
 #: src/components/chat/pins/PinBanner.tsx
 msgid "View all pinned messages"
 msgstr "查看所有已釘選的訊息"
+
+#: src/components/chat/lists/ChatList.tsx
+msgid "View archived chats and threads"
+msgstr "查看已封存聊天和話題"
 
 #. placeholder {0}: index + 1
 #: src/components/chat/messages/media/ImageViewer.tsx

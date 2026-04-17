@@ -105,16 +105,15 @@ import { parseResumeHash } from '@/types/chatThreadNavigation';
 import { getUploadMimeType } from '@/utils/heicMedia';
 import { READ_REQUEST_COOLDOWN_MS } from '@/constants/chatTiming';
 import {
+  archiveThread,
   markThreadAsRead as apiMarkThreadAsRead,
   getThreadSubscriptionStatus,
   getThreads,
   subscribeToThread,
   unarchiveThread,
-  unsubscribeFromThread,
 } from '@/api/threads';
 import {
   markThreadRead as markThreadReadAction,
-  removeThread,
   selectThreadArchivedStatus,
   selectThreadSubscriptionStatus,
   setThreadSubscriptionStatus,
@@ -376,7 +375,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
     if (threadArchived) {
       presentAlert({
         header: t`Unarchive thread?`,
-        message: t`Unmuting will move this thread back to Threads. Continue?`,
+        message: t`This thread will move back to Threads. Continue?`,
         buttons: [
           { text: t`Cancel`, role: 'cancel' },
           {
@@ -401,13 +400,14 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
     setThreadSubLoading(true);
     try {
       if (threadSubscribed) {
-        await unsubscribeFromThread(chatId, threadId);
-        setThreadSubscribed(false);
-        dispatch(setThreadSubscriptionStatus({ threadRootId: threadId, subscribed: false, archived: false }));
-        dispatch(removeThread({ threadRootId: threadId }));
+        await archiveThread(chatId, threadId);
+        setThreadSubscribed(true);
+        setThreadArchived(true);
+        dispatch(setThreadSubscriptionStatus({ threadRootId: threadId, subscribed: true, archived: true }));
       } else {
         await subscribeToThread(chatId, threadId);
         setThreadSubscribed(true);
+        setThreadArchived(false);
         dispatch(setThreadSubscriptionStatus({ threadRootId: threadId, subscribed: true, archived: false }));
         // Refresh threads list so the newly subscribed thread appears
         getThreads()
@@ -417,7 +417,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
           .catch(() => {});
       }
     } catch (err) {
-      console.error('Failed to toggle thread subscription', err);
+      console.error('Failed to toggle thread archive state', err);
     } finally {
       setThreadSubLoading(false);
     }
