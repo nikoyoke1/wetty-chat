@@ -13,9 +13,9 @@ import { useComposeAttachments } from './useComposeAttachments';
 import { useVoiceRecorder } from './useVoiceRecorder';
 import { useMentionAutocomplete } from './useMentionAutocomplete';
 import { MentionAutocomplete } from './MentionAutocomplete';
-import { isSupportedMediaFile } from '@/utils/heicMedia';
 import type { StickerSummary } from '@/api/stickers';
 import type { ComposeSendPayload, ComposeUploadInput, ComposeUploadResult, EditingMessage, ReplyTo } from './types';
+import { isSupportedMediaFile } from '@/utils/heicMedia';
 export type {
   ComposeSendAudioPayload,
   ComposeSendPayload,
