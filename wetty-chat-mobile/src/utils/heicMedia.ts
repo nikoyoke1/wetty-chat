@@ -40,7 +40,10 @@ export function isSupportedMediaFile(file: File) {
 }
 
 function isLikelySafariUserAgent(userAgent: string) {
-  return /Safari\//.test(userAgent) && !/(Chrome|Chromium|CriOS|Edg|EdgiOS|OPR|FxiOS|Firefox|SamsungBrowser)\//.test(userAgent);
+  return (
+    /Safari\//.test(userAgent) &&
+    !/(Chrome|Chromium|CriOS|Edg|EdgiOS|OPR|FxiOS|Firefox|SamsungBrowser)\//.test(userAgent)
+  );
 }
 
 function parseSafariMajorVersion(userAgent: string) {

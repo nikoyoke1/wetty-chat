@@ -7,8 +7,7 @@ interface DisplayableImageProps extends ImgHTMLAttributes<HTMLImageElement> {
   fileName?: string | null;
 }
 
-const TRANSPARENT_PIXEL =
-  'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+const TRANSPARENT_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
 
 export function DisplayableImage({ src, mimeType, fileName, onError, ...imgProps }: DisplayableImageProps) {
   return (
@@ -76,5 +75,12 @@ function DisplayableImageInner({ src, mimeType, fileName, onError, ...imgProps }
     };
   }, [displaySrc, src]);
 
-  return <img {...imgProps} src={displaySrc} onError={handleError} style={{ opacity: isResolving ? 0 : 1, ...imgProps.style }} />;
+  return (
+    <img
+      {...imgProps}
+      src={displaySrc}
+      onError={handleError}
+      style={{ opacity: isResolving ? 0 : 1, ...imgProps.style }}
+    />
+  );
 }
